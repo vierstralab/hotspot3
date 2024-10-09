@@ -164,7 +164,7 @@ class ChromosomeProcessor:
             'log10_pval': log_pvals.filled(np.nan),
             'sliding_mean': sliding_mean.filled(np.nan),
             'sliding_variance': sliding_variance.filled(np.nan),
-            'start': np.arange(self.chrom_size)
+            'start': np.arange(self.chrom_size, np.uint32),
         })
         data_df['#chr'] = self.chrom_name
 
@@ -213,8 +213,8 @@ class ChromosomeProcessor:
             bg_sum = np.sum(compressed_cutcounts)
             bg_sum_sq = np.sum(compressed_cutcounts * compressed_cutcounts)
 
-        sliding_mean = bg_sum / bg_sum_mappable
-        sliding_variance = (bg_sum_sq - bg_sum * sliding_mean) / (bg_sum_mappable - 1)
+        sliding_mean = (bg_sum / bg_sum_mappable).astype(np.float32)
+        sliding_variance = ((bg_sum_sq - bg_sum * sliding_mean) / (bg_sum_mappable - 1)).astype(np.float32)
 
         return sliding_mean, sliding_variance
     
@@ -248,7 +248,6 @@ class ChromosomeProcessor:
         )
         
 
-
 def negbin_neglog10pvalue(x, r, p):
     x = ma.asarray(x)
     r = ma.asarray(r)
@@ -260,7 +259,7 @@ def negbin_neglog10pvalue(x, r, p):
         resulting_mask = reduce(ma.mask_or, [x.mask, r.mask, p.mask])
         r = r[~resulting_mask]
         p = p[~resulting_mask]
-    result = ma.masked_where(resulting_mask, np.zeros(x.shape))
+    result = ma.masked_where(resulting_mask, np.zeros(x.shape, dtype=np.float32))
     result[~resulting_mask] = -st.nbinom.logsf(x[~resulting_mask] - 1, r, 1 - p) / np.log(10)
     return result
 
