@@ -29,7 +29,7 @@ class GenomeProcessor:
     """
     Base class to run hotspot2 on a whole genome
     """
-    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.uint32, fdr_method='fdr_bh', cpus=3) -> None:
+    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.uint32, fdr_method='fdr_bh', cpus=1) -> None:
         self.chrom_sizes = chrom_sizes
         self.mappable_bases_file = mappable_bases_file
         self.min_mappable_bg = min_mappable_bg
@@ -87,6 +87,7 @@ class ChromosomeProcessor:
 
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
         cutcounts = self.extract_cutcounts(cutcounts_file)
+        print('Extracted cutcounts for chromosome', self.chrom_name)
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
