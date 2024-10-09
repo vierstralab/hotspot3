@@ -104,8 +104,12 @@ class ChromosomeProcessor:
         })
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
-    def read_tabix(self, cutcounts_file):
-        with TabixExtractor(cutcounts_file) as cutcounts_loader:
+    def extract_cutcounts(self, cutcounts_file):
+        # FIXME extract straight from bam
+        with TabixExtractor(
+            cutcounts_file, 
+            columns=['#chr', 'start', 'end', 'id', 'cutcounts']
+        ) as cutcounts_loader:
             cutcounts = cutcounts_loader[self.genomic_interval]
             assert cutcounts.shape[0] == self.chrom_size, "Cutcounts file does not match chromosome sizes"
         return cutcounts
@@ -143,8 +147,11 @@ class ChromosomeProcessor:
         if mappable_file is None:
             mappable = np.ones(self.chrom_size, dtype=bool)
         else:
-            with TabixExtractor(mappable_file) as mappable_loader:
-                mappable = mappable_loader[self.genomic_interval]
+            with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
+                for _, row in mappable_loader[self.genomic_interval].iterrows():
+                    if row['end'] > self.genomic_interval.end:
+                        raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end}")
+                    mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = 1
                 assert mappable.shape[0] == self.chrom_size, "Mappable bases file does not match chromosome sizes"
         return ma.masked_where(~mappable, mappable)
     
