@@ -292,5 +292,6 @@ if __name__ == "__main__":
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
     result, params = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
+    root_logger.debug('Saving results')
     result.to_parquet(sys.argv[5])
     params.to_csv(sys.argv[5] + '.params', sep='\t', header=True)
