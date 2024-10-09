@@ -26,7 +26,7 @@ class GenomeProcessor:
     Base class to run hotspot2 on a whole genome
     """
     def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.uint32, fdr_method='fdr_bh', cpus=1) -> None:
-        self.chrom_sizes = self.read_chrom_sizes(chrom_sizes)
+        self.chrom_sizes = chrom_sizes
         self.mappable_bases_file = mappable_bases_file
         self.min_mappable_bg = min_mappable_bg
 
@@ -62,14 +62,6 @@ class GenomeProcessor:
         fdr[pval_list.mask] = np.nan
         fdr[~pval_list.mask] = multipletests(pval_list.compressed(), method=self.fdr_method)[1]
         return fdr
-
-    @staticmethod
-    def read_chrom_sizes(chrom_sizes):
-        return pd.read_table(
-            chrom_sizes,
-            header=None,
-            names=['chrom', 'size']
-        ).set_index('chrom')['size'].to_dict()
 
 
 class ChromosomeProcessor:
@@ -203,6 +195,14 @@ def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None):
     return result
 
 
+def read_chrom_sizes(chrom_sizes):
+    return pd.read_table(
+        chrom_sizes,
+        header=None,
+        names=['chrom', 'size']
+    ).set_index('chrom')['size'].to_dict()
+
+
 def main(cutcounts, chrom_sizes, mappable_bases_file):
     # TODO add parser here
     genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file)
@@ -211,6 +211,6 @@ def main(cutcounts, chrom_sizes, mappable_bases_file):
 
 if __name__ == "__main__":
     cutcounts = sys.argv[1]
-    chrom_sizes = sys.argv[2]
+    chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
-    main()
+    main(cutcounts, chrom_sizes, mappable_bases_file)
