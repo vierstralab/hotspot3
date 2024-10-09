@@ -280,7 +280,7 @@ def read_chrom_sizes(chrom_sizes):
 
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
-    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus, chromosomes=['chr19', 'chr20', 'chr21'])
+    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus)
     root_logger.debug('Calling peaks')
     return genome_processor.call_peaks(cutcounts)
 
