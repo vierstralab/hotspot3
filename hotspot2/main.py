@@ -133,6 +133,7 @@ class ChromosomeProcessor:
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
+        logger.info(f'Extracting cutcounts for chromosome {self.chrom_name}')
         with TabixExtractor(
             cutcounts_file, 
             columns=['#chr', 'start', 'end', 'id', 'cutcounts']
