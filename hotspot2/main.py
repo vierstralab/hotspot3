@@ -178,12 +178,13 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
+        data_path = f'{self.chrom_name}.parquet'
         data_df.to_parquet(
-            f'{self.chrom_name}.parquet',
+            data_path,
             compression='zstd',
             index=False
         )
-        return PeakCallingData(self.chrom_name, data_df, params_df)
+        return PeakCallingData(self.chrom_name, data_path, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
         with TabixExtractor(
