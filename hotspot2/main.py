@@ -132,7 +132,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
-        self.gp.logger.debug(f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts_masked.count()}/{agg_cutcounts_masked.shape} bases are mappable")
+        self.gp.logger.debug(f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts_masked.count()}/{agg_cutcounts_masked.shape[0]} bases are mappable")
 
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr:1f} for {self.chrom_name}')
