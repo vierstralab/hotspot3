@@ -134,7 +134,7 @@ class GenomeProcessor:
         not_nan = ~np.isnan(pval_list)
         fdr[~not_nan] = np.nan
         fdr[not_nan] = multipletests(np.power(10, -pval_list[not_nan]), method=self.fdr_method)[1]
-        return fdr
+        return fdr.astype(np.float32)
 
 
 class ChromosomeProcessor:
@@ -279,7 +279,7 @@ def negbin_neglog10pvalue(x, r, p):
         p = p[~resulting_mask]
     result = ma.masked_where(resulting_mask, np.zeros(x.shape, dtype=np.float32))
     result[~resulting_mask] = -st.nbinom.logsf(x[~resulting_mask] - 1, r, 1 - p) / np.log(10)
-    return result
+    return result.astype(np.float32)
 
 
 def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None):
