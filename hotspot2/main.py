@@ -189,7 +189,7 @@ class ChromosomeProcessor:
                 position_skip_mask=high_signal_mask
             )
             bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
-            
+            self.gp.logger.debug(f"{self.bg_sum_mappable.count()}/{self.bg_sum_mappable.shape} bases are mappable")
             bg_sum = self.smooth_counts(agg_cutcounts, self.gp.bg_window, position_skip_mask=high_signal_mask)
             bg_sum_sq = self.smooth_counts(
                 agg_cutcounts * agg_cutcounts,
