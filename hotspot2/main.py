@@ -4,7 +4,7 @@ import numpy.ma as ma
 from scipy.signal import convolve
 import scipy.stats as st
 from functools import reduce
-from concurrent.futures import ProcessPoolExecutor as PoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor
 import multiprocessing as mp
@@ -100,11 +100,10 @@ class GenomeProcessor:
     
         else:
             self.logger.debug(f'Using {self.cpus} CPUs')
-            ctx = mp.get_context("forkserver")
-            with ctx.Pool(self.cpus) as executor:
-                results = executor.starmap(
-                    ChromosomeProcessor.calc_pvals,
-                    [(cp, cutcounts_file) for cp in sorted_processors])
+            with ProcessPoolExecutor(max_workers=self.cpus) as executor:
+                results = executor.map(
+                    ChromosomeProcessor.calc_pvals, sorted_processors, [cutcounts_file] * len(sorted_processors)
+                )
 
         self.restore_logger()
         self.logger.debug('Concatenating results')
