@@ -109,7 +109,7 @@ class GenomeProcessor:
 
         self.restore_logger()
         self.logger.debug('Concatenating results')
-        data_df = pd.concat([result.data_df for result in results])
+        data_df = dd.concat([result.data_df for result in results])
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
         params_df = pd.concat([result.params_df for result in results])
