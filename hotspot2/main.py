@@ -87,9 +87,10 @@ class GenomeProcessor:
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         self.logger.debug(f'Using {self.cpus} CPUs')
+        sorted_processors = sorted(self.chromosome_processors, key=lambda x: x.chrom_size)
         if self.cpus == 1:
             result = []
-            for chrom_processor in self.chromosome_processors:
+            for chrom_processor in sorted_processors:
                 res = chrom_processor.calc_pvals(cutcounts_file)
                 result.append(res)
     
@@ -98,7 +99,7 @@ class GenomeProcessor:
             with ctx.Pool(self.cpus) as executor:
                 results = executor.starmap(
                     ChromosomeProcessor.calc_pvals,
-                    [(cp, cutcounts_file) for cp in self.chromosome_processors])
+                    [(cp, cutcounts_file) for cp in sorted_processors])
 
         self.restore_logger()
         self.logger.debug('Concatenating results')
