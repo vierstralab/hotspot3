@@ -114,7 +114,7 @@ class GenomeProcessor:
         data_df, params_df = self.merge_dfs(results)
         self.logger.debug('Results concatenated. Calculating FDR')
         
-        data_df['log10_fdr'] = self.calc_fdr(data_df['log10_pval'])
+        data_df['log10_fdr'] = self.calc_log10fdr(data_df['log10_pval'])
 
         result_columns = ['#chr', 'log10_fdr']
         if self.save_debug:
@@ -137,8 +137,8 @@ class GenomeProcessor:
             data.append(df)
         return pd.concat(data, ignore_index=True), pd.concat(params, ignore_index=True)
 
-    def calc_fdr(self, pval_list):
-        log_fdr = np.empty(pval_list.shape)
+    def calc_log10fdr(self, pval_list):
+        log_fdr = np.empty(pval_list.shape, dtype=np.float32)
         not_nan = ~np.isnan(pval_list)
         log_fdr[~not_nan] = np.nan
         log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -pval_list[not_nan]), method=self.fdr_method)[1])
