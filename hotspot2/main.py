@@ -85,7 +85,7 @@ class GenomeProcessor:
             except NoContigPresentError:
                 continue
         
-    def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def call_hotspots(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         self.logger.debug(f'Using {self.cpus} CPUs')
         sorted_processors = sorted(
             self.chromosome_processors,
@@ -286,8 +286,8 @@ def read_chrom_sizes(chrom_sizes):
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
     genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus)
-    root_logger.debug('Calling peaks')
-    return genome_processor.call_peaks(cutcounts)
+    root_logger.debug('Calling hotspots')
+    return genome_processor.call_hotspots(cutcounts)
 
 
 if __name__ == "__main__":
