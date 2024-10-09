@@ -98,10 +98,9 @@ class ChromosomeProcessor:
         self.mappable_bases = self.get_mappable_bases(self.gp.mappable_bases_file)
 
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
-        logger = mp.get_logger()
-        logger.info(f'Extracting cutcounts for chromosome {self.chrom_name}')
+        print(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
-        logger.info(f'Extracted cutcounts for chromosome {self.chrom_name}')
+        print(f'Extracted cutcounts for chromosome {self.chrom_name}')
         
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
@@ -120,7 +119,7 @@ class ChromosomeProcessor:
         }).reset_index(names='start')
         data_df['#chr'] = self.chrom_name
 
-        logger.info(f"Chromosome {self.chrom_name} initial fit done")
+        print(f"Chromosome {self.chrom_name} initial fit done")
 
         m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
 
@@ -131,7 +130,7 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        logger.info(f"Chromosome {self.chrom_name} initial fit finished")
+        print(f"Chromosome {self.chrom_name} initial fit finished")
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
