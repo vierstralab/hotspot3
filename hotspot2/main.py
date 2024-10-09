@@ -116,7 +116,7 @@ class GenomeProcessor:
         
         data_df['log10_fdr'] = self.calc_fdr(data_df['log10_pval'])
 
-        result_columns = ['#chr', 'start', 'log10_fdr']
+        result_columns = ['#chr', 'log10_fdr']
         if self.save_debug:
             result_columns += ['log10_pval', 'sliding_mean', 'sliding_variance']
         data_df = data_df[result_columns]
@@ -127,8 +127,8 @@ class GenomeProcessor:
         params = []
         for res in results:
             df = res.data_df
-            df['#chr'] = np.asarray([res.chrom] * df.shape[0], dtype='S10')
-            df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
+            df['#chr'] = np.array([res.chrom] * df.shape[0], dtype='S10')
+            #df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
             params.append(res.params_df)
             data.append(df)
         return pd.concat(data), pd.concat(params)
