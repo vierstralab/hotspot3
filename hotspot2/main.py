@@ -21,11 +21,15 @@ class PeakCallingData:
     params_df: pd.DataFrame
 
 
+class NoContigPresentError(Exception):
+    ...
+
+
 class GenomeProcessor:
     """
     Base class to run hotspot2 on a whole genome
     """
-    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.uint32, fdr_method='fdr_bh', cpus=1) -> None:
+    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.uint32, fdr_method='fdr_bh', cpus=3) -> None:
         self.chrom_sizes = chrom_sizes
         self.mappable_bases_file = mappable_bases_file
         self.min_mappable_bg = min_mappable_bg
@@ -49,6 +53,7 @@ class GenomeProcessor:
                 continue
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        print(f'Using {self.cpus} CPUs')
         with PoolExecutor(max_workers=self.cpus) as executor:
             results = [
                 executor.map(
@@ -68,10 +73,6 @@ class GenomeProcessor:
         fdr[pval_list.mask] = np.nan
         fdr[~pval_list.mask] = multipletests(pval_list.compressed(), method=self.fdr_method)[1]
         return fdr
-
-
-class NoContigPresentError(Exception):
-    ...
 
 
 class ChromosomeProcessor:
@@ -103,6 +104,8 @@ class ChromosomeProcessor:
         }).reset_index(names='start')
         data_df['#chr'] = self.chrom_name
 
+        print(f"Chromosome {self.chrom_name} initial fit done")
+
         m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
 
         params_df = pd.DataFrame({
@@ -112,6 +115,7 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
+        print(f"Chromosome {self.chrom_name} initial fit finished")
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
@@ -224,9 +228,9 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def main(cutcounts, chrom_sizes, mappable_bases_file):
+def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
     # TODO add parser here
-    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file)
+    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus)
     print('Calling peaks')
     return genome_processor.call_peaks(cutcounts)
 
@@ -236,6 +240,7 @@ if __name__ == "__main__":
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
-    result, params = main(cutcounts, chrom_sizes, mappable_bases_file)
-    result.to_parquet(sys.argv[4])
-    params.to_csv(sys.argv[4] + '.params', sep='\t', header=True)
+    cpus = int(sys.argv[4])
+    result, params = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
+    result.to_parquet(sys.argv[5])
+    params.to_csv(sys.argv[5] + '.params', sep='\t', header=True)
