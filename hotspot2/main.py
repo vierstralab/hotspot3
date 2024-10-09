@@ -110,9 +110,9 @@ class GenomeProcessor:
 
     def calc_fdr(self, pval_list):
         fdr = np.empty(pval_list.shape)
-        print(pval_list.mask)
-        fdr[pval_list.mask] = np.nan
-        fdr[~pval_list.mask] = multipletests(np.power(10, -pval_list.compressed()), method=self.fdr_method)[1]
+        not_nan = ~np.isnan(pval_list)
+        fdr[~not_nan] = np.nan
+        fdr[not_nan] = multipletests(np.power(10, -pval_list[not_nan]), method=self.fdr_method)[1]
         return fdr
 
 
