@@ -55,7 +55,7 @@ class GenomeProcessor:
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
         params_df = pd.concat([result.params_df for result in results])
-        return data_df, params_df
+        return data_df[['#chr', 'start', 'log10_pval', 'fdr']], params_df
 
     def calc_fdr(self, pval_list):
         fdr = np.empty(pval_list.shape)
@@ -213,4 +213,6 @@ if __name__ == "__main__":
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
-    main(cutcounts, chrom_sizes, mappable_bases_file)
+    result, params = main(cutcounts, chrom_sizes, mappable_bases_file)
+    result.to_parquet(sys.argv[4])
+    params.to_csv(sys.argv[4] + '.params', sep='\t', header=True)
