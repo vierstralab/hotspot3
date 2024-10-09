@@ -14,7 +14,7 @@ from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
 import gc
-import dask.dataframe as dd
+
 
 root_logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def set_logger_config(logger, level):
 @dataclasses.dataclass
 class PeakCallingData:
     chrom: str
-    data_path: str
+    data_df: pd.DataFrame
     params_df: pd.DataFrame
 
 
@@ -44,8 +44,9 @@ class GenomeProcessor:
     """
     Base class to run hotspot2 on a whole genome
     """
-    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.int32, fdr_method='fdr_bh', cpus=1, chromosomes=None, logger_level=logging.DEBUG) -> None:
+    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.int32, fdr_method='fdr_bh', cpus=1, chromosomes=None, save_debug=False, logger_level=logging.DEBUG) -> None:
         self.logger = root_logger
+        self.save_debug = save_debug
         self.logger_level = logger_level
         self.chrom_sizes = chrom_sizes
         if chromosomes is not None:
@@ -109,12 +110,24 @@ class GenomeProcessor:
 
         self.restore_logger()
         self.logger.debug('Concatenating results')
-        data_df = dd.read_parquet([result.data_path for result in results])
+
+        data_df = self.merge_dfs(results)
         self.logger.debug('Results concatenated. Calculating FDR')
-        data_df['fdr'] = self.calc_fdr(data_df['log10_pval'].compute())
+        
+        data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
         params_df = pd.concat([result.params_df for result in results])
-        return data_df[['#chr', 'start', 'log10_pval', 'fdr']], params_df
+        result_columns = ['#chr', 'start', 'log10_pval', 'fdr', 'sliding_mean', 'sliding_variance'] if self.save_debug else ['#chr', 'start', 'fdr']
+        return data_df[result_columns], params_df
+    
+    def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
+        data = []
+        for res in results:
+            df = res.data_df
+            df['#chr'] = res.chrom
+            df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
+            data.append(df)
+        return pd.concat(data)
 
     def calc_fdr(self, pval_list):
         fdr = np.empty(pval_list.shape)
@@ -157,19 +170,26 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
 
         sliding_mean, sliding_variance = self.fit_model(agg_cutcounts, high_signal_mask)
+        if not self.gp.save_debug:
+            del sliding_mean, sliding_variance
+            gc.collect()
+
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}. Saving results")
-        data_df = pd.DataFrame.from_dict({
-            'log10_pval': log_pvals.filled(np.nan),
-            'sliding_mean': sliding_mean.filled(np.nan),
-            'sliding_variance': sliding_variance.filled(np.nan),
-            'start': np.arange(self.chrom_size, dtype=np.uint32),
-        })
-        data_df['#chr'] = self.chrom_name
+        data = {'log10_pval': log_pvals.filled(np.nan)}
+        if self.gp.save_debug:
+            data.update({
+                'sliding_mean': sliding_mean.filled(np.nan),
+                'sliding_variance': sliding_variance.filled(np.nan),
+            })
+        else:
+            del r0, p0
+            gc.collect()
+        data_df = pd.DataFrame.from_dict(data)
 
         params_df = pd.DataFrame({
             'chrom': [self.chrom_name],
@@ -178,13 +198,7 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        data_path = f'{self.chrom_name}.parquet'
-        data_df.to_parquet(
-            data_path,
-            compression='zstd',
-            index=False
-        )
-        return PeakCallingData(self.chrom_name, data_path, params_df)
+        return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
         with TabixExtractor(
@@ -317,5 +331,5 @@ if __name__ == "__main__":
     cpus = int(sys.argv[4])
     result, params = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
     root_logger.debug('Saving results')
-    result.to_parquet(sys.argv[5])
+    result.to_parquet(sys.argv[5], compression='zstd')
     params.to_csv(sys.argv[5] + '.params', sep='\t', header=True)
