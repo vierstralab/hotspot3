@@ -138,8 +138,8 @@ class ChromosomeProcessor:
         
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
-        self.gp.logger.debug(f'Looking for outlier threshold {self.chrom_name}')
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
+        self.gp.logger.debug(f'Found outlier threshold={outliers_tr:0f} for {self.chrom_name}')
 
         high_signal_mask = (agg_cutcounts_masked >= outliers_tr).filled(False)
 
