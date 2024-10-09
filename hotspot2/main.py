@@ -32,7 +32,7 @@ def set_logger_config(logger, level):
 @dataclasses.dataclass
 class PeakCallingData:
     chrom: str
-    data_df: dd.DataFrame
+    data_path: str
     params_df: pd.DataFrame
 
 
@@ -109,7 +109,8 @@ class GenomeProcessor:
 
         self.restore_logger()
         self.logger.debug('Concatenating results')
-        data_df = dd.concat([result.data_df for result in results])
+        data_df = dd.read_parquet([result.data_path for result in results])
+        self.logger.debug('Results concatenated. Calculating FDR')
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
         params_df = pd.concat([result.params_df for result in results])
