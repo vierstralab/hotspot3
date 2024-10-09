@@ -67,7 +67,7 @@ class GenomeProcessor:
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         self.logger.debug(f'Using {self.cpus} CPUs')
-        if self.jobs == 1:
+        if self.cpus == 1:
             result = []
             for chrom_processor in self.chromosome_processors:
                 res = chrom_processor.calc_pvals(cutcounts_file)
