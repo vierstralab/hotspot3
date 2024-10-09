@@ -286,6 +286,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
 
 
 if __name__ == "__main__":
+    set_logger_config(root_logger, logging.DEBUG)
     root_logger.debug('Processing started')
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
