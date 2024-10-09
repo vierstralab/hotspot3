@@ -51,6 +51,7 @@ class GenomeProcessor:
                     cutcounts_file
                 )
             ]
+        print('Concatenating results')
         data_df = pd.concat([result.data_df for result in results])
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
@@ -213,10 +214,12 @@ def read_chrom_sizes(chrom_sizes):
 def main(cutcounts, chrom_sizes, mappable_bases_file):
     # TODO add parser here
     genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file)
+    print('Calling peaks')
     return genome_processor.call_peaks(cutcounts)
 
 
 if __name__ == "__main__":
+    print('Processing started')
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
