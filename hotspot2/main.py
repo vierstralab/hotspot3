@@ -38,8 +38,10 @@ class GenomeProcessor:
     """
     Base class to run hotspot2 on a whole genome
     """
-    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.int32, fdr_method='fdr_bh', cpus=1) -> None:
+    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.int32, fdr_method='fdr_bh', cpus=1, chromosomes=None) -> None:
         self.chrom_sizes = chrom_sizes
+        if chromosomes is not None:
+            self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
         self.mappable_bases_file = mappable_bases_file
         self.min_mappable_bg = min_mappable_bg
 
@@ -239,7 +241,7 @@ def read_chrom_sizes(chrom_sizes):
 
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
-    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus)
+    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus, chromosomes='chr19')
     logger.info('Calling peaks')
     return genome_processor.call_peaks(cutcounts)
 
