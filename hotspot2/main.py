@@ -199,12 +199,14 @@ class ChromosomeProcessor:
                 position_skip_mask=high_signal_mask
             )
             bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
+            self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
             bg_sum = self.smooth_counts(agg_cutcounts, self.gp.bg_window, position_skip_mask=high_signal_mask)
             bg_sum_sq = self.smooth_counts(
                 agg_cutcounts * agg_cutcounts,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
             )
+            self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
             bg_sum_mappable = np.sum(self.mappable_bases[~high_signal_mask].compressed())
             compressed_cutcounts = agg_cutcounts[~high_signal_mask]
