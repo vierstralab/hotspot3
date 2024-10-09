@@ -111,24 +111,24 @@ class GenomeProcessor:
         self.restore_logger()
         self.logger.debug('Concatenating results')
 
-        data_df = self.merge_dfs(results)
+        data_df, params_df = self.merge_dfs(results)
         self.logger.debug('Results concatenated. Calculating FDR')
         
         data_df['log10_fdr'] = self.calc_fdr(data_df['log10_pval'])
-
-        params_df = pd.concat([result.params_df for result in results])
 
         result_columns = ['#chr', 'start', 'log10_pval', 'log10_fdr', 'sliding_mean', 'sliding_variance'] if self.save_debug else ['#chr', 'start', 'log10_fdr']
         return data_df[result_columns], params_df
     
     def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
         data = []
+        params = []
         for res in results:
             df = res.data_df
             df['#chr'] = res.chrom
             df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
+            params.append(res.params_df)
             data.append(df)
-        return pd.concat(data)
+        return pd.concat(data), pd.concat(params)
 
     def calc_fdr(self, pval_list):
         log_fdr = np.empty(pval_list.shape)
