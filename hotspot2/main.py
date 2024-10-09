@@ -360,7 +360,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        chromosomes=['chr20', 'chr19']
+        #chromosomes=['chr20', 'chr19']
     )
     root_logger.debug('Calling hotspots')
     return genome_processor.call_hotspots(cutcounts)
