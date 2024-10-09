@@ -129,7 +129,7 @@ class ChromosomeProcessor:
         self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
   
         self.int_dtype = self.gp.int_dtype
-        self.mappable_bases = self.get_mappable_bases(self.gp.mappable_bases_file)
+        self.mappable_bases = self.get_mappable_bases()
 
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
@@ -210,7 +210,8 @@ class ChromosomeProcessor:
     def find_outliers_tr(self, aggregated_cutcounts):
         return np.quantile(aggregated_cutcounts.compressed(), self.gp.signal_tr)
 
-    def get_mappable_bases(self, mappable_file):
+    def get_mappable_bases(self):
+        mappable_file = self.gp.mappable_bases_file
         if mappable_file is None:
             mappable = np.ones(self.chrom_size, dtype=bool)
         else:
@@ -219,11 +220,12 @@ class ChromosomeProcessor:
                     mappable = np.zeros(self.chrom_size, dtype=bool)
                     for _, row in mappable_loader[self.genomic_interval].iterrows():
                         if row['end'] > self.genomic_interval.end:
-                            raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end}")
+                            raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end} for {self.chrom_name}")
                         mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = 1
                     assert mappable.shape[0] == self.chrom_size, "Mappable bases file does not match chromosome sizes"
             except ValueError:
                 raise NoContigPresentError
+        self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
         return ma.masked_where(~mappable, mappable)
     
     def smooth_counts(self, signal, window, position_skip_mask=None):
