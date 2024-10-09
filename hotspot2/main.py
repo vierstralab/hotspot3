@@ -116,15 +116,18 @@ class GenomeProcessor:
         
         data_df['log10_fdr'] = self.calc_fdr(data_df['log10_pval'])
 
-        result_columns = ['#chr', 'start', 'log10_pval', 'log10_fdr', 'sliding_mean', 'sliding_variance'] if self.save_debug else ['#chr', 'start', 'log10_fdr']
-        return data_df[result_columns], params_df
+        result_columns = ['#chr', 'start', 'log10_fdr']
+        if self.save_debug:
+            result_columns += ['log10_pval', 'sliding_mean', 'sliding_variance']
+        data_df = data_df[result_columns]
+        return data_df, params_df
     
     def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
         data = []
         params = []
         for res in results:
             df = res.data_df
-            df['#chr'] = res.chrom
+            df['#chr'] = res.chrom.astype('S10')
             df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
             params.append(res.params_df)
             data.append(df)
