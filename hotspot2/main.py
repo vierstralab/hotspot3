@@ -22,6 +22,15 @@ logging.basicConfig(
 )
 root_logger = logging.getLogger(__name__)
 
+def set_logger_config(logger, level):
+    logger.setLevel(level)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(level)
+        formatter = logging.Formatter('%(asctime)s  %(levelname)s  %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
 
 @dataclasses.dataclass
 class PeakCallingData:
@@ -58,6 +67,19 @@ class GenomeProcessor:
         self.chromosome_processors = [x for x in self.get_chromosome_processors()]
         self.logger.info(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
     
+    def __getstate__(self):
+        state = self.__dict__
+        if 'logger' in state:
+            del state['logger']
+        return state
+
+    def __setstate__(self, state):
+        for name, value in state.items():
+            setattr(self, name, value)
+        assert not hasattr(self, 'logger')
+        self.logger = root_logger
+        set_logger_config(self.logger, self.logger_level)
+
     def get_chromosome_processors(self):
         for chrom_name in self.chrom_sizes.keys():
             try:
@@ -76,12 +98,10 @@ class GenomeProcessor:
         else:
             ctx = mp.get_context("forkserver")
             with ctx.Pool(self.cpus) as executor:
-                results = [
-                    executor.map(
-                        [cp.calc_pvals for cp in self.chromosome_processors],
-                        [cutcounts_file] * len(self.chromosome_processors)
-                    )
-                ]
+                results = executor.starmap(
+                    ChromosomeProcessor.calc_pvals,
+                    [(cp, cutcounts_file) for cp in self.chromosome_processors])
+    
         
         self.logger.debug('Concatenating results')
         print([result for result in results])
@@ -207,6 +227,7 @@ class ChromosomeProcessor:
             dtype=self.int_dtype,
             position_skip_mask=position_skip_mask
         )
+        
 
 
 def negbin_neglog10pvalue(x, r, p):
