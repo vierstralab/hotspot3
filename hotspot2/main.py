@@ -127,7 +127,7 @@ class GenomeProcessor:
         params = []
         for res in results:
             df = res.data_df
-            df['#chr'] = res.chrom.astype('S10')
+            df['#chr'] = np.asarray([res.chrom] * df.shape[0], dtype='S10')
             df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
             params.append(res.params_df)
             data.append(df)
@@ -314,6 +314,41 @@ def read_chrom_sizes(chrom_sizes):
         header=None,
         names=['chrom', 'size']
     ).set_index('chrom')['size'].to_dict()
+
+
+def merge_regions_log10_fdr_vectorized(log10_fdr_array, threshold=0.05, min_width=50):
+    """
+    Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
+
+    Parameters:
+    - log10_fdr_array: NumPy array of log10(FDR) values, length of the chromosome.
+    - threshold: The log10(FDR) threshold for merging.
+    - min_width: Minimum width for a merged region.
+
+    Returns:
+    - start_indices: Array of start positions of the merged regions.
+    - end_indices: Array of end positions of the merged regions.
+    - min_log10_fdr_values: Array of minimum log10(FDR) values within each region.
+    """
+    below_threshold = log10_fdr_array >= -np.log10(threshold)
+    # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
+    boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
+
+    region_starts = np.where(boundaries == 1)[0]
+    region_ends = np.where(boundaries == -1)[0]
+
+    # Filter regions by minimum width
+    valid_widths = (region_ends - region_starts) >= min_width
+    region_starts = region_starts[valid_widths]
+    region_ends = region_ends[valid_widths]
+
+    min_log10_fdr_values = np.empty(region_ends.shape)  # Pre-allocate array
+    for i in range(len(region_starts)):
+        start = region_starts[i]
+        end = region_ends[i]
+        min_log10_fdr_values[i] = np.min(log10_fdr_array[start:end])
+
+    return region_starts, region_ends, min_log10_fdr_values
 
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
