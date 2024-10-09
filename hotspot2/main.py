@@ -69,9 +69,9 @@ class GenomeProcessor:
         return state
 
     def restore_logger(self):
-        assert not hasattr(self, 'logger')
-        self.logger = root_logger
-        set_logger_config(self.logger, self.logger_level)
+        if not hasattr(self, 'logger'):
+            self.logger = root_logger
+            set_logger_config(self.logger, self.logger_level)
 
     def __setstate__(self, state):
         for name, value in state.items():
@@ -110,8 +110,9 @@ class GenomeProcessor:
 
     def calc_fdr(self, pval_list):
         fdr = np.empty(pval_list.shape)
+        print(pval_list.mask)
         fdr[pval_list.mask] = np.nan
-        fdr[~pval_list.mask] = multipletests(pval_list.compressed(), method=self.fdr_method)[1]
+        fdr[~pval_list.mask] = multipletests(np.power(10, -pval_list.compressed()), method=self.fdr_method)[1]
         return fdr
 
 
