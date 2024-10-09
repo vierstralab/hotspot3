@@ -125,13 +125,17 @@ class GenomeProcessor:
     def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
         data = []
         params = []
+        categories=[x for x in self.chrom_sizes.keys()]
         for res in results:
             df = res.data_df
-            df['#chr'] = np.array([res.chrom] * df.shape[0], dtype='S10')
+            df['#chr'] = pd.Categorical(
+                [res.chrom] * df.shape[0],
+                categories=categories,
+                )
             #df['start'] = np.arange(0, df.shape[0], dtype=np.int32)
             params.append(res.params_df)
             data.append(df)
-        return pd.concat(data), pd.concat(params)
+        return pd.concat(data, ignore_index=True), pd.concat(params, ignore_index=True)
 
     def calc_fdr(self, pval_list):
         log_fdr = np.empty(pval_list.shape)
