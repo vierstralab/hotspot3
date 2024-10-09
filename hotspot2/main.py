@@ -161,7 +161,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
-        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
+        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}. Saving results")
         data_df = pd.DataFrame.from_dict({
             'log10_pval': log_pvals.filled(np.nan),
             'sliding_mean': sliding_mean.filled(np.nan),
