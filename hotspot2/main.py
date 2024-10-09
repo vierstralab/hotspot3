@@ -131,18 +131,18 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
-        self.gp.logger.debug(f"Chromosome {self.chrom_name} cutcounts aggregated {agg_cutcounts_masked.count()}/{agg_cutcounts_masked.shape} bases are mappable")
+        self.gp.logger.debug(f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts_masked.count()}/{agg_cutcounts_masked.shape} bases are mappable")
 
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
-        self.gp.logger.debug(f'Found outlier threshold={outliers_tr:0f} for {self.chrom_name}')
+        self.gp.logger.debug(f'Found outlier threshold={outliers_tr:1f} for {self.chrom_name}')
 
         high_signal_mask = (agg_cutcounts_masked >= outliers_tr).filled(False)
 
-        self.gp.logger.debug(f'Fit model {self.chrom_name}')
+        self.gp.logger.debug(f'Fit model for {self.chrom_name}')
         sliding_mean, sliding_variance = self.fit_model(agg_cutcounts_masked, high_signal_mask)
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
-        self.gp.logger.debug(f'Calculate p-value {self.chrom_name}')
+        self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts_masked, r0, p0)
         data_df = pd.DataFrame({
             'log10_pval': log_pvals.filled(np.nan),
@@ -151,7 +151,7 @@ class ChromosomeProcessor:
         }).reset_index(names='start')
         data_df['#chr'] = self.chrom_name
 
-        self.gp.logger.debug(f"Chromosome {self.chrom_name} initial fit done")
+        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
 
         m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
 
@@ -162,7 +162,7 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        self.gp.logger.debug(f"Chromosome {self.chrom_name} initial fit finished")
+        self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
@@ -184,7 +184,6 @@ class ChromosomeProcessor:
                 position_skip_mask=high_signal_mask
             )
             bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
-            self.gp.logger.debug(f"{bg_sum_mappable.count()}/{bg_sum_mappable.shape} bases are mappable")
             bg_sum = self.smooth_counts(agg_cutcounts, self.gp.bg_window, position_skip_mask=high_signal_mask)
             bg_sum_sq = self.smooth_counts(
                 agg_cutcounts * agg_cutcounts,
