@@ -92,6 +92,7 @@ class GenomeProcessor:
             reverse=True
         )
         if self.cpus == 1:
+            self.logger.debug('Using 1 CPU')
             result = []
             for chrom_processor in sorted_processors:
                 res = chrom_processor.calc_pvals(cutcounts_file)
@@ -138,7 +139,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
-        self.gp.logger.debug(f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
+        self.gp.logger.debug(
+            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
         outliers_tr = self.find_outliers_tr(agg_cutcounts)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr:1f} for {self.chrom_name}')
@@ -155,7 +157,8 @@ class ChromosomeProcessor:
             'log10_pval': log_pvals.filled(np.nan),
             'sliding_mean': sliding_mean.filled(np.nan),
             'sliding_variance': sliding_variance.filled(np.nan),
-        }).reset_index(names='start')
+            'start': np.arange(self.chrom_size)
+        })
         data_df['#chr'] = self.chrom_name
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
