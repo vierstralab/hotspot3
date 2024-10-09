@@ -64,7 +64,12 @@ class GenomeProcessor:
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         logger.info(f'Using {self.cpus} CPUs')
         with PoolExecutor(max_workers=self.cpus) as executor:
-            results = list(executor.map(lambda cp: cp.calc_pvals(cutcounts_file), self.chromosome_processors))
+            results = [
+                executor.map(
+                    [cp.calc_pvals for cp in self.chromosome_processors],
+                    cutcounts_file
+                )
+            ]
         
         logger.info('Concatenating results')
         data_df = pd.concat([result.data_df for result in results])
