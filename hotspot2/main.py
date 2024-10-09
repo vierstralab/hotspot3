@@ -181,7 +181,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
-        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}. Saving results")
+        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
         data = {'log10_pval': log_pvals.filled(np.nan)}
         if self.gp.save_debug:
             data.update({
