@@ -13,6 +13,8 @@ import dataclasses
 from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
+import gc
+import dask.dataframe as dd
 
 root_logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ def set_logger_config(logger, level):
 @dataclasses.dataclass
 class PeakCallingData:
     chrom: str
-    data_df: pd.DataFrame
+    data_df: dd.DataFrame
     params_df: pd.DataFrame
 
 
@@ -141,18 +143,24 @@ class ChromosomeProcessor:
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
+        del cutcounts
+        gc.collect()
+
         outliers_tr = self.find_outliers_tr(agg_cutcounts)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr:1f} for {self.chrom_name}')
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
-
         self.gp.logger.debug(f'Fit model for {self.chrom_name}')
+
+        m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
+        self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
+
         sliding_mean, sliding_variance = self.fit_model(agg_cutcounts, high_signal_mask)
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
-        data_df = pd.DataFrame({
+        data_df = dd.DataFrame.from_dict({
             'log10_pval': log_pvals.filled(np.nan),
             'sliding_mean': sliding_mean.filled(np.nan),
             'sliding_variance': sliding_variance.filled(np.nan),
@@ -162,8 +170,6 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
 
-        m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
-
         params_df = pd.DataFrame({
             'chrom': [self.chrom_name],
             'outliers_tr': [outliers_tr],
@@ -171,7 +177,7 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
+        data_df.to_parquet(f'{self.chrom_name}.parquet')
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
@@ -287,7 +293,12 @@ def read_chrom_sizes(chrom_sizes):
 
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
-    genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus)
+    genome_processor = GenomeProcessor(
+        chrom_sizes,
+        mappable_bases_file,
+        cpus=cpus,
+        chromosomes=['chr1', 'chr19']
+    )
     root_logger.debug('Calling hotspots')
     return genome_processor.call_hotspots(cutcounts)
 
