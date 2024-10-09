@@ -61,7 +61,7 @@ class GenomeProcessor:
         self.int_dtype = int_dtype
         
         self.cpus = min(cpus, max(1, mp.cpu_count()))
-        self.signal_tr = 1 - signal_tr
+        self.signal_tr = signal_tr
         self.fdr_method = fdr_method
 
         self.chromosome_processors = [x for x in self.get_chromosome_processors()]
@@ -134,11 +134,12 @@ class ChromosomeProcessor:
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
+
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
         self.gp.logger.debug(f"Chromosome {self.chrom_name} cutcounts aggregated {agg_cutcounts_masked.count()}/{agg_cutcounts_masked.shape} bases are mappable")
+
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr:0f} for {self.chrom_name}')
 
