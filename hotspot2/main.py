@@ -14,13 +14,8 @@ from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
 
-# Set up logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
 root_logger = logging.getLogger(__name__)
+
 
 def set_logger_config(logger, level):
     logger.setLevel(level)
@@ -74,13 +69,13 @@ class GenomeProcessor:
         return state
 
     def restore_logger(self):
+        assert not hasattr(self, 'logger')
         self.logger = root_logger
         set_logger_config(self.logger, self.logger_level)
 
     def __setstate__(self, state):
         for name, value in state.items():
             setattr(self, name, value)
-        assert not hasattr(self, 'logger')
         self.restore_logger()
 
     def get_chromosome_processors(self):
