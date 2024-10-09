@@ -38,10 +38,15 @@ class GenomeProcessor:
         self.signal_tr = 1 - signal_tr
         self.fdr_method = fdr_method
 
-        self.chromosome_processors = [
-            ChromosomeProcessor(self, chrom) 
-            for chrom in self.chrom_sizes.keys()
-        ]
+        self.chromosome_processors = [x for x in self.get_chromosome_processors()]
+        print(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
+    
+    def get_chromosome_processors(self):
+        for chrom_name in self.chrom_sizes.keys():
+            try:
+                yield ChromosomeProcessor(self, chrom_name)
+            except NoContigPresentError:
+                continue
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         with PoolExecutor(max_workers=self.cpus) as executor:
@@ -63,6 +68,10 @@ class GenomeProcessor:
         fdr[pval_list.mask] = np.nan
         fdr[~pval_list.mask] = multipletests(pval_list.compressed(), method=self.fdr_method)[1]
         return fdr
+
+
+class NoContigPresentError(Exception):
+    ...
 
 
 class ChromosomeProcessor:
@@ -148,13 +157,16 @@ class ChromosomeProcessor:
         if mappable_file is None:
             mappable = np.ones(self.chrom_size, dtype=bool)
         else:
-            with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
-                mappable = np.zeros(self.chrom_size, dtype=bool)
-                for _, row in mappable_loader[self.genomic_interval].iterrows():
-                    if row['end'] > self.genomic_interval.end:
-                        raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end}")
-                    mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = 1
-                assert mappable.shape[0] == self.chrom_size, "Mappable bases file does not match chromosome sizes"
+            try:
+                with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
+                    mappable = np.zeros(self.chrom_size, dtype=bool)
+                    for _, row in mappable_loader[self.genomic_interval].iterrows():
+                        if row['end'] > self.genomic_interval.end:
+                            raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end}")
+                        mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = 1
+                    assert mappable.shape[0] == self.chrom_size, "Mappable bases file does not match chromosome sizes"
+            except ValueError:
+                raise NoContigPresentError
         return ma.masked_where(~mappable, mappable)
     
     def smooth_counts(self, signal, window, position_skip_mask):
