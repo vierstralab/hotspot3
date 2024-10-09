@@ -138,7 +138,9 @@ class ChromosomeProcessor:
             cutcounts_file, 
             columns=['#chr', 'start', 'end', 'id', 'cutcounts']
         ) as cutcounts_loader:
-            cutcounts = cutcounts_loader[self.genomic_interval]['cutcounts'].to_numpy()
+            cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
+            data = cutcounts_loader[self.genomic_interval]
+            cutcounts[data['start'] - self.genomic_interval.start] = data['cutcounts'].to_numpy()
             assert cutcounts.shape[0] == self.chrom_size, "Cutcounts file does not match chromosome sizes"
         return cutcounts
 
