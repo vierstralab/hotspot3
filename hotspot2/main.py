@@ -20,7 +20,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-logger = logging.getLogger(__name__)
+logger = mp.get_logger()
 
 
 @dataclasses.dataclass
@@ -98,6 +98,8 @@ class ChromosomeProcessor:
         self.mappable_bases = self.get_mappable_bases(self.gp.mappable_bases_file)
 
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
+        logger = mp.get_logger()
+        logger.info(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
         logger.info(f'Extracted cutcounts for chromosome {self.chrom_name}')
         
@@ -133,7 +135,6 @@ class ChromosomeProcessor:
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
-        logger.info(f'Extracting cutcounts for chromosome {self.chrom_name}')
         with TabixExtractor(
             cutcounts_file, 
             columns=['#chr', 'start', 'end', 'id', 'cutcounts']
