@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import numpy.ma as ma
 from scipy.signal import convolve
@@ -12,6 +13,14 @@ import dataclasses
 from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -43,7 +52,7 @@ class GenomeProcessor:
         self.fdr_method = fdr_method
 
         self.chromosome_processors = [x for x in self.get_chromosome_processors()]
-        print(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
+        logger.info(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
     
     def get_chromosome_processors(self):
         for chrom_name in self.chrom_sizes.keys():
@@ -53,15 +62,11 @@ class GenomeProcessor:
                 continue
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        print(f'Using {self.cpus} CPUs')
+        logger.info(f'Using {self.cpus} CPUs')
         with PoolExecutor(max_workers=self.cpus) as executor:
-            results = [
-                executor.map(
-                    [cp.calc_pvals for cp in self.chromosome_processors],
-                    cutcounts_file
-                )
-            ]
-        print('Concatenating results')
+            results = list(executor.map(lambda cp: cp.calc_pvals(cutcounts_file), self.chromosome_processors))
+        
+        logger.info('Concatenating results')
         data_df = pd.concat([result.data_df for result in results])
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
@@ -87,7 +92,8 @@ class ChromosomeProcessor:
 
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
         cutcounts = self.extract_cutcounts(cutcounts_file)
-        print('Extracted cutcounts for chromosome', self.chrom_name)
+        logger.info(f'Extracted cutcounts for chromosome {self.chrom_name}')
+        
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
@@ -105,22 +111,21 @@ class ChromosomeProcessor:
         }).reset_index(names='start')
         data_df['#chr'] = self.chrom_name
 
-        print(f"Chromosome {self.chrom_name} initial fit done")
+        logger.info(f"Chromosome {self.chrom_name} initial fit done")
 
         m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
 
         params_df = pd.DataFrame({
             'chrom': [self.chrom_name],
             'outliers_tr': [outliers_tr],
-            'mean': [m0], #FIXME
+            'mean': [m0],
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        print(f"Chromosome {self.chrom_name} initial fit finished")
+        logger.info(f"Chromosome {self.chrom_name} initial fit finished")
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
-        # FIXME extract straight from bam
         with TabixExtractor(
             cutcounts_file, 
             columns=['#chr', 'start', 'end', 'id', 'cutcounts']
@@ -191,7 +196,6 @@ def negbin_neglog10pvalue(x, r, p):
     if len(r.shape) == 0:
         resulting_mask = x.mask
     else:
-    # assumes x, r, p to be masked arrays. TODO use ma.get_mask
         resulting_mask = reduce(ma.mask_or, [x.mask, r.mask, p.mask])
         r = r[~resulting_mask]
         p = p[~resulting_mask]
@@ -230,14 +234,13 @@ def read_chrom_sizes(chrom_sizes):
 
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
-    # TODO add parser here
     genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus)
-    print('Calling peaks')
+    logger.info('Calling peaks')
     return genome_processor.call_peaks(cutcounts)
 
 
 if __name__ == "__main__":
-    print('Processing started')
+    logger.info('Processing started')
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
