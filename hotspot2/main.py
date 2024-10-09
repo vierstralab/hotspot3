@@ -141,7 +141,7 @@ class GenomeProcessor:
         log_fdr = np.empty(pval_list.shape, dtype=np.float32)
         not_nan = ~np.isnan(pval_list)
         log_fdr[~not_nan] = np.nan
-        log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -pval_list[not_nan]), method=self.fdr_method)[1])
+        log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -pval_list[not_nan].astype(np.float64)), method=self.fdr_method)[1])
         return log_fdr.astype(np.float32)
 
 
