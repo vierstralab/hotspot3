@@ -149,6 +149,7 @@ class ChromosomeProcessor:
             mappable = np.ones(self.chrom_size, dtype=bool)
         else:
             with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
+                mappable = np.zeros(self.chrom_size, dtype=bool)
                 for _, row in mappable_loader[self.genomic_interval].iterrows():
                     if row['end'] > self.genomic_interval.end:
                         raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end}")
