@@ -39,8 +39,8 @@ class GenomeProcessor:
         self.fdr_method = fdr_method
 
         self.chromosome_processors = [
-            ChromosomeProcessor(self, chrom, chrom_size) 
-            for chrom, chrom_size in self.chrom_sizes.items()
+            ChromosomeProcessor(self, chrom) 
+            for chrom in self.chrom_sizes.keys()
         ]
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
