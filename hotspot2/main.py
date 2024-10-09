@@ -16,7 +16,7 @@ import sys
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
@@ -79,7 +79,7 @@ class GenomeProcessor:
                 results = [
                     executor.map(
                         [cp.calc_pvals for cp in self.chromosome_processors],
-                        cutcounts_file
+                        [cutcounts_file] * len(self.chromosome_processors)
                     )
                 ]
         
