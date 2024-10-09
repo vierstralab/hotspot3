@@ -73,12 +73,15 @@ class GenomeProcessor:
             del state['logger']
         return state
 
+    def restore_logger(self):
+        self.logger = root_logger
+        set_logger_config(self.logger, self.logger_level)
+
     def __setstate__(self, state):
         for name, value in state.items():
             setattr(self, name, value)
         assert not hasattr(self, 'logger')
-        self.logger = root_logger
-        set_logger_config(self.logger, self.logger_level)
+        self.restore_logger()
 
     def get_chromosome_processors(self):
         for chrom_name in self.chrom_sizes.keys():
@@ -102,7 +105,7 @@ class GenomeProcessor:
                     ChromosomeProcessor.calc_pvals,
                     [(cp, cutcounts_file) for cp in self.chromosome_processors])
     
-        
+        self.restore_logger()
         self.logger.debug('Concatenating results')
         print([result for result in results])
         data_df = pd.concat([result.data_df for result in results])
@@ -131,17 +134,20 @@ class ChromosomeProcessor:
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
-        self.gp.logger.debug(f'Extracted cutcounts for chromosome {self.chrom_name}')
+        self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
+        self.gp.logger.debug(f'Looking for outlier threshold {self.chrom_name}')
         outliers_tr = self.find_outliers_tr(agg_cutcounts_masked)
 
         high_signal_mask = (agg_cutcounts_masked >= outliers_tr).filled(False)
 
+        self.gp.logger.debug(f'Fit model {self.chrom_name}')
         sliding_mean, sliding_variance = self.fit_model(agg_cutcounts_masked, high_signal_mask)
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
+        self.gp.logger.debug(f'Calculate p-value {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts_masked, r0, p0)
         data_df = pd.DataFrame({
             'log10_pval': log_pvals.filled(np.nan),
