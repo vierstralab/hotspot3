@@ -111,7 +111,7 @@ class GenomeProcessor:
         self.logger.debug('Concatenating results')
         data_df = dd.read_parquet([result.data_path for result in results])
         self.logger.debug('Results concatenated. Calculating FDR')
-        data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
+        data_df['fdr'] = self.calc_fdr(data_df['log10_pval'].compute())
 
         params_df = pd.concat([result.params_df for result in results])
         return data_df[['#chr', 'start', 'log10_pval', 'fdr']], params_df
@@ -302,7 +302,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        chromosomes=['chr20', 'chr19']
+        chromosomes=['chr1', 'chr2', 'chr20', 'chr19']
     )
     root_logger.debug('Calling hotspots')
     return genome_processor.call_hotspots(cutcounts)
