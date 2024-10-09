@@ -20,7 +20,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-logger = logging.getLogger(__name__)
+root_logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -38,7 +38,9 @@ class GenomeProcessor:
     """
     Base class to run hotspot2 on a whole genome
     """
-    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.int32, fdr_method='fdr_bh', cpus=1, chromosomes=None) -> None:
+    def __init__(self, chrom_sizes, mappable_bases_file=None, window=201, bg_window=50001, min_mappable_bg=10000, signal_tr=0.975, int_dtype = np.int32, fdr_method='fdr_bh', cpus=1, chromosomes=None, logger_level=logging.DEBUG) -> None:
+        self.logger = root_logger
+        self.logger_level = logger_level
         self.chrom_sizes = chrom_sizes
         if chromosomes is not None:
             self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
@@ -54,7 +56,7 @@ class GenomeProcessor:
         self.fdr_method = fdr_method
 
         self.chromosome_processors = [x for x in self.get_chromosome_processors()]
-        logger.info(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
+        self.logger.info(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
     
     def get_chromosome_processors(self):
         for chrom_name in self.chrom_sizes.keys():
@@ -64,16 +66,25 @@ class GenomeProcessor:
                 continue
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        logger.info(f'Using {self.cpus} CPUs')
-        with PoolExecutor(max_workers=self.cpus) as executor:
-            results = [
-                executor.map(
-                    [cp.calc_pvals for cp in self.chromosome_processors],
-                    cutcounts_file
-                )
-            ]
+        self.logger.debug(f'Using {self.cpus} CPUs')
+        if self.jobs == 1:
+            result = []
+            for chrom_processor in self.chromosome_processors:
+                res = chrom_processor.calc_pvals(cutcounts_file)
+                result.append(res)
+    
+        else:
+            ctx = mp.get_context("forkserver")
+            with ctx.Pool(self.cpus) as executor:
+                results = [
+                    executor.map(
+                        [cp.calc_pvals for cp in self.chromosome_processors],
+                        cutcounts_file
+                    )
+                ]
         
-        logger.info('Concatenating results')
+        self.logger.debug('Concatenating results')
+        print([result for result in results])
         data_df = pd.concat([result.data_df for result in results])
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
@@ -98,9 +109,9 @@ class ChromosomeProcessor:
         self.mappable_bases = self.get_mappable_bases(self.gp.mappable_bases_file)
 
     def calc_pvals(self, cutcounts_file) -> PeakCallingData:
-        print(f'Extracting cutcounts for chromosome {self.chrom_name}')
+        self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
-        print(f'Extracted cutcounts for chromosome {self.chrom_name}')
+        self.gp.logger.debug(f'Extracted cutcounts for chromosome {self.chrom_name}')
         
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts_masked = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
@@ -119,7 +130,7 @@ class ChromosomeProcessor:
         }).reset_index(names='start')
         data_df['#chr'] = self.chrom_name
 
-        print(f"Chromosome {self.chrom_name} initial fit done")
+        self.gp.logger.debug(f"Chromosome {self.chrom_name} initial fit done")
 
         m0, v0 = self.fit_model(agg_cutcounts, high_signal_mask, in_window=False)
 
@@ -130,7 +141,7 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        print(f"Chromosome {self.chrom_name} initial fit finished")
+        self.gp.logger.debug(f"Chromosome {self.chrom_name} initial fit finished")
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
