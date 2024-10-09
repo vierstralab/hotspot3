@@ -177,7 +177,11 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        data_df.to_parquet(f'{self.chrom_name}.parquet')
+        data_df.to_parquet(
+            f'{self.chrom_name}.parquet',
+            compression='zstd',
+            write_index=False
+        )
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
     def extract_cutcounts(self, cutcounts_file):
