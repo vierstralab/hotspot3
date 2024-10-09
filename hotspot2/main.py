@@ -87,7 +87,11 @@ class GenomeProcessor:
         
     def call_peaks(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         self.logger.debug(f'Using {self.cpus} CPUs')
-        sorted_processors = sorted(self.chromosome_processors, key=lambda x: x.chrom_size)
+        sorted_processors = sorted(
+            self.chromosome_processors,
+            key=lambda x: x.chrom_size,
+            reverse=True
+        )
         if self.cpus == 1:
             result = []
             for chrom_processor in sorted_processors:
