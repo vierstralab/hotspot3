@@ -160,15 +160,15 @@ class ChromosomeProcessor:
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
-        data_df = dd.DataFrame.from_dict({
+
+        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
+        data_df = pd.DataFrame.from_dict({
             'log10_pval': log_pvals.filled(np.nan),
             'sliding_mean': sliding_mean.filled(np.nan),
             'sliding_variance': sliding_variance.filled(np.nan),
             'start': np.arange(self.chrom_size, np.uint32),
         })
         data_df['#chr'] = self.chrom_name
-
-        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
 
         params_df = pd.DataFrame({
             'chrom': [self.chrom_name],
@@ -180,7 +180,7 @@ class ChromosomeProcessor:
         data_df.to_parquet(
             f'{self.chrom_name}.parquet',
             compression='zstd',
-            write_index=False
+            index=False
         )
         return PeakCallingData(self.chrom_name, data_df, params_df)
 
@@ -192,7 +192,6 @@ class ChromosomeProcessor:
             cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
             data = cutcounts_loader[self.genomic_interval]
             cutcounts[data['start'] - self.genomic_interval.start] = data['cutcounts'].to_numpy()
-            assert cutcounts.shape[0] == self.chrom_size, "Cutcounts file does not match chromosome sizes"
         return cutcounts
 
     def fit_model(self, agg_cutcounts, high_signal_mask, in_window=True):
@@ -237,7 +236,6 @@ class ChromosomeProcessor:
                         if row['end'] > self.genomic_interval.end:
                             raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end} for {self.chrom_name}")
                         mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = 1
-                    assert mappable.shape[0] == self.chrom_size, "Mappable bases file does not match chromosome sizes"
             except ValueError:
                 raise NoContigPresentError
         self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
@@ -302,7 +300,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        chromosomes=['chr1', 'chr19']
+        chromosomes=['chr20', 'chr19']
     )
     root_logger.debug('Calling hotspots')
     return genome_processor.call_hotspots(cutcounts)
