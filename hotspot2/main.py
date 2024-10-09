@@ -256,12 +256,12 @@ def read_chrom_sizes(chrom_sizes):
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
     genome_processor = GenomeProcessor(chrom_sizes, mappable_bases_file, cpus=cpus, chromosomes=['chr19', 'chr20', 'chr21'])
-    logger.info('Calling peaks')
+    root_logger.debug('Calling peaks')
     return genome_processor.call_peaks(cutcounts)
 
 
 if __name__ == "__main__":
-    logger.info('Processing started')
+    root_logger.debug('Processing started')
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
