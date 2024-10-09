@@ -114,10 +114,11 @@ class GenomeProcessor:
         data_df = self.merge_dfs(results)
         self.logger.debug('Results concatenated. Calculating FDR')
         
-        data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
+        data_df['log10_fdr'] = self.calc_fdr(data_df['log10_pval'])
 
         params_df = pd.concat([result.params_df for result in results])
-        result_columns = ['#chr', 'start', 'log10_pval', 'fdr', 'sliding_mean', 'sliding_variance'] if self.save_debug else ['#chr', 'start', 'fdr']
+
+        result_columns = ['#chr', 'start', 'log10_pval', 'log10_fdr', 'sliding_mean', 'sliding_variance'] if self.save_debug else ['#chr', 'start', 'log10_fdr']
         return data_df[result_columns], params_df
     
     def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
@@ -130,11 +131,11 @@ class GenomeProcessor:
         return pd.concat(data)
 
     def calc_fdr(self, pval_list):
-        fdr = np.empty(pval_list.shape)
+        log_fdr = np.empty(pval_list.shape)
         not_nan = ~np.isnan(pval_list)
-        fdr[~not_nan] = np.nan
-        fdr[not_nan] = multipletests(np.power(10, -pval_list[not_nan]), method=self.fdr_method)[1]
-        return fdr.astype(np.float32)
+        log_fdr[~not_nan] = np.nan
+        log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -pval_list[not_nan]), method=self.fdr_method)[1])
+        return log_fdr.astype(np.float32)
 
 
 class ChromosomeProcessor:
@@ -170,12 +171,13 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
 
         sliding_mean, sliding_variance = self.fit_model(agg_cutcounts, high_signal_mask)
+
+        r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
+        p0 = (sliding_variance - sliding_mean) / (sliding_variance)
         if not self.gp.save_debug:
             del sliding_mean, sliding_variance
             gc.collect()
 
-        r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
-        p0 = (sliding_variance - sliding_mean) / (sliding_variance)
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
