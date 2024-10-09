@@ -167,7 +167,7 @@ class ChromosomeProcessor:
             'log10_pval': log_pvals.filled(np.nan),
             'sliding_mean': sliding_mean.filled(np.nan),
             'sliding_variance': sliding_variance.filled(np.nan),
-            'start': np.arange(self.chrom_size, np.uint32),
+            'start': np.arange(self.chrom_size, dtype=np.uint32),
         })
         data_df['#chr'] = self.chrom_name
 
