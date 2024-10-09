@@ -105,9 +105,7 @@ class GenomeProcessor:
                     ChromosomeProcessor.calc_pvals,
                     [(cp, cutcounts_file) for cp in self.chromosome_processors])
     
-        self.restore_logger()
         self.logger.debug('Concatenating results')
-        print([result for result in results])
         data_df = pd.concat([result.data_df for result in results])
         data_df['fdr'] = self.calc_fdr(data_df['log10_pval'])
 
