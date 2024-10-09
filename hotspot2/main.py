@@ -220,7 +220,7 @@ class ChromosomeProcessor:
                 raise NoContigPresentError
         return ma.masked_where(~mappable, mappable)
     
-    def smooth_counts(self, signal, window, position_skip_mask):
+    def smooth_counts(self, signal, window, position_skip_mask=None):
         return nan_moving_sum(
             signal,
             window=window,
