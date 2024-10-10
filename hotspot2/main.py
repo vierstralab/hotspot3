@@ -4,7 +4,7 @@ import numpy.ma as ma
 from scipy.signal import convolve
 import scipy.stats as st
 from functools import reduce
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor
 import multiprocessing as mp
@@ -101,14 +101,7 @@ class GenomeProcessor:
             hotspots.append(
                 merge_regions_log10_fdr_vectorized(chrom, fdr_path, fdr_tr, min_width)
             )
-        # with ThreadPoolExecutor(max_workers=self.cpus) as executor:
-        #     hotspots = executor.map(
-        #         merge_regions_log10_fdr_vectorized,
-        #         chromosomes,
-        #         [fdr_path] * len(chromosomes),
-        #         [fdr_tr] * len(chromosomes),
-        #         [min_width] * len(chromosomes)
-        #     )
+
         self.logger.debug('Hotspots called for all chromosomes')
         hotspots = pd.concat(hotspots, ignore_index=True)
         return hotspots
@@ -407,7 +400,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        chromosomes=['chr20', 'chr19']
+        #chromosomes=['chr20', 'chr19']
     )
     if fdr_path is None:
         root_logger.debug('Calculating p-values')
