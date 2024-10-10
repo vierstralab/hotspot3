@@ -378,7 +378,7 @@ def call_hotspots(df: pd.DataFrame, cpus, fdr_tr=0.05, min_width=50):
     Returns:
     - hotspots: DataFrame containing the hotspots.
     """
-    groups = df.groupby('#chr')
+    groups = df.groupby('#chr', observed=True)
     names = [name for name in groups.groups]
     dfs = [groups.get_group(name) for name in names]
     with ProcessPoolExecutor(max_workers=cpus) as executor:
