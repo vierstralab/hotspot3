@@ -62,13 +62,16 @@ class GenomeProcessor:
         self.signal_tr = signal_tr
         self.fdr_method = fdr_method
 
-        self.chromosome_processors = [x for x in self.get_chromosome_processors()]
-        self.logger.info(f"Chromosomes with mappable track: {len(self.chromosome_processors)}")
+        self.chromosome_processors = [
+            ChromosomeProcessor(self, chrom_name) for chrom_name in self.chrom_sizes.keys()
+        ]
     
     def __getstate__(self):
         state = self.__dict__
         if 'logger' in state:
             del state['logger']
+        if 'chromosome_processors' in state:
+            del state['chromosome_processors']
         return state
 
     def restore_logger(self):
@@ -80,13 +83,6 @@ class GenomeProcessor:
         for name, value in state.items():
             setattr(self, name, value)
         self.restore_logger()
-
-    def get_chromosome_processors(self):
-        for chrom_name in self.chrom_sizes.keys():
-            try:
-                yield ChromosomeProcessor(self, chrom_name)
-            except NoContigPresentError:
-                continue
         
     def calc_pval(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         sorted_processors = sorted(
@@ -105,13 +101,14 @@ class GenomeProcessor:
             self.logger.debug(f'Using {self.cpus} CPUs')
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 results = executor.map(
-                    ChromosomeProcessor.calc_pvals, sorted_processors, [cutcounts_file] * len(sorted_processors)
+                    ChromosomeProcessor.calc_pvals,
+                    sorted_processors,
+                    [cutcounts_file] * len(sorted_processors)
                 )
-
         self.restore_logger()
         self.logger.debug('Concatenating results')
 
-        data_df, params_df = self.merge_dfs(results)
+        data_df, params_df = self.merge_dfs([res for res in results if res is not None])
         self.logger.debug('Results concatenated. Calculating FDR')
         
         data_df['log10_fdr'] = self.calc_log10fdr(data_df['log10_pval'])
@@ -156,7 +153,11 @@ class ChromosomeProcessor:
         self.mappable_bases = None
 
     def calc_pvals(self, cutcounts_file, force_read_mappable_file=False) -> PeakCallingData:
-        self.get_mappable_bases(force=force_read_mappable_file)
+        try:
+            self.get_mappable_bases(force=force_read_mappable_file)
+        except NoContigPresentError:
+            self.gp.logger.warning(f"Chromosome {self.chrom_name} not found in mappable bases file")
+            return
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
