@@ -364,7 +364,7 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
         fdr_path,
         filters=[('chrom', '==', chrom_name)],
         engine='pyarrow'
-    )['log10_fdr'].values.compute()
+    )['log10_fdr'].values
     if log10_fdr_array.size == 0:
         return None
     below_threshold = log10_fdr_array >= -np.log10(threshold)
