@@ -83,6 +83,33 @@ class GenomeProcessor:
         for name, value in state.items():
             setattr(self, name, value)
         self.restore_logger()
+    
+    def call_hotspots(self, fdr_df: dd.DataFrame, fdr_tr=0.05, min_width=50):
+        """
+        Call hotspots in a list of dataframes.
+
+        Parameters:
+        - df: DataFrame containing the log10(FDR) values.
+        - fdr_tr: FDR threshold for calling hotspots.
+        - min_width: Minimum width for a hotspot.
+
+        Returns:
+        - hotspots: DataFrame containing the hotspots.
+        """
+        groups = fdr_df.groupby('#chr', observed=True)
+        names = [name[0] for name in fdr_df['#chr'].unique().compute().tolist()]
+        dfs = [groups.get_group(name) for name in names]
+        with ProcessPoolExecutor(max_workers=self.cpus) as executor:
+            hotspots = executor.map(
+                merge_regions_log10_fdr_vectorized,
+                names,
+                dfs,
+                [fdr_tr] * len(names),
+                [min_width] * len(names)
+            )
+        self.logger.debug('Hotspots called for all chromosomes')
+        hotspots = pd.concat(hotspots, ignore_index=True)
+        return hotspots
         
     def calc_pval(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         sorted_processors = sorted(
@@ -340,7 +367,9 @@ def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0
     - end_indices: Array of end positions of the merged regions.
     - min_log10_fdr_values: Array of minimum log10(FDR) values within each region.
     """
+    root_logger.debug(f'Reading dask array for {chrom_name}')
     log10_fdr_array = df['log10_fdr'].compute().to_numpy()
+    root_logger.debug(f'Processing chromosome {chrom_name}')
     below_threshold = log10_fdr_array >= -np.log10(threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
@@ -348,12 +377,13 @@ def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0
     region_starts = np.where(boundaries == 1)[0]
     region_ends = np.where(boundaries == -1)[0]
 
-    # Filter regions by minimum width
     valid_widths = (region_ends - region_starts) >= min_width
     region_starts = region_starts[valid_widths]
     region_ends = region_ends[valid_widths]
 
-    min_log10_fdr_values = np.empty(region_ends.shape)  # Pre-allocate array
+    root_logger.debug(f'Found hotspots for {chrom_name}')
+
+    min_log10_fdr_values = np.empty(region_ends.shape)
     for i in range(len(region_starts)):
         start = region_starts[i]
         end = region_ends[i]
@@ -366,35 +396,6 @@ def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0
         'log10_fdr': min_log10_fdr_values
     })
 
-
-def call_hotspots(df: pd.DataFrame, cpus, fdr_tr=0.05, min_width=50):
-    """
-    Call hotspots in a list of dataframes.
-
-    Parameters:
-    - df: DataFrame containing the log10(FDR) values.
-    - cpus: Number of CPUs to use.
-    - fdr_tr: FDR threshold for calling hotspots.
-    - min_width: Minimum width for a hotspot.
-
-    Returns:
-    - hotspots: DataFrame containing the hotspots.
-    """
-    groups = df.groupby('#chr', observed=True)
-    names = [name[0] for name in df['#chr'].unique().compute().tolist()]
-    dfs = [groups.get_group(name) for name in names]
-    with ProcessPoolExecutor(max_workers=cpus) as executor:
-        hotspots = executor.map(
-            merge_regions_log10_fdr_vectorized,
-            names,
-            dfs,
-            [fdr_tr] * len(names),
-            [min_width] * len(names)
-        )
-
-    hotspots = pd.concat(hotspots, ignore_index=True)
-
-    return hotspots
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=None):
     genome_processor = GenomeProcessor(
@@ -415,7 +416,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         outpath = fdr_path
     root_logger.debug('Calling hotspots')
     df = dd.read_parquet(outpath)
-    hotspots = call_hotspots(df, cpus)
+    hotspots = genome_processor.call_hotspots(df, fdr_tr=0.05)
     hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
     root_logger.debug('Hotspots calling finished')
 
