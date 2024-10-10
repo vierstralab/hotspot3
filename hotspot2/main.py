@@ -14,7 +14,7 @@ from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
 import gc
-
+import dask.dataframe as dd
 
 root_logger = logging.getLogger(__name__)
 
@@ -326,12 +326,12 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def merge_regions_log10_fdr_vectorized(chrom_name, log10_fdr_array, threshold=0.05, min_width=50) -> pd.DataFrame:
+def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0.05, min_width=50) -> pd.DataFrame:
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
 
     Parameters:
-    - log10_fdr_array: NumPy array of log10(FDR) values, length of the chromosome.
+    - dd: dask DataFrame containing the log10(FDR) values.
     - threshold: The log10(FDR) threshold for merging.
     - min_width: Minimum width for a merged region.
 
@@ -340,6 +340,7 @@ def merge_regions_log10_fdr_vectorized(chrom_name, log10_fdr_array, threshold=0.
     - end_indices: Array of end positions of the merged regions.
     - min_log10_fdr_values: Array of minimum log10(FDR) values within each region.
     """
+    log10_fdr_array = df['log10_fdr'].compute().to_numpy()
     below_threshold = log10_fdr_array >= -np.log10(threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
@@ -380,13 +381,13 @@ def call_hotspots(df: pd.DataFrame, cpus, fdr_tr=0.05, min_width=50):
     - hotspots: DataFrame containing the hotspots.
     """
     groups = df.groupby('#chr', observed=True)
-    names = [name for name in groups.groups]
+    names = [name[0] for name in df['#chr'].unique().compute().tolist()]
     dfs = [groups.get_group(name) for name in names]
     with ProcessPoolExecutor(max_workers=cpus) as executor:
         hotspots = executor.map(
             merge_regions_log10_fdr_vectorized,
             names,
-            [df['log10_fdr'].to_numpy() for df in dfs],
+            dfs,
             [fdr_tr] * len(names),
             [min_width] * len(names)
         )
@@ -395,16 +396,24 @@ def call_hotspots(df: pd.DataFrame, cpus, fdr_tr=0.05, min_width=50):
 
     return hotspots
 
-def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
+def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=None):
     genome_processor = GenomeProcessor(
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
         #chromosomes=['chr20', 'chr19']
     )
-    root_logger.debug('Calculating p-values')
-    df, params = genome_processor.calc_pval(cutcounts)
+    if fdr_path is None:
+        root_logger.debug('Calculating p-values')
+        df, params = genome_processor.calc_pval(cutcounts)
+        root_logger.debug('Saving P-values')
+        df.to_parquet(outpath, engine='pyarrow', compression='zstd', compression_level=22, index=False)
+        params.to_csv(outpath + '.params.gz', sep='\t', index=False)
+        del df, params
+        gc.collect()
+    
     root_logger.debug('Calling hotspots')
+    df = dd.read_parquet(outpath)
     hotspots = call_hotspots(df, cpus)
     return df, params, hotspots
 
@@ -417,7 +426,7 @@ if __name__ == "__main__":
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
     result, params, hotspots = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
-    root_logger.debug('Saving results')
+    
     result.to_parquet(sys.argv[5], engine='pyarrow', compression='zstd', compression_level=22, index=False)
     params.to_csv(sys.argv[5] + '.params.gz', sep='\t', index=False)
     hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
