@@ -155,8 +155,8 @@ class ChromosomeProcessor:
         self.int_dtype = self.gp.int_dtype
         self.mappable_bases = None
 
-    def calc_pvals(self, cutcounts_file) -> PeakCallingData:
-        self.get_mappable_bases()
+    def calc_pvals(self, cutcounts_file, force_read_mappable_file=False) -> PeakCallingData:
+        self.get_mappable_bases(force=force_read_mappable_file)
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
