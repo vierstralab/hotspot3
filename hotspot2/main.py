@@ -365,12 +365,12 @@ def merge_regions_log10_fdr_vectorized(chrom_name, log10_fdr_array, threshold=0.
     })
 
 
-def call_hotspots(dfs, cpus, fdr_tr=0.05, min_width=50):
+def call_hotspots(df: pd.DataFrame, cpus, fdr_tr=0.05, min_width=50):
     """
     Call hotspots in a list of dataframes.
 
     Parameters:
-    - dfs: List of dataframes, each containing log10(FDR) values for a chromosome.
+    - df: DataFrame containing the log10(FDR) values.
     - cpus: Number of CPUs to use.
     - fdr_tr: FDR threshold for calling hotspots.
     - min_width: Minimum width for a hotspot.
@@ -378,13 +378,16 @@ def call_hotspots(dfs, cpus, fdr_tr=0.05, min_width=50):
     Returns:
     - hotspots: DataFrame containing the hotspots.
     """
+    groups = df.groupby('#chr')
+    names = [name for name in groups.groups]
+    dfs = [groups.get_group(name) for name in names]
     with ProcessPoolExecutor(max_workers=cpus) as executor:
         hotspots = executor.map(
             merge_regions_log10_fdr_vectorized,
-            [df.name for df in dfs],
+            names,
             [df['log10_fdr'].to_numpy() for df in dfs],
-            [fdr_tr] * len(dfs),
-            [min_width] * len(dfs)
+            [fdr_tr] * len(names),
+            [min_width] * len(names)
         )
 
     hotspots = pd.concat(
@@ -409,9 +412,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
     root_logger.debug('Calculating p-values')
     df, params = genome_processor.calc_pval(cutcounts)
     root_logger.debug('Calling hotspots')
-    groups = df.groupby('#chr')
-    groups = [groups.get_group(chrom) for chrom in groups.groups]
-    hotspots = call_hotspots(groups, cpus)
+    hotspots = call_hotspots(df, cpus)
     return df, params, hotspots
 
 
