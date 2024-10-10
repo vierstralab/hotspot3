@@ -390,15 +390,7 @@ def call_hotspots(df: pd.DataFrame, cpus, fdr_tr=0.05, min_width=50):
             [min_width] * len(names)
         )
 
-    hotspots = pd.concat(
-        [pd.DataFrame({
-            'start': start,
-            'end': end,
-            'log10_fdr': log10_fdr,
-            'width': end - start
-        }) for start, end, log10_fdr in hotspots],
-        ignore_index=True
-    )
+    hotspots = pd.concat(hotspots, ignore_index=True)
 
     return hotspots
 
