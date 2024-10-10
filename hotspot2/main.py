@@ -84,7 +84,7 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.restore_logger()
     
-    def call_hotspots(self, fdr_df: dd.DataFrame, fdr_tr=0.05, min_width=50):
+    def call_hotspots(self, chromosomes, fdr_path, fdr_tr=0.05, min_width=50):
         """
         Call hotspots in a list of dataframes.
 
@@ -96,14 +96,13 @@ class GenomeProcessor:
         Returns:
         - hotspots: DataFrame containing the hotspots.
         """
-        names = [name for name in fdr_df['#chr'].unique().compute().tolist()]
         with ProcessPoolExecutor(max_workers=self.cpus) as executor:
             hotspots = executor.map(
                 merge_regions_log10_fdr_vectorized,
-                names,
-                [fdr_df] * len(names),
-                [fdr_tr] * len(names),
-                [min_width] * len(names)
+                chromosomes,
+                [fdr_path] * len(chromosomes),
+                [fdr_tr] * len(chromosomes),
+                [min_width] * len(chromosomes)
             )
         self.logger.debug('Hotspots called for all chromosomes')
         hotspots = pd.concat(hotspots, ignore_index=True)
@@ -351,7 +350,7 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0.05, min_width=50) -> pd.DataFrame:
+def merge_regions_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min_width=50) -> pd.DataFrame:
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
 
@@ -366,6 +365,7 @@ def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0
     - min_log10_fdr_values: Array of minimum log10(FDR) values within each region.
     """
     root_logger.debug(f'Reading dask array for {chrom_name}')
+    df = dd.read_parquet(fdr_path)
     log10_fdr_array = df[df['#chr'] == chrom_name]['log10_fdr'].compute().to_numpy()
     root_logger.debug(f'Processing chromosome {chrom_name}')
     below_threshold = log10_fdr_array >= -np.log10(threshold)
@@ -416,7 +416,8 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         outpath = fdr_path
     root_logger.debug('Calling hotspots')
     df = dd.read_parquet(outpath)
-    hotspots = genome_processor.call_hotspots(df, fdr_tr=0.05)
+    chroms = df['#chr'].unique().compute().tolist()
+    hotspots = genome_processor.call_hotspots(chroms, outpath, fdr_tr=0.05)
     hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
     root_logger.debug('Hotspots calling finished')
 
