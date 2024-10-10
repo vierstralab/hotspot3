@@ -398,6 +398,8 @@ def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0
 
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=None):
+    set_logger_config(root_logger, logging.DEBUG)
+    root_logger.debug('Processing started')
     genome_processor = GenomeProcessor(
         chrom_sizes,
         mappable_bases_file,
@@ -423,10 +425,9 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
 
 
 if __name__ == "__main__":
-    set_logger_config(root_logger, logging.DEBUG)
-    root_logger.debug('Processing started')
     cutcounts = sys.argv[1]
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, sys.argv[5])
+    outpath = sys.argv[5]
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, outpath)
