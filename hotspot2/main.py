@@ -366,7 +366,7 @@ def merge_regions_log10_fdr_vectorized(chrom_name, df: dd.DataFrame, threshold=0
     - min_log10_fdr_values: Array of minimum log10(FDR) values within each region.
     """
     root_logger.debug(f'Reading dask array for {chrom_name}')
-    log10_fdr_array = df['log10_fdr'].compute().to_numpy()
+    log10_fdr_array = df[df['#chr'] == chrom_name]['log10_fdr'].compute().to_numpy()
     root_logger.debug(f'Processing chromosome {chrom_name}')
     below_threshold = log10_fdr_array >= -np.log10(threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
