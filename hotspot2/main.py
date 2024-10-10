@@ -428,4 +428,4 @@ if __name__ == "__main__":
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, sys.argv[5])
