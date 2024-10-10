@@ -14,7 +14,6 @@ from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
 import gc
-import dask.dataframe as dd
 
 root_logger = logging.getLogger(__name__)
 
@@ -84,27 +83,28 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.restore_logger()
     
-    def call_hotspots(self, chromosomes, fdr_path, fdr_tr=0.05, min_width=50):
+    def call_hotspots(self, fdr_path, fdr_tr=0.05, min_width=50):
         """
         Call hotspots in a list of dataframes.
 
         Parameters:
-        - df: DataFrame containing the log10(FDR) values.
-        - fdr_tr: FDR threshold for calling hotspots.
-        - min_width: Minimum width for a hotspot.
+            - fdr_path: Path to the parquet file containing the log10(FDR) values.
+            - fdr_tr: FDR threshold for calling hotspots.
+            - min_width: Minimum width for a region to be called a hotspot.
 
         Returns:
-        - hotspots: DataFrame containing the hotspots.
+            - hotspots: DataFrame containing the hotspots.
         """
         hotspots = []
-        for chrom in chromosomes:
-            hotspots.append(
-                merge_regions_log10_fdr_vectorized(chrom, fdr_path, fdr_tr, min_width)
-            )
-
-        self.logger.debug('Hotspots called for all chromosomes')
-        hotspots = pd.concat(hotspots, ignore_index=True)
-        return hotspots
+        for chrom in self.chrom_sizes.keys():
+                
+            # FIXME add to chromosome processors
+            data = hotspots_from_log10_fdr_vectorized(chrom, fdr_path, fdr_tr, min_width)
+            if data is None:
+                self.logger.debug(f"Chromosome {chrom} not found in FDR file. Skipping...")
+                continue
+            hotspots.append(data)
+        return pd.concat(hotspots, ignore_index=True)
         
     def calc_pval(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         sorted_processors = sorted(
@@ -112,15 +112,14 @@ class GenomeProcessor:
             key=lambda x: x.chrom_size,
             reverse=True
         )
+        self.logger.debug(f'Using {self.cpus} CPUs')
         if self.cpus == 1:
-            self.logger.debug('Using 1 CPU')
-            result = []
-            for chrom_processor in sorted_processors:
-                res = chrom_processor.calc_pvals(cutcounts_file)
-                result.append(res)
+            results = [
+                chrom_processor.calc_pvals(cutcounts_file)
+                for chrom_processor in sorted_processors
+            ]
     
         else:
-            self.logger.debug(f'Using {self.cpus} CPUs')
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 results = executor.map(
                     ChromosomeProcessor.calc_pvals,
@@ -135,7 +134,7 @@ class GenomeProcessor:
         
         data_df['log10_fdr'] = self.calc_log10fdr(data_df['log10_pval'])
 
-        result_columns = ['#chr', 'log10_fdr']
+        result_columns = ['chrom', 'log10_fdr']
         if self.save_debug:
             result_columns += ['log10_pval', 'sliding_mean', 'sliding_variance']
         data_df = data_df[result_columns]
@@ -147,7 +146,7 @@ class GenomeProcessor:
         categories=[x for x in self.chrom_sizes.keys()]
         for res in results:
             df = res.data_df
-            df['#chr'] = pd.Categorical(
+            df['chrom'] = pd.Categorical(
                 [res.chrom] * df.shape[0],
                 categories=categories,
                 )
@@ -178,7 +177,7 @@ class ChromosomeProcessor:
         try:
             self.get_mappable_bases(force=force_read_mappable_file)
         except NoContigPresentError:
-            self.gp.logger.warning(f"Chromosome {self.chrom_name} not found in mappable bases file")
+            self.gp.logger.debug(f"Chromosome {self.chrom_name} not found in mappable bases. Skipping...")
             return
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
@@ -348,24 +347,26 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def merge_regions_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min_width=50) -> pd.DataFrame:
+def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min_width=50) -> pd.DataFrame:
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
 
     Parameters:
-    - dd: dask DataFrame containing the log10(FDR) values.
-    - threshold: The log10(FDR) threshold for merging.
-    - min_width: Minimum width for a merged region.
+        - chrom_name: Chromosome name.
+        - fdr_path: Path to the parquet file containing the log10(FDR) values.
+        - threshold: FDR threshold for merging regions.
+        - min_width: Minimum width for a region to be called a hotspot.
 
     Returns:
-    - start_indices: Array of start positions of the merged regions.
-    - end_indices: Array of end positions of the merged regions.
-    - min_log10_fdr_values: Array of minimum log10(FDR) values within each region.
+        - pd.DataFrame: DataFrame containing the hotspots in bed format.
     """
-    root_logger.debug(f'Reading dask array for {chrom_name}')
-    df = dd.read_parquet(fdr_path)
-    log10_fdr_array = df[df['#chr'] == chrom_name]['log10_fdr'].values.compute()
-    root_logger.debug(f'Processing chromosome {chrom_name}')
+    log10_fdr_array = pd.read_parquet(
+        fdr_path,
+        filters=[('chrom', '==', chrom_name)],
+        engine='pyarrow'
+    )['log10_fdr'].values.compute()
+    if log10_fdr_array.size == 0:
+        return None
     below_threshold = log10_fdr_array >= -np.log10(threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
@@ -383,7 +384,7 @@ def merge_regions_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
     for i in range(len(region_starts)):
         start = region_starts[i]
         end = region_ends[i]
-        min_log10_fdr_values[i] = np.min(log10_fdr_array[start:end])
+        min_log10_fdr_values[i] = np.max(log10_fdr_array[start:end])
 
     return pd.DataFrame({
         '#chr': [chrom_name] * len(region_starts),
@@ -406,19 +407,16 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         root_logger.debug('Calculating p-values')
         df, params = genome_processor.calc_pval(cutcounts)
         root_logger.debug('Saving P-values')
-        df.to_parquet(outpath, engine='pyarrow', compression='zstd', compression_level=22, index=False)
+        df.to_parquet(outpath, engine='pyarrow', compression='zstd', compression_level=22, index=False, partition_cols=['chrom']) #  partition_on=['chrom']
         params.to_csv(outpath + '.params.gz', sep='\t', index=False)
         del df, params
         gc.collect()
     else:
         outpath = fdr_path
     root_logger.debug('Calling hotspots')
-    df = dd.read_parquet(outpath)
-    chroms = df['#chr'].unique().compute().tolist()
-    hotspots = genome_processor.call_hotspots(chroms, outpath, fdr_tr=0.05)
-    hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
+    hotspots = genome_processor.call_hotspots(outpath, fdr_tr=0.05)
     root_logger.debug('Hotspots calling finished')
-
+    hotspots.to_csv(outpath + '.hotspots.gz', sep='\t', index=False)
 
 
 if __name__ == "__main__":
@@ -427,4 +425,8 @@ if __name__ == "__main__":
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
     outpath = sys.argv[5]
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath)
+    if len(sys.argv) > 6:
+        fdr_path = sys.argv[6]
+    else:
+        fdr_path = None
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=fdr_path)
