@@ -368,8 +368,9 @@ def merge_regions_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
     df = dd.read_parquet(fdr_path)
     log10_fdr_array = df[df['#chr'] == chrom_name]['log10_fdr']
     root_logger.debug(f'Filtering dask df for {chrom_name}')
-    log10_fdr_array = log10_fdr_array.compute().to_numpy()
+    log10_fdr_array = log10_fdr_array.compute()
     root_logger.debug(f'Processing chromosome {chrom_name}')
+    log10_fdr_array = log10_fdr_array.to_numpy()
     below_threshold = log10_fdr_array >= -np.log10(threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
