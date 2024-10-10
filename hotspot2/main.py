@@ -4,7 +4,7 @@ import numpy.ma as ma
 from scipy.signal import convolve
 import scipy.stats as st
 from functools import reduce
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor
 import multiprocessing as mp
@@ -96,14 +96,19 @@ class GenomeProcessor:
         Returns:
         - hotspots: DataFrame containing the hotspots.
         """
-        with ProcessPoolExecutor(max_workers=self.cpus) as executor:
-            hotspots = executor.map(
-                merge_regions_log10_fdr_vectorized,
-                chromosomes,
-                [fdr_path] * len(chromosomes),
-                [fdr_tr] * len(chromosomes),
-                [min_width] * len(chromosomes)
+        hotspots = []
+        for chrom in chromosomes:
+            hotspots.append(
+                merge_regions_log10_fdr_vectorized(chrom, fdr_path, fdr_tr, min_width)
             )
+        # with ThreadPoolExecutor(max_workers=self.cpus) as executor:
+        #     hotspots = executor.map(
+        #         merge_regions_log10_fdr_vectorized,
+        #         chromosomes,
+        #         [fdr_path] * len(chromosomes),
+        #         [fdr_tr] * len(chromosomes),
+        #         [min_width] * len(chromosomes)
+        #     )
         self.logger.debug('Hotspots called for all chromosomes')
         hotspots = pd.concat(hotspots, ignore_index=True)
         return hotspots
