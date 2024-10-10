@@ -97,7 +97,7 @@ class GenomeProcessor:
         - hotspots: DataFrame containing the hotspots.
         """
         groups = fdr_df.groupby('#chr', observed=True)
-        names = [name[0] for name in fdr_df['#chr'].unique().compute().tolist()]
+        names = [name for name in fdr_df['#chr'].unique().compute().tolist()]
         dfs = [groups.get_group(name) for name in names]
         with ProcessPoolExecutor(max_workers=self.cpus) as executor:
             hotspots = executor.map(
