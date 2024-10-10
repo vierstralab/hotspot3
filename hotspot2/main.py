@@ -399,7 +399,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        chromosomes=['chr20', 'chr19']
+        #chromosomes=['chr20', 'chr19']
     )
     root_logger.debug('Calculating p-values')
     df, params = genome_processor.calc_pval(cutcounts)
@@ -420,3 +420,4 @@ if __name__ == "__main__":
     result.to_parquet(sys.argv[5], engine='pyarrow', compression='zstd', compression_level=22, index=False)
     params.to_csv(sys.argv[5] + '.params.gz', sep='\t', index=False)
     hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
+    root_logger.debug('Finished succesfully')
