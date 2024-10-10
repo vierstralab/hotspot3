@@ -427,4 +427,4 @@ if __name__ == "__main__":
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
     outpath = sys.argv[5]
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, outpath)
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath)
