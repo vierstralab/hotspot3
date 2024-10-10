@@ -401,7 +401,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        #chromosomes=['chr20', 'chr19']
+        chromosomes=['chr20', 'chr19']
     )
     if fdr_path is None:
         root_logger.debug('Calculating p-values')
@@ -411,11 +411,14 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         params.to_csv(outpath + '.params.gz', sep='\t', index=False)
         del df, params
         gc.collect()
-    
+    else:
+        outpath = fdr_path
     root_logger.debug('Calling hotspots')
     df = dd.read_parquet(outpath)
     hotspots = call_hotspots(df, cpus)
-    return df, params, hotspots
+    hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
+    root_logger.debug('Hotspots calling finished')
+
 
 
 if __name__ == "__main__":
@@ -425,9 +428,4 @@ if __name__ == "__main__":
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
-    result, params, hotspots = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
-    
-    result.to_parquet(sys.argv[5], engine='pyarrow', compression='zstd', compression_level=22, index=False)
-    params.to_csv(sys.argv[5] + '.params.gz', sep='\t', index=False)
-    hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
-    root_logger.debug('Finished succesfully')
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
