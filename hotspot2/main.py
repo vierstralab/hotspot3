@@ -366,7 +366,7 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
         engine='pyarrow'
     )['log10_fdr'].values
     if log10_fdr_array.size == 0:
-        return None
+        return
     below_threshold = log10_fdr_array >= -np.log10(threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
@@ -411,10 +411,9 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=No
         params.to_csv(outpath + '.params.gz', sep='\t', index=False)
         del df, params
         gc.collect()
-    else:
-        outpath = fdr_path
+        fdr_path = outpath
     root_logger.debug('Calling hotspots')
-    hotspots = genome_processor.call_hotspots(outpath, fdr_tr=0.05)
+    hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=0.05)
     root_logger.debug('Hotspots calling finished')
     hotspots.to_csv(outpath + '.hotspots.gz', sep='\t', index=False)
 
