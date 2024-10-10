@@ -88,7 +88,7 @@ class GenomeProcessor:
             except NoContigPresentError:
                 continue
         
-    def call_hotspots(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def calc_pval(self, cutcounts_file) -> Tuple[pd.DataFrame, pd.DataFrame]:
         sorted_processors = sorted(
             self.chromosome_processors,
             key=lambda x: x.chrom_size,
@@ -142,7 +142,7 @@ class GenomeProcessor:
         not_nan = ~np.isnan(pval_list)
         log_fdr[~not_nan] = np.nan
         log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -pval_list[not_nan].astype(np.float64)), method=self.fdr_method)[1])
-        return log_fdr.astype(np.float32)
+        return log_fdr.astype(np.float16)
 
 
 class ChromosomeProcessor:
@@ -320,7 +320,7 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def merge_regions_log10_fdr_vectorized(log10_fdr_array, threshold=0.05, min_width=50):
+def merge_regions_log10_fdr_vectorized(chrom_name, log10_fdr_array, threshold=0.05, min_width=50) -> pd.DataFrame:
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
 
@@ -352,18 +352,62 @@ def merge_regions_log10_fdr_vectorized(log10_fdr_array, threshold=0.05, min_widt
         end = region_ends[i]
         min_log10_fdr_values[i] = np.min(log10_fdr_array[start:end])
 
-    return region_starts, region_ends, min_log10_fdr_values
+    return pd.DataFrame({
+        '#chr': [chrom_name] * len(region_starts),
+        'start': region_starts,
+        'end': region_ends,
+        'log10_fdr': min_log10_fdr_values
+    })
 
+
+def call_hotspots(dfs, cpus, fdr_tr=0.05, min_width=50):
+    """
+    Call hotspots in a list of dataframes.
+
+    Parameters:
+    - dfs: List of dataframes, each containing log10(FDR) values for a chromosome.
+    - cpus: Number of CPUs to use.
+    - fdr_tr: FDR threshold for calling hotspots.
+    - min_width: Minimum width for a hotspot.
+
+    Returns:
+    - hotspots: DataFrame containing the hotspots.
+    """
+    with ProcessPoolExecutor(max_workers=cpus) as executor:
+        hotspots = executor.map(
+            merge_regions_log10_fdr_vectorized,
+            [df.name for df in dfs],
+            [df['log10_fdr'].to_numpy() for df in dfs],
+            [fdr_tr] * len(dfs),
+            [min_width] * len(dfs)
+        )
+
+    hotspots = pd.concat(
+        [pd.DataFrame({
+            'start': start,
+            'end': end,
+            'log10_fdr': log10_fdr,
+            'width': end - start
+        }) for start, end, log10_fdr in hotspots],
+        ignore_index=True
+    )
+
+    return hotspots
 
 def main(cutcounts, chrom_sizes, mappable_bases_file, cpus):
     genome_processor = GenomeProcessor(
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
-        #chromosomes=['chr20', 'chr19']
+        chromosomes=['chr20', 'chr19']
     )
+    root_logger.debug('Calculating p-values')
+    df, params = genome_processor.calc_pval(cutcounts)
     root_logger.debug('Calling hotspots')
-    return genome_processor.call_hotspots(cutcounts)
+    groups = df.groupby('#chr')
+    groups = [groups.get_group(chrom) for chrom in groups.groups]
+    hotspots = call_hotspots(groups, cpus)
+    return df, params, hotspots
 
 
 if __name__ == "__main__":
@@ -373,7 +417,8 @@ if __name__ == "__main__":
     chrom_sizes = read_chrom_sizes(sys.argv[2])
     mappable_bases_file = sys.argv[3]
     cpus = int(sys.argv[4])
-    result, params = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
+    result, params, hotspots = main(cutcounts, chrom_sizes, mappable_bases_file, cpus)
     root_logger.debug('Saving results')
-    result.to_parquet(sys.argv[5], compression='zstd')
-    params.to_csv(sys.argv[5] + '.params.gz', sep='\t', header=True)
+    result.to_parquet(sys.argv[5], compression='zstd', compression_level=22, index=False)
+    params.to_csv(sys.argv[5] + '.params.gz', sep='\t', index=False)
+    hotspots.to_csv(sys.argv[5] + '.hotspots.gz', sep='\t', index=False)
