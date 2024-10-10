@@ -96,14 +96,12 @@ class GenomeProcessor:
         Returns:
         - hotspots: DataFrame containing the hotspots.
         """
-        groups = fdr_df.groupby('#chr', observed=True)
         names = [name for name in fdr_df['#chr'].unique().compute().tolist()]
-        dfs = [groups.get_group(name) for name in names]
         with ProcessPoolExecutor(max_workers=self.cpus) as executor:
             hotspots = executor.map(
                 merge_regions_log10_fdr_vectorized,
                 names,
-                dfs,
+                [fdr_df] * len(names),
                 [fdr_tr] * len(names),
                 [min_width] * len(names)
             )
