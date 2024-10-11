@@ -52,7 +52,7 @@ def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None) ->
     return ma.array(result, mask=masked_array.mask)
 
 
-def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, fdr_threshold, min_width):
+def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width):
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
 

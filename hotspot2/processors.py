@@ -265,10 +265,10 @@ class ChromosomeProcessor:
         return ProcessorOutputData(self.chrom_name, data_df, params_df)
 
     def call_hotspots(self, fdr_path, fdr_threshold=0.05, min_width=50) -> ProcessorOutputData:
-        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name)['log10_fdr'].values
+        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name)['log10_fdr'].to_numpy()
         if log10_fdr_array.size == 0:
             return None
-        data = hotspots_from_log10_fdr_vectorized(self.chrom_name, fdr_path, fdr_threshold=fdr_threshold, min_width=min_width)
+        data = hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold=fdr_threshold, min_width=min_width)
         return ProcessorOutputData(self.chrom_name, data) if data is not None else None
     
     def call_variable_width_peaks(self, density_path, hotspots):
