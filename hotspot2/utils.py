@@ -2,6 +2,7 @@ import pandas as pd
 import dataclasses
 import pysam
 import io
+import functools
 
 
 @dataclasses.dataclass
@@ -90,7 +91,8 @@ class NoContigPresentError(Exception):
 
 
 def ensure_contig_exists(func):
-    def wrapper(func, *args, **kwargs):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except NoContigPresentError:
