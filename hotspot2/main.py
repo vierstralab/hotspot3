@@ -400,22 +400,24 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
     })
 
 
-def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, logger_level, fdr, fdr_path=None):
-    set_logger_config(root_logger, logger_level)
-    root_logger.debug('Processing started')
+def main():
+    args, logger_level = parse_arguments()
     genome_processor = GenomeProcessor(
-        chrom_sizes,
-        mappable_bases_file,
-        cpus=cpus,
-        logger_level=logger_level
+        args.chrom_sizes,
+        args.mappable_bases,
+        cpus=args.cpus,
+        logger_level=logger_level,
+        save_debug=args.debug,
         #chromosomes=['chr20', 'chr19']
     )
     if fdr_path is None:
         root_logger.info('Calculating p-values')
-        df, params = genome_processor.calc_pval(cutcounts)
+        df, params = genome_processor.calc_pval(args.cutcounts)
         root_logger.debug('Saving P-values')
+        parquet_path = f"{args.prefix}.stats.parquet"
+        params_path = f"{args.prefix}.params.gz"
         df.to_parquet(
-            outpath,
+            parquet_path,
             engine='pyarrow',
             compression='zstd',
             compression_level=22,
@@ -424,40 +426,45 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, logger_leve
             use_dictionary=True,
             row_group_size=1_000_000,
         )
-        params.to_csv(outpath + '.params.gz', sep='\t', index=False)
+        params.to_csv(params_path, sep='\t', index=False)
         del df, params
         gc.collect()
-        fdr_path = outpath
+        fdr_path = parquet_path
     root_logger.info('Calling hotspots')
-    hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=fdr)
-    hotspots.to_csv(outpath + '.hotspots.gz', sep='\t', index=False)
+    hotspots_path = f"{args.prefix}.hotspots.bed"
+    hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=args.fdr)
+    hotspots.to_csv(hotspots_path, sep='\t', index=False)
     root_logger.info('Program finished')
 
 
-if __name__ == "__main__":
+def parse_arguments():
     parser = argparse.ArgumentParser(description="Process data for p-values or hotspots.")
     
     # common arguments
     parser.add_argument("prefix", type=str, help="Output prefix")
     parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
     parser.add_argument("--fdr", help="FDR threshold for p-values", type=float, default=0.05)
+    parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
 
     # Argument for calculating p-values
     parser.add_argument("--cutcounts", help="Path to cutcounts tabix file")
-    parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed)", default=None)
     
     # Argument to call hotspots, skip calculating p-values if provided
     parser.add_argument("--precalc_fdrs", help="Path to pre-calculated parquet folder with fdrs", default=None)
 
     args = parser.parse_args()
-    logger_level = logging.DEBUG if args.debug_mode else logging.INFO
-    cutcounts = args.cutcounts
-    chrom_sizes = read_chrom_sizes(args.chrom_sizes)
-    mappable_bases_file = args.mappable_bases
-    cpus = args.cpus
-    outpath = args.prefix
-    fdr_path = args.precalc_fdrs
+    logger_level = logging.DEBUG if args.debug else logging.INFO
+    set_logger_config(root_logger, logger_level)
 
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=fdr_path, logger_level=logger_level, fdr=args.fdr)
+    if args.precalc_fdrs is not None:
+        if args.cutcounts is not None:
+            root_logger.debug("Ignoring cutcounts file as precalculated FDRs are provided")
+        if args.mappable_bases is not None:
+            root_logger.debug("Ignoring mappable bases file as precalculated FDRs are provided")
+    return args, logger_level
+
+
+if __name__ == "__main__":
+    main()
