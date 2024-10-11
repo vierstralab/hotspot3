@@ -400,7 +400,7 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
     })
 
 
-def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, logger_level, fdr_path=None):
+def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, logger_level, fdr, fdr_path=None):
     set_logger_config(root_logger, logger_level)
     root_logger.debug('Processing started')
     genome_processor = GenomeProcessor(
@@ -429,7 +429,7 @@ def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, logger_leve
         gc.collect()
         fdr_path = outpath
     root_logger.info('Calling hotspots')
-    hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=0.05)
+    hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=fdr)
     hotspots.to_csv(outpath + '.hotspots.gz', sep='\t', index=False)
     root_logger.info('Program finished')
 
@@ -440,10 +440,11 @@ if __name__ == "__main__":
     # common arguments
     parser.add_argument("prefix", type=str, help="Output prefix")
     parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
+    parser.add_argument("--fdr", help="FDR threshold for p-values", type=float, default=0.05)
     parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
 
     # Argument for calculating p-values
-    parser.add_argument("--cutcounts", help="Path to cutcounts file")
+    parser.add_argument("--cutcounts", help="Path to cutcounts tabix file")
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed)", default=None)
     
@@ -459,4 +460,4 @@ if __name__ == "__main__":
     outpath = args.prefix
     fdr_path = args.precalc_fdrs
 
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=fdr_path, logger_level=logger_level)
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=fdr_path, logger_level=logger_level, fdr=args.fdr)
