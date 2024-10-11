@@ -402,9 +402,10 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
 
 def main():
     args, logger_level = parse_arguments()
+    chrom_sizes = read_chrom_sizes(args.chrom_sizes)
     genome_processor = GenomeProcessor(
-        args.chrom_sizes,
-        args.mappable_bases,
+        chrom_sizes=chrom_sizes,
+        mappable_bases_file=args.mappable_bases,
         cpus=args.cpus,
         logger_level=logger_level,
         save_debug=args.debug,
