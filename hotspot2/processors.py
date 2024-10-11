@@ -184,10 +184,10 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
     
     def extract_cutcounts(self, cutcounts_file):
-        self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
         try:
             self.extract_mappable_bases()
+            self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
             with TabixExtractor(
                 cutcounts_file, columns=['#chr', 'start', 'end', 'id', 'cutcounts']
             ) as cutcounts_loader:
