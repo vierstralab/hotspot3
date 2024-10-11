@@ -148,7 +148,7 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
-        return pd.concat(hotspots, ignore_index=True)
+        return hotspots
 
 
 class ChromosomeProcessor:
