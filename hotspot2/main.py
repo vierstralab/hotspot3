@@ -462,9 +462,9 @@ def parse_arguments():
 
     if args.precalc_fdrs is not None:
         if args.cutcounts is not None:
-            root_logger.debug("Ignoring cutcounts file as precalculated FDRs are provided")
+            root_logger.warning("Ignoring cutcounts file as precalculated FDRs are provided")
         if args.mappable_bases is not None:
-            root_logger.debug("Ignoring mappable bases file as precalculated FDRs are provided")
+            root_logger.warning("Ignoring mappable bases file as precalculated FDRs are provided")
     return args, logger_level
 
 
