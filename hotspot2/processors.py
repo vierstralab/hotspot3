@@ -272,6 +272,7 @@ class ChromosomeProcessor:
         log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name)['log10_fdr'].to_numpy()
         if log10_fdr_array.size == 0:
             raise NoContigPresentError
+        self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         data = hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold=fdr_threshold, min_width=min_width)
         return ProcessorOutputData(self.chrom_name, data) if data is not None else None
     
