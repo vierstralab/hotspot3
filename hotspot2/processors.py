@@ -130,7 +130,7 @@ class GenomeProcessor:
 
 
     def calc_density(self, cutcounts_file) -> ProcessorOutputData:
-        merged_data = self.parallel_by_chromosome(ChromosomeProcessor.extract_cutcounts, cutcounts_file)
+        merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_density, cutcounts_file)
         return merged_data
     
 

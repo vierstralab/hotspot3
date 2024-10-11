@@ -40,7 +40,7 @@ def main():
     
     precalc_density = args.precalc_density
     if precalc_density is None:
-        root_logger.info('Calling peaks')
+        root_logger.info('Calling densities')
         density_data = genome_processor.calc_density(args.cutcounts)
         precalc_density = f"{args.prefix}.density.bed"
         density_data.data_df.to_csv(precalc_density, sep='\t', index=False)
