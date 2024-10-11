@@ -14,6 +14,7 @@ from statsmodels.stats.multitest import multipletests
 from typing import Tuple
 import sys
 import gc
+import argparse
 
 root_logger = logging.getLogger(__name__)
 
@@ -143,7 +144,7 @@ class GenomeProcessor:
     def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
         data = []
         params = []
-        categories=[x for x in self.chrom_sizes.keys()]
+        categories=[x.chrom for x in results]
         for res in results:
             df = res.data_df
             df['chrom'] = pd.Categorical(
@@ -340,12 +341,21 @@ def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None):
 
 
 def read_chrom_sizes(chrom_sizes):
+    if chrom_sizes is None:
+        raise NotImplementedError("hg38 chromosome sizes are not embedded yet. Please provide a chromosome sizes file.")
     return pd.read_table(
         chrom_sizes,
         header=None,
         names=['chrom', 'size']
     ).set_index('chrom')['size'].to_dict()
 
+
+def read_df_for_chrom(df_path, chrom_name):
+    return pd.read_parquet(
+        df_path,
+        filters=[('chrom', '==', chrom_name)],
+        engine='pyarrow'
+    )
 
 def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min_width=50) -> pd.DataFrame:
     """
@@ -360,11 +370,7 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
     Returns:
         - pd.DataFrame: DataFrame containing the hotspots in bed format.
     """
-    log10_fdr_array = pd.read_parquet(
-        fdr_path,
-        filters=[('chrom', '==', chrom_name)],
-        engine='pyarrow'
-    )['log10_fdr'].values
+    log10_fdr_array = read_df_for_chrom(fdr_path, chrom_name)['log10_fdr'].values
     if log10_fdr_array.size == 0:
         return
     below_threshold = log10_fdr_array >= -np.log10(threshold)
@@ -394,38 +400,63 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, threshold=0.05, min
     })
 
 
-def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=None):
-    set_logger_config(root_logger, logging.DEBUG)
+def main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, logger_level, fdr_path=None):
+    set_logger_config(root_logger, logger_level)
     root_logger.debug('Processing started')
     genome_processor = GenomeProcessor(
         chrom_sizes,
         mappable_bases_file,
         cpus=cpus,
+        logger_level=logger_level
         #chromosomes=['chr20', 'chr19']
     )
     if fdr_path is None:
-        root_logger.debug('Calculating p-values')
+        root_logger.info('Calculating p-values')
         df, params = genome_processor.calc_pval(cutcounts)
         root_logger.debug('Saving P-values')
-        df.to_parquet(outpath, engine='pyarrow', compression='zstd', compression_level=22, index=False, partition_cols=['chrom']) #  partition_on=['chrom']
+        df.to_parquet(
+            outpath,
+            engine='pyarrow',
+            compression='zstd',
+            compression_level=22,
+            index=False,
+            partition_cols=['chrom'],
+            use_dictionary=True,
+            row_group_size=1_000_000,
+        )
         params.to_csv(outpath + '.params.gz', sep='\t', index=False)
         del df, params
         gc.collect()
         fdr_path = outpath
-    root_logger.debug('Calling hotspots')
+    root_logger.info('Calling hotspots')
     hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=0.05)
-    root_logger.debug('Hotspots calling finished')
     hotspots.to_csv(outpath + '.hotspots.gz', sep='\t', index=False)
+    root_logger.info('Program finished')
 
 
 if __name__ == "__main__":
-    cutcounts = sys.argv[1]
-    chrom_sizes = read_chrom_sizes(sys.argv[2])
-    mappable_bases_file = sys.argv[3]
-    cpus = int(sys.argv[4])
-    outpath = sys.argv[5]
-    if len(sys.argv) > 6:
-        fdr_path = sys.argv[6]
-    else:
-        fdr_path = None
-    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=fdr_path)
+    parser = argparse.ArgumentParser(description="Process data for p-values or hotspots.")
+    
+    # common arguments
+    parser.add_argument("prefix", type=str, help="Output prefix")
+    parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
+    parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
+
+    # Argument for calculating p-values
+    parser.add_argument("--cutcounts", help="Path to cutcounts file")
+    parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
+    parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed)", default=None)
+    
+    # Argument to call hotspots, skip calculating p-values if provided
+    parser.add_argument("--precalc_fdrs", help="Path to pre-calculated parquet folder with fdrs", default=None)
+
+    args = parser.parse_args()
+    logger_level = logging.DEBUG if args.debug_mode else logging.INFO
+    cutcounts = args.cutcounts
+    chrom_sizes = read_chrom_sizes(args.chrom_sizes)
+    mappable_bases_file = args.mappable_bases
+    cpus = args.cpus
+    outpath = args.prefix
+    fdr_path = args.precalc_fdrs
+
+    main(cutcounts, chrom_sizes, mappable_bases_file, cpus, outpath, fdr_path=fdr_path, logger_level=logger_level)
