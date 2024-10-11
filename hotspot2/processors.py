@@ -124,7 +124,8 @@ class GenomeProcessor:
     def calc_density(self, cutcounts_file) -> ProcessorOutputData:
         merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_density, cutcounts_file)
         merged_data.data_df['end'] = merged_data.data_df['start'] + self.density_step
-        return merged_data[['chrom', 'start', 'end', 'density']]
+        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'density']]
+        return merged_data
     
 
     def call_hotspots(self, fdr_path, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
@@ -137,7 +138,7 @@ class GenomeProcessor:
             - min_width: Minimum width for a region to be called a hotspot.
 
         Returns:
-            - hotspots: BED-like DataFrame containing hotspots.
+            - hotspots: ProcessorOutputData containing the hotspots in bed format.
         """
         hotspots = self.parallel_by_chromosome(
             ChromosomeProcessor.call_hotspots,
@@ -145,13 +146,14 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
-
-        return hotspots[['chrom', 'start', 'end', 'max_neglog10_fdr']]
+        hotspots.data_df = hotspots.data_df[['chrom', 'start', 'end', 'max_neglog10_fdr']]
+        return hotspots
 
     def call_peaks(self, hotspots_path, density_path):
         merged_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks, density_path, hotspots_path)
-        return merged_data[['chrom', 'start', 'end']]
+        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end']]
+        return merged_data
 
 
 class ChromosomeProcessor:
@@ -273,7 +275,7 @@ class ChromosomeProcessor:
         data = hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold=fdr_threshold, min_width=min_width)
         return ProcessorOutputData(self.chrom_name, data) if data is not None else None
     
-    
+
     @ensure_contig_exists
     def call_variable_width_peaks(self, density_path, hotspots) -> ProcessorOutputData:
         raise NotImplementedError
