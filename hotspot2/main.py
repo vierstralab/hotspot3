@@ -43,6 +43,7 @@ def main():
         root_logger.info('Calling densities')
         density_data = genome_processor.calc_density(args.cutcounts)
         precalc_density = f"{args.prefix}.density.bed"
+        root_logger.debug('Saving densities')
         density_data.data_df.to_csv(precalc_density, sep='\t', index=False)
         del density_data
         gc.collect()
