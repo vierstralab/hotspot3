@@ -144,8 +144,8 @@ class GenomeProcessor:
     def merge_dfs(self, results: list[PeakCallingData]) -> pd.DataFrame:
         data = []
         params = []
-        categories=[x.chrom for x in results]
-        for res in results:
+        categories = [x.chrom for x in results]
+        for res in sorted(results, key=lambda x: x.chrom):
             df = res.data_df
             df['chrom'] = pd.Categorical(
                 [res.chrom] * df.shape[0],
