@@ -477,7 +477,7 @@ def main():
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Process data for p-values or hotspots.")
+    parser = argparse.ArgumentParser(description="Call hotspots from cutcounts")
     
     # common arguments
     parser.add_argument("prefix", type=str, help="Output prefix")
@@ -491,7 +491,7 @@ def parse_arguments():
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed)", default=None)
     
     # Argument to call hotspots, skip calculating p-values if provided
-    parser.add_argument("--precalc_fdrs", help="Path to pre-calculated parquet folder with fdrs", default=None)
+    parser.add_argument("--precalc_fdrs", help="Path to pre-calculated partitioned parquet file(s) with FDRs. Skips FDR calculation", default=None)
 
     args = parser.parse_args()
     logger_level = logging.DEBUG if args.debug else logging.INFO
