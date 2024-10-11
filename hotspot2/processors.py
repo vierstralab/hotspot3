@@ -271,7 +271,7 @@ class ChromosomeProcessor:
         data = hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold=fdr_threshold, min_width=min_width)
         return ProcessorOutputData(self.chrom_name, data) if data is not None else None
     
-    def call_variable_width_peaks(self, density_path, hotspots):
+    def call_variable_width_peaks(self, density_path, hotspots) -> ProcessorOutputData:
         raise NotImplementedError
 
     def fit_background_negbin_model(self, agg_cutcounts, high_signal_mask, in_window=True):
