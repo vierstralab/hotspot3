@@ -97,12 +97,10 @@ class GenomeProcessor:
             - hotspots: DataFrame containing the hotspots.
         """
         hotspots = []
-        for chrom in self.chrom_sizes.keys():
-                
-            # FIXME add to chromosome processors
-            data = hotspots_from_log10_fdr_vectorized(chrom, fdr_path, fdr_tr, min_width)
+        for chrom_processor in self.chromosome_processors:
+            data = chrom_processor.hotspots_from_log10_fdr_vectorized(fdr_path, fdr_tr, min_width)
             if data is None:
-                self.logger.debug(f"Chromosome {chrom} not found in FDR file. Skipping...")
+                self.logger.debug(f"Chromosome {chrom_processor.chrom_name} not found in FDR file. Skipping...")
                 continue
             hotspots.append(data)
         return pd.concat(hotspots, ignore_index=True)
@@ -232,6 +230,47 @@ class ChromosomeProcessor:
             'rmsea': [np.nan],
         })
         return PeakCallingData(self.chrom_name, data_df, params_df)
+
+    def hotspots_from_log10_fdr_vectorized(self, fdr_path, fdr_threshold=0.05, min_width=50):
+        """
+        Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
+
+        Parameters:
+            - fdr_path: Path to the partitioned parquet file(s) containing the log10(FDR) values.
+            - threshold: FDR threshold for merging regions.
+            - min_width: Minimum width for a region to be called a hotspot.
+
+        Returns:
+            - pd.DataFrame: DataFrame containing the hotspots in bed format.
+        """
+        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name)['log10_fdr'].values
+        if log10_fdr_array.size == 0:
+            return
+        below_threshold = log10_fdr_array >= -np.log10(fdr_threshold)
+        # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
+        boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
+
+        region_starts = np.where(boundaries == 1)[0]
+        region_ends = np.where(boundaries == -1)[0]
+
+        valid_widths = (region_ends - region_starts) >= min_width
+        region_starts = region_starts[valid_widths]
+        region_ends = region_ends[valid_widths]
+
+        root_logger.debug(f'Found hotspots for {self.chrom_name}')
+
+        min_log10_fdr_values = np.empty(region_ends.shape)
+        for i in range(len(region_starts)):
+            start = region_starts[i]
+            end = region_ends[i]
+            min_log10_fdr_values[i] = np.max(log10_fdr_array[start:end])
+
+        return pd.DataFrame({
+            '#chr': [self.chrom_name] * len(region_starts),
+            'start': region_starts,
+            'end': region_ends,
+            'log10_fdr': min_log10_fdr_values
+        })
 
     def extract_cutcounts(self, cutcounts_file):
         with TabixExtractor(
@@ -425,8 +464,6 @@ def main():
             compression_level=22,
             index=False,
             partition_cols=['chrom'],
-            use_dictionary=True,
-            row_group_size=1_000_000,
         )
         params.to_csv(params_path, sep='\t', index=False)
         del df, params
