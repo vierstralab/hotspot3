@@ -411,6 +411,7 @@ def main():
         save_debug=args.debug,
         #chromosomes=['chr20', 'chr19']
     )
+    fdr_path = args.precalc_fdrs
     if fdr_path is None:
         root_logger.info('Calculating p-values')
         df, params = genome_processor.calc_pval(args.cutcounts)
