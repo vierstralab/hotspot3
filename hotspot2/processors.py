@@ -146,7 +146,7 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
-        hotspots.data_df['id'] = 'id-' + np.arange(1, len(hotspots.data_df) + 1).astype(str)
+        hotspots.data_df['id'] = [f'id-{x}' for x in np.arange(1, len(hotspots.data_df) + 1)]
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 1000)
         hotspots.data_df = hotspots.data_df[['chrom', 'start', 'end', 'id', 'max_neglog10_fdr']]
         return hotspots
