@@ -57,7 +57,7 @@ def is_iterable(obj):
 
 
 def arg_to_list(arg, size):
-    if is_iterable(arg):
+    if not isinstance(arg, str) and is_iterable(arg):
         assert len(arg) == size, f"Expected {size} elements, got {len(arg)} ({arg})"
         return arg
     return [arg] * size
