@@ -197,8 +197,8 @@ class ChromosomeProcessor:
             with TabixExtractor(
                 cutcounts_file, columns=['#chr', 'start', 'end', 'id', 'cutcounts']
             ) as cutcounts_loader:
-                
                 data = cutcounts_loader[self.genomic_interval]
+                assert data.eval('end - start == 1').all(), "Cutcounts should be in basepair resolution"
                 cutcounts[data['start']] = data['cutcounts'].to_numpy()
         except ValueError:
             raise NoContigPresentError
@@ -212,7 +212,10 @@ class ChromosomeProcessor:
             cutcounts,
             self.gp.density_bandwidth
         )[::self.gp.density_step].filled(0)
-        data = pd.DataFrame({'density': density, 'start': np.arange(0, self.chrom_size, self.gp.density_step)})
+        data = pd.DataFrame({
+            'density': density,
+            'start': np.arange(0, self.chrom_size, self.gp.density_step)
+        })
         return ProcessorOutputData(self.chrom_name, data)
 
     @ensure_contig_exists

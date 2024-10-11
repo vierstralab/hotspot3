@@ -91,6 +91,12 @@ class NoContigPresentError(Exception):
 
 
 def ensure_contig_exists(func):
+    """
+    Decorator for functions that require a contig to be present in the input data.
+
+    Returns None if the contig is not present.
+    Otherwise, returns the result of the function.
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
