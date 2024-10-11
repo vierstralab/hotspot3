@@ -148,6 +148,11 @@ class GenomeProcessor:
 
         return hotspots[['chrom', 'start', 'end', 'max_neglog10_fdr']]
 
+    def call_peaks(self, hotspots_path, density_path):
+        merged_data = self.parallel_by_chromosome(
+            ChromosomeProcessor.call_variable_width_peaks, density_path, hotspots_path)
+        return merged_data[['chrom', 'start', 'end']]
+
 
 class ChromosomeProcessor:
     """
