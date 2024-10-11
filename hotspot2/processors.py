@@ -98,7 +98,6 @@ class GenomeProcessor:
             self.chromosome_processors, 
             *[arg_to_list(arg, len(self.chromosome_processors)) for arg in args]
         ]
-        print(all_args)
         if self.cpus == 1:
             results = [func(*func_args) for func_args in all_args]
         else:
