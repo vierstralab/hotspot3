@@ -164,8 +164,6 @@ class ChromosomeProcessor:
         self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
         self.int_dtype = self.gp.int_dtype
         self.mappable_bases = None
-        self.cutcounts = None
-        self.last_cutcounts_file = None
     
     def extract_mappable_bases(self, force=False):
         if self.mappable_bases is not None and not force:
@@ -188,8 +186,6 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
     
     def extract_cutcounts(self, cutcounts_file, force=False):
-        if self.cutcounts is not None and not force and cutcounts_file == self.last_cutcounts_file:
-            return
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
         try:
@@ -201,17 +197,16 @@ class ChromosomeProcessor:
                 cutcounts[data['start']] = data['cutcounts'].to_numpy()
         except ValueError:
             raise NoContigPresentError
-        self.cutcounts = cutcounts
-        self.last_cutcounts_file = cutcounts_file
+        return cutcounts
 
     def calc_density(self, cutcounts_file) -> ProcessorOutputData:
         try:
-            self.extract_cutcounts(cutcounts_file)
+            cutcounts = self.extract_cutcounts(cutcounts_file)
         except NoContigPresentError: # FIXME handle in decorator
             return
         self.gp.logger.debug(f'Calculating density {self.chrom_name}')
         density = self.smooth_counts(
-            self.cutcounts,
+            cutcounts,
             self.gp.density_bandwidth
         )[::self.gp.density_step].filled(0)
         return ProcessorOutputData(self.chrom_name, pd.DataFrame({'density': density}))
@@ -219,12 +214,13 @@ class ChromosomeProcessor:
     def calc_pvals(self, cutcounts_file) -> ProcessorOutputData:
         try:
             self.extract_mappable_bases()
-            self.extract_cutcounts(cutcounts_file)
+            cutcounts = self.extract_cutcounts(cutcounts_file)
         except NoContigPresentError: # FIXME handle in decorator
             return
 
+        
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        agg_cutcounts = self.smooth_counts(self.cutcounts, self.gp.window)
+        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
