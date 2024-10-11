@@ -91,7 +91,7 @@ def parse_arguments():
             root_logger.warning("Ignoring mappable bases file as precalculated FDRs are provided")
     
     if args.precalc_density is not None:
-        if args.cutcounts is not None:
+        if args.cutcounts is not None and args.precalc_fdrs is None:
             root_logger.warning("Ignoring cutcounts file as precalculated density is provided")
     # elif args.cutcounts is None:
     #     raise ValueError("Either cutcounts or precalculated density file should be provided for calling peaks")
