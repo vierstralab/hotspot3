@@ -2,7 +2,7 @@ import logging
 import gc
 import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
-from utils import read_chrom_sizes
+from utils import read_chrom_sizes, df_to_tabix
 
 
 def main():
@@ -42,19 +42,19 @@ def main():
     if precomp_density is None:
         root_logger.info('Computing densities')
         density_data = genome_processor.calc_density(args.cutcounts)
-        precomp_density = f"{args.prefix}.density.bed"
+        precomp_density = f"{args.prefix}.density.bed.gz"
         root_logger.debug('Saving densities')
-        density_data.data_df.to_csv(precomp_density, sep='\t', index=False)
+        df_to_tabix(density_data, precomp_density)
         del density_data
         gc.collect()
 
     root_logger.info('Calling hotspots')
     hotspots_path = f"{args.prefix}.hotspots.bed"
     hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr)
-    hotspots.data_df.to_csv(hotspots_path, sep='\t', index=False) # TODO save as tabix
+    df_to_tabix(hotspots.data_df, hotspots_path)
 
     root_logger.info('Calling peaks is not yet implemented')
-    #genome_processor.call_peaks(hotspots_path, precalc_density)
+    # genome_processor.call_peaks(hotspots_path, precomp_density)
     root_logger.info('Program finished')
 
 

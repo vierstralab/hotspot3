@@ -1,5 +1,8 @@
 import pandas as pd
 import dataclasses
+import pysam
+import io
+
 
 @dataclasses.dataclass
 class ProcessorOutputData:
@@ -61,3 +64,35 @@ def arg_to_list(arg, size):
         assert len(arg) == size, f"Expected {size} elements, got {len(arg)} ({arg})"
         return arg
     return [arg] * size
+
+
+def df_to_tabix(df: pd.DataFrame, tabix_path):
+    """
+    Convert a DataFrame to a tabix-indexed file.
+    Renames 'chrom' column to '#chr' if exists.
+
+    Parameters:
+        - df: DataFrame to convert - bed format. First columns (chr start end).
+        - tabix_path: Path to the tabix-indexed file.
+
+    Returns:
+        - None
+    """
+    with pysam.BGZFile(tabix_path, 'w') as bgzip_out:
+        with io.TextIOWrapper(bgzip_out, encoding='utf-8') as text_out:
+            df.rename(columns={'chrom': '#chr'}).to_csv(text_out, sep='\t', index=False)
+
+    pysam.tabix_index(tabix_path, preset='bed', force=True)
+
+
+class NoContigPresentError(Exception):
+    ...
+
+
+def ensure_contig_exists(func):
+    def wrapper(func, *args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except NoContigPresentError:
+            return None
+    return wrapper

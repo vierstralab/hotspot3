@@ -64,9 +64,6 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, fdr_threshold, min_
     Returns:
         - pd.DataFrame: DataFrame containing the hotspots in bed format.
     """
-    log10_fdr_array = read_df_for_chrom(fdr_path, chrom_name)['log10_fdr'].values
-    if log10_fdr_array.size == 0:
-        return
     below_threshold = log10_fdr_array >= -np.log10(fdr_threshold)
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
@@ -87,5 +84,5 @@ def hotspots_from_log10_fdr_vectorized(chrom_name, fdr_path, fdr_threshold, min_
     return pd.DataFrame({
         'start': region_starts,
         'end': region_ends,
-        'log10_fdr': min_log10_fdr_values
+        'max_neglog10_fdr': min_log10_fdr_values
     })

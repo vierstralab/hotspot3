@@ -9,7 +9,7 @@ import pandas as pd
 import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized
-from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome
+from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom
 
 
 root_logger = logging.getLogger(__name__)
@@ -23,10 +23,6 @@ def set_logger_config(logger: logging.Logger, level: int):
         formatter = logging.Formatter('%(asctime)s  %(levelname)s  %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-
-
-class NoContigPresentError(Exception):
-    ...
 
 
 class GenomeProcessor:
@@ -96,6 +92,7 @@ class GenomeProcessor:
             self.chromosome_processors, 
             *[arg_to_list(arg, len(self.chromosome_processors)) for arg in args]
         ]
+        self.logger.debug(f'Using {self.cpus} CPUs')
         if self.cpus == 1:
             results = [func(*func_args) for func_args in all_args]
         else:
@@ -107,7 +104,6 @@ class GenomeProcessor:
 
 
     def calc_pval(self, cutcounts_file, write_raw_pvals=False) -> ProcessorOutputData:
-        self.logger.debug(f'Using {self.cpus} CPUs')
         merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_pvals, cutcounts_file)
     
         self.logger.debug('Results concatenated. Calculating FDR')
@@ -127,7 +123,8 @@ class GenomeProcessor:
 
     def calc_density(self, cutcounts_file) -> ProcessorOutputData:
         merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_density, cutcounts_file)
-        return merged_data
+        merged_data.data_df['end'] = merged_data.data_df['start'] + self.density_step
+        return merged_data[['chrom', 'start', 'end', 'density']]
     
 
     def call_hotspots(self, fdr_path, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
@@ -148,7 +145,8 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
-        return hotspots
+
+        return hotspots[['chrom', 'start', 'end', 'max_neglog10_fdr']]
 
 
 class ChromosomeProcessor:
@@ -186,8 +184,8 @@ class ChromosomeProcessor:
     
     def extract_cutcounts(self, cutcounts_file):
         cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
+        self.extract_mappable_bases()
         try:
-            self.extract_mappable_bases()
             self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
             with TabixExtractor(
                 cutcounts_file, columns=['#chr', 'start', 'end', 'id', 'cutcounts']
@@ -199,25 +197,21 @@ class ChromosomeProcessor:
             raise NoContigPresentError
         return cutcounts
 
+    @ensure_contig_exists
     def calc_density(self, cutcounts_file) -> ProcessorOutputData:
-        try:
-            cutcounts = self.extract_cutcounts(cutcounts_file)
-        except NoContigPresentError: # FIXME handle in decorator
-            return
+        cutcounts = self.extract_cutcounts(cutcounts_file)
         self.gp.logger.debug(f'Calculating density {self.chrom_name}')
         density = self.smooth_counts(
             cutcounts,
             self.gp.density_bandwidth
         )[::self.gp.density_step].filled(0)
-        return ProcessorOutputData(self.chrom_name, pd.DataFrame({'density': density}))
+        data = pd.DataFrame({'density': density, 'start': np.arange(0, self.chrom_size, self.gp.density_step)})
+        return ProcessorOutputData(self.chrom_name, data)
 
+    @ensure_contig_exists
     def calc_pvals(self, cutcounts_file) -> ProcessorOutputData:
-        try:
-            cutcounts = self.extract_cutcounts(cutcounts_file)
-        except NoContigPresentError: # FIXME handle in decorator
-            return
+        cutcounts = self.extract_cutcounts(cutcounts_file)
 
-        
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
         agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
@@ -266,6 +260,9 @@ class ChromosomeProcessor:
         return ProcessorOutputData(self.chrom_name, data_df, params_df)
 
     def call_hotspots(self, fdr_path, fdr_threshold=0.05, min_width=50) -> ProcessorOutputData:
+        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name)['log10_fdr'].values
+        if log10_fdr_array.size == 0:
+            return None
         data = hotspots_from_log10_fdr_vectorized(self.chrom_name, fdr_path, fdr_threshold=fdr_threshold, min_width=min_width)
         return ProcessorOutputData(self.chrom_name, data) if data is not None else None
     
