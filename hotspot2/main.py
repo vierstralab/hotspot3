@@ -49,7 +49,7 @@ def main():
         gc.collect()
 
     root_logger.info('Calling hotspots')
-    hotspots_path = f"{args.prefix}.hotspots.bed"
+    hotspots_path = f"{args.prefix}.hotspots.bed.gz"
     hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr)
     df_to_tabix(hotspots.data_df, hotspots_path)
 
