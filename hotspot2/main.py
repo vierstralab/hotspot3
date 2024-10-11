@@ -448,6 +448,8 @@ def main():
         cpus=args.cpus,
         logger_level=logger_level,
         save_debug=args.debug,
+        window=args.window,
+        bg_window=args.background_window,
         #chromosomes=['chr20', 'chr19']
     )
     fdr_path = args.precalc_fdrs
@@ -486,9 +488,12 @@ def parse_arguments():
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
 
+
     # Argument for calculating p-values
     parser.add_argument("--cutcounts", help="Path to cutcounts tabix file")
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed)", default=None)
+    parser.add_argument("--window", help="Window size for smoothing cutcounts", type=int, default=201)
+    parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
     
     # Argument to call hotspots, skip calculating p-values if provided
     parser.add_argument("--precalc_fdrs", help="Path to pre-calculated partitioned parquet file(s) with FDRs. Skips FDR calculation", default=None)
