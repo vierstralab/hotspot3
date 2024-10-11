@@ -49,8 +49,8 @@ def main():
         gc.collect()
 
     root_logger.info('Calling hotspots')
-    hotspots_path = f"{args.prefix}.hotspots.bed.gz"
     hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr).data_df
+    hotspots_path = f"{args.prefix}.hotspots.fdr{args.fdr}.bed.gz"
     df_to_tabix(hotspots, hotspots_path)
 
     root_logger.info('Calling peaks is not yet implemented')
