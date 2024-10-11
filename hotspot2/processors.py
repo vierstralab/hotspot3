@@ -104,9 +104,6 @@ class GenomeProcessor:
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 results = list(executor.map(func, *all_args))
         self.set_logger() # Restore logger after parallel execution
-        for res in results:
-            if res is None:
-                self.logger.debug(f"{res.chrom_name} not found in {args[0]}. Skipping...")
         return merge_and_add_chromosome([x for x in results if x is not None])
 
 
