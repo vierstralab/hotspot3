@@ -92,8 +92,8 @@ def parse_arguments():
     if args.precalc_density is not None:
         if args.cutcounts is not None:
             root_logger.warning("Ignoring cutcounts file as precalculated density is provided")
-    elif args.cutcounts is None:
-        raise ValueError("Either cutcounts or precalculated density file should be provided for calling peaks")
+    # elif args.cutcounts is None:
+    #     raise ValueError("Either cutcounts or precalculated density file should be provided for calling peaks")
 
     return args, logger_level
 
