@@ -18,8 +18,8 @@ def main():
         bg_window=args.background_window,
         #chromosomes=['chr20', 'chr19']
     )
-    fdr_path = args.precalc_fdrs
-    if fdr_path is None:
+    precomp_fdrs = args.precomp_fdrs
+    if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
         pvals_data = genome_processor.calc_pval(args.cutcounts)
         root_logger.debug('Saving P-values')
@@ -36,21 +36,21 @@ def main():
         del pvals_data
         gc.collect()
 
-        fdr_path = parquet_path
+        precomp_fdrs = parquet_path
     
-    precalc_density = args.precalc_density
-    if precalc_density is None:
-        root_logger.info('Calling densities')
+    precomp_density = args.precomp_density
+    if precomp_density is None:
+        root_logger.info('Computing densities')
         density_data = genome_processor.calc_density(args.cutcounts)
-        precalc_density = f"{args.prefix}.density.bed"
+        precomp_density = f"{args.prefix}.density.bed"
         root_logger.debug('Saving densities')
-        density_data.data_df.to_csv(precalc_density, sep='\t', index=False)
+        density_data.data_df.to_csv(precomp_density, sep='\t', index=False)
         del density_data
         gc.collect()
 
     root_logger.info('Calling hotspots')
     hotspots_path = f"{args.prefix}.hotspots.bed"
-    hotspots = genome_processor.call_hotspots(fdr_path, fdr_tr=args.fdr)
+    hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr)
     hotspots.data_df.to_csv(hotspots_path, sep='\t', index=False) # TODO save as tabix
 
     root_logger.info('Calling peaks is not yet implemented')
@@ -75,23 +75,23 @@ def parse_arguments():
     parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
     
     # Arguments to call hotspots, skip calculating p-values if provided
-    parser.add_argument("--precalc_fdrs", help="Path to pre-calculated partitioned parquet file(s) with FDRs. Skips FDR calculation", default=None)
+    parser.add_argument("--precomp_fdrs", help="Path to pre-calculated partitioned parquet file(s) with FDRs. Skips FDR calculation", default=None)
 
     # Arguments to call peaks, skip calculating p-values if provided
-    parser.add_argument("--precalc_density", help="Path to pre-calculated tabix density file", default=None)
+    parser.add_argument("--precomp_density", help="Path to pre-calculated tabix density file", default=None)
 
     args = parser.parse_args()
     logger_level = logging.DEBUG if args.debug else logging.INFO
     set_logger_config(root_logger, logger_level)
 
-    if args.precalc_fdrs is not None:
+    if args.precomp_fdrs is not None:
         if args.cutcounts is not None:
             root_logger.warning("Ignoring cutcounts file as precalculated FDRs are provided")
         if args.mappable_bases is not None:
             root_logger.warning("Ignoring mappable bases file as precalculated FDRs are provided")
     
-    if args.precalc_density is not None:
-        if args.cutcounts is not None and args.precalc_fdrs is None:
+    if args.precomp_density is not None:
+        if args.cutcounts is not None and args.precomp_fdrs is None:
             root_logger.warning("Ignoring cutcounts file as precalculated density is provided")
     # elif args.cutcounts is None:
     #     raise ValueError("Either cutcounts or precalculated density file should be provided for calling peaks")
