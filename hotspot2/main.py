@@ -41,7 +41,7 @@ def main():
     precomp_density = args.precomp_density
     if precomp_density is None:
         root_logger.info('Computing densities')
-        density_data = genome_processor.calc_density(args.cutcounts)
+        density_data = genome_processor.calc_density(args.cutcounts).data_df
         precomp_density = f"{args.prefix}.density.bed.gz"
         root_logger.debug('Saving densities')
         df_to_tabix(density_data, precomp_density)
@@ -50,8 +50,8 @@ def main():
 
     root_logger.info('Calling hotspots')
     hotspots_path = f"{args.prefix}.hotspots.bed.gz"
-    hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr)
-    df_to_tabix(hotspots.data_df, hotspots_path)
+    hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr).data_df
+    df_to_tabix(hotspots, hotspots_path)
 
     root_logger.info('Calling peaks is not yet implemented')
     # genome_processor.call_peaks(hotspots_path, precomp_density)
