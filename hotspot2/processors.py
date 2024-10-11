@@ -79,8 +79,6 @@ class GenomeProcessor:
         state = self.__dict__
         if 'logger' in state:
             del state['logger']
-        if 'chromosome_processors' in state:
-            del state['chromosome_processors']
         return state
 
     def set_logger(self):
@@ -185,7 +183,7 @@ class ChromosomeProcessor:
         self.mappable_bases = ma.masked_where(~mappable, mappable)
         self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
     
-    def extract_cutcounts(self, cutcounts_file, force=False):
+    def extract_cutcounts(self, cutcounts_file):
         self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
         try:
