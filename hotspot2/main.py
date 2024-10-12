@@ -16,7 +16,7 @@ def main():
         save_debug=args.debug,
         window=args.window,
         bg_window=args.background_window,
-        chromosomes=['chr20', 'chr19']
+        #chromosomes=['chr20', 'chr19']
     )
     precomp_fdrs = args.precomp_fdrs
 
