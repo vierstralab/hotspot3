@@ -1,10 +1,10 @@
 from functools import reduce
-from scipy.signal import convolve
+from scipy.signal import convolve, find_peaks
 import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
 from statsmodels.stats.multitest import multipletests
-from utils import read_df_for_chrom
+import pywt
 import pandas as pd
 
 
@@ -86,3 +86,151 @@ def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width
         'end': region_ends,
         'max_neglog10_fdr': min_log10_fdr_values
     })
+
+
+def convolve1d_fast(arr, ker, mode='wrap', origin=0):
+    pad_width = len(ker) // 2
+    padded_arr = np.pad(arr, pad_width, mode=mode)
+    conv_result = convolve(padded_arr, ker, mode='valid')
+    return np.roll(conv_result[:len(arr)], origin)
+
+
+def convolve_d(h_t, v_j_1, j):
+    '''
+    jth level decomposition
+    h_t: \tilde{h} = h / sqrt(2)
+    v_j_1: v_{j-1}, the (j-1)th scale coefficients
+    return: w_j (or v_j)
+    '''
+    ker = np.zeros(len(h_t) * 2**(j - 1))
+    for i, h in enumerate(h_t):
+        ker[i * 2**(j - 1)] = h
+
+    return convolve1d_fast(v_j_1, ker, mode='wrap', origin=-len(ker) // 2)
+
+
+def convolve_s(g_t, v_j, j):
+    '''
+    (j-1)th level synthesis from w_j, w_j
+    see function circular_convolve_d
+    '''
+    g_ker = np.zeros(len(g_t) * 2**(j - 1))
+
+    for i, g in enumerate(g_t):
+        g_ker[i * 2**(j - 1)] = g
+
+    return convolve1d_fast(v_j,
+                        np.flip(g_ker),
+                        mode='wrap',
+                        origin=(len(g_ker) - 1) // 2)
+
+
+def modwt(x, filters, level):
+    '''
+    filters: 'db1', 'db2', 'haar', ...
+    return: see matlab
+    '''
+    wavelet = pywt.Wavelet(filters)
+    g = wavelet.dec_lo
+    g_t = np.array(g) / np.sqrt(2)
+    v_j_1 = x
+    for j in range(level):
+        v_j_1 = convolve_d(g_t, v_j_1, j + 1)
+    return v_j_1
+
+
+def imodwt(v_j, filters, level):
+    ''' inverse modwt '''
+    wavelet = pywt.Wavelet(filters)
+    g = wavelet.dec_lo
+    g_t = np.array(g) / np.sqrt(2)
+    for jp in range(level):
+        j = level - jp - 1
+        v_j = convolve_s(g_t, v_j, j + 1)
+    return v_j
+
+
+def modwt_smooth(x, filters, level):
+    w = modwt(x, filters, level) # last level approximation
+    return imodwt(w, filters, level)
+
+
+def find_closest_min_peaks(signal):
+    """
+    Find peak summits (maxima) and peak starts and ends (closest local minima).
+    Returns:
+        - peaks_coordinates: np.array of shape (n_peaks, 3) with peak starts, summits and ends
+    """
+    maxima, _ = find_peaks(signal)
+    minima, _ = find_peaks(-signal)
+    total_dif = len(maxima) - (len(minima) - 1)
+    if total_dif == 1:
+        fist_minima_pos = minima[0]
+        fist_maxima_pos = maxima[0]
+        if fist_minima_pos < fist_maxima_pos:
+            padding = (0, 1)
+        else:
+            padding = (1, 0)
+    elif total_dif == 0:
+        padding = 0
+    else:
+        padding = 1
+    minima = np.pad(minima, padding, mode='constant', constant_values=(0, len(signal) - 1))
+    peaks_coordinates = np.zeros([len(maxima), 3], dtype=int) # start, summit, end
+    peaks_coordinates[:, 1] = maxima
+
+    peaks_coordinates[:, 0] = minima[:len(maxima)]
+    peaks_coordinates[:, 2] = minima[1:]
+    return peaks_coordinates
+
+
+def filter_peaks_summits_within_hotspots(peaks_coordinates, hotspot_starts, hotspot_ends):
+    """
+    Filter peaks that are in hotspots.
+    Returns:
+        - valid_hotspot_starts: starts of hotspots that contain peaks
+        - valid_hotspot_ends: ends of hotspots that contain peaks
+        - valid_mask: mask of peaks that are in hotspots
+    """
+    summits = peaks_coordinates[:, 1]
+    closest_left_index = np.searchsorted(hotspot_starts, summits, side='right') - 1
+    valid_mask = (closest_left_index >= 0) & (summits < hotspot_ends[closest_left_index])
+
+    valid_hotspot_starts = hotspot_starts[closest_left_index[valid_mask]]
+    valid_hotspot_ends = hotspot_ends[closest_left_index[valid_mask]]
+    
+    return valid_hotspot_starts, valid_hotspot_ends, valid_mask
+
+
+def trim_at_threshold(signal, peaks_coordinates):
+    """
+    Trim peaks at the threshold height.
+    Returns:
+        - peaks_in_hotspots_trimmed: trimmed peaks coordinates
+        - threshold_heights: heights of the threshold
+    """
+    heights = signal[peaks_coordinates]
+    heights[:, 1] = heights[:, 1] / 2
+    threshold_heights = np.max(heights, axis=1)
+
+    peaks_in_hotspots_trimmed = np.zeros(peaks_coordinates.shape, dtype=np.int32)
+    for i, (left, summit, right) in enumerate(peaks_coordinates):
+        threshold = threshold_heights[i]
+        new_left = summit - np.argmax(signal[left:summit + 1][::-1] <= threshold)
+
+        new_right = summit + np.argmax(signal[summit:right + 1] <= threshold) - 1
+        peaks_in_hotspots_trimmed[i, :] = np.array([new_left, summit, new_right])
+    return peaks_in_hotspots_trimmed, threshold_heights
+
+
+def find_varwidth_peaks(signal, hotspot_starts, hotspot_ends, min_width=20):
+    peaks_coordinates = find_closest_min_peaks(signal)
+    hs_left, hs_right, in_hs_mask = filter_peaks_summits_within_hotspots(peaks_coordinates, hotspot_starts, hotspot_ends)
+    peaks_in_hotspots = peaks_coordinates[in_hs_mask, :]
+
+    peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_hotspots)
+    peaks_in_hotspots_trimmed[:, 0] = np.maximum(peaks_in_hotspots_trimmed[:, 0], hs_left)
+    peaks_in_hotspots_trimmed[:, 2] = np.minimum(peaks_in_hotspots_trimmed[:, 2], hs_right)
+    
+    width_mask = (peaks_in_hotspots_trimmed[:, 2] - peaks_in_hotspots_trimmed[:, 0]) >= min_width
+    return peaks_in_hotspots_trimmed[width_mask], threshold_heights[width_mask]

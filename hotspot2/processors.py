@@ -8,7 +8,7 @@ import multiprocessing as mp
 import pandas as pd
 import sys
 import gc
-from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized
+from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom
 
 
@@ -151,10 +151,10 @@ class GenomeProcessor:
         hotspots.data_df = hotspots.data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
         return hotspots
 
-    def call_peaks(self, hotspots_path, density_path):
+    def call_peaks(self, hotspots_path, cutcounts_path):
         merged_data = self.parallel_by_chromosome(
-            ChromosomeProcessor.call_variable_width_peaks, density_path, hotspots_path)
-        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end']]
+            ChromosomeProcessor.call_variable_width_peaks, cutcounts_path, hotspots_path)
+        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'summit']]
         return merged_data
 
 
@@ -283,8 +283,23 @@ class ChromosomeProcessor:
     
 
     @ensure_contig_exists
-    def call_variable_width_peaks(self, density_path, hotspots) -> ProcessorOutputData:
-        raise NotImplementedError
+    def call_variable_width_peaks(self, cutcounts_path, hotspots, level=7) -> ProcessorOutputData:
+        cutcounts = self.extract_cutcounts(cutcounts_path)
+        self.gp.logger.debug(f"Calculating variable width peaks for {self.chrom_name}")
+        agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
+        smoothed = modwt_smooth(agg_counts, 'haar', level=level)
+        hotspots_coordinates = self.read_hotspots_tabix(hotspots)
+        hotspot_starts = hotspots_coordinates['start'].values
+        hotspot_ends = hotspots_coordinates['end'].values
+        peaks_in_hotspots_trimmed = find_varwidth_peaks(smoothed, hotspot_starts, hotspot_ends)
+
+        return ProcessorOutputData(self.chrom_name, pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end']))
+
+
+    def read_hotspots_tabix(self, hotspots):
+        with TabixExtractor(hotspots) as hotspots_loader:
+            df = hotspots_loader[self.genomic_interval]
+        return df
 
     def fit_background_negbin_model(self, agg_cutcounts, high_signal_mask, in_window=True):
         if in_window:
