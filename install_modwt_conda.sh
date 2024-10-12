@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Check if g++ is installed
 if ! which g++ > /dev/null; then
     echo "Error: g++ is not installed. Please install g++ and try again."
