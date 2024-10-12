@@ -3,6 +3,8 @@ import dataclasses
 import pysam
 import io
 import functools
+import subprocess
+import numpy as np
 
 
 @dataclasses.dataclass
@@ -104,3 +106,57 @@ def ensure_contig_exists(func):
         except NoContigPresentError:
             return None
     return wrapper
+
+
+def run_modwt(signal, level=3):
+    """
+    Wrapper for the modwt command-line tool.
+    """
+    # Convert the NumPy array of integers to a newline-separated string
+    input_data = "\n".join(map(str, signal))
+
+    # Define the command and arguments
+    cmd = ['modwt', '--level', f"{level}", '--to-stdout', '--boundary', 'reflected', '--filter', 'haar', '-']
+
+    # Use Popen to stream input data
+    process = subprocess.Popen(
+        cmd, 
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    stdout, stderr = process.communicate(input=input_data)
+
+    if process.returncode != 0:
+        print(f"Error running modwt: {stderr}")
+        return None
+
+    return np.array2string(stdout, sep='\n')
+
+
+import cProfile
+import pstats
+import numpy as np
+
+# Assuming you have the run_modwt_optimized or the original function ready
+
+def profile_modwt(func, signal, level=3):
+    # Create a profiler instance
+    profiler = cProfile.Profile()
+
+    # Start profiling
+    profiler.enable()
+
+    # Run the function to profile
+    result = func(signal, level)  # Call your function here
+
+    # Stop profiling
+    profiler.disable()
+
+    # Create Stats object to print profiling data
+    stats = pstats.Stats(profiler).sort_stats('cumtime')  # Sort by cumulative time
+    stats.print_stats(10)  # Print top 10 lines of stats
+
+    return result
+

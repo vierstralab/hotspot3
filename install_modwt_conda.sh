@@ -12,12 +12,11 @@ if ! which make > /dev/null; then
     exit 1
 fi
 
-github_link="https://github.com/sjneph/modwt"
+github_link="https://github.com/wishabc/modwt"
 echo "Installing modwt from $github_link into conda env - $CONDA_PREFIX"
 
 git clone $github_link
 cd modwt
-git checkout 6df4ac87d1ca8552d2aafb93a6a58b9cd2e8d961 # latest commit as of 2024-10-11
 
 make -C .
 
