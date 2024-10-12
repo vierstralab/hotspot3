@@ -159,7 +159,7 @@ class GenomeProcessor:
     def call_peaks(self, hotspots_path, cutcounts_path, prefix) -> ProcessorOutputData:
         merged_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks, cutcounts_path, hotspots_path)
-        total_cutcounts = np.sum(merged_data.extra_df['sum_cutcounts'])
+        total_cutcounts = np.sum(merged_data.extra_df['total_cutcounts'])
         merged_data.data_df['id'] = prefix
         merged_data.data_df['max_norm_density'] = normalize_density(
             merged_data.data_df['max_density'], 
@@ -321,7 +321,7 @@ class ChromosomeProcessor:
                 peaks_df['start'], peaks_df['end']
             )
         ]
-        extra_df = pd.DataFrame({'sum_cutcounts': [np.sum(cutcounts)]})
+        extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
         return ProcessorOutputData(self.chrom_name, peaks_df, extra_df)
 
 
