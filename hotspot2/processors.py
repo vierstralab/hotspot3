@@ -295,9 +295,14 @@ class ChromosomeProcessor:
         hotspot_ends = hotspots_coordinates['end'].values
 
         self.gp.logger.debug(f"Finding peaks in hotspots for {self.chrom_name}")
-        peaks_in_hotspots_trimmed = find_varwidth_peaks(smoothed, hotspot_starts, hotspot_ends)
+        peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
+            smoothed,
+            hotspot_starts,
+            hotspot_ends
+        )
+        peaks_df = pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end'])
 
-        return ProcessorOutputData(self.chrom_name, pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end']))
+        return ProcessorOutputData(self.chrom_name, peaks_df)
 
 
     def read_hotspots_tabix(self, hotspots):
