@@ -285,7 +285,7 @@ class ChromosomeProcessor:
     @ensure_contig_exists
     def call_variable_width_peaks(self, cutcounts_path, hotspots, level=7) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        self.gp.logger.debug(f"Finding variable width peaks for {self.chrom_name}")
+        self.gp.logger.debug(f"Calling variable width peaks for {self.chrom_name}")
         agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
         filters = 'haar'
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
