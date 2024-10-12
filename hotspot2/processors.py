@@ -285,12 +285,16 @@ class ChromosomeProcessor:
     @ensure_contig_exists
     def call_variable_width_peaks(self, cutcounts_path, hotspots, level=7) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        self.gp.logger.debug(f"Calculating variable width peaks for {self.chrom_name}")
+        self.gp.logger.debug(f"Finding variable width peaks for {self.chrom_name}")
         agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
-        smoothed = modwt_smooth(agg_counts, 'haar', level=level)
+        filters = 'haar'
+        self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
+        smoothed = modwt_smooth(agg_counts, filters, level=level)
         hotspots_coordinates = self.read_hotspots_tabix(hotspots)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
+
+        self.gp.logger.debug(f"Finding peaks in hotspots for {self.chrom_name}")
         peaks_in_hotspots_trimmed = find_varwidth_peaks(smoothed, hotspot_starts, hotspot_ends)
 
         return ProcessorOutputData(self.chrom_name, pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end']))
