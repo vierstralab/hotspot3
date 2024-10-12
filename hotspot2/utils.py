@@ -11,7 +11,7 @@ import numpy as np
 class ProcessorOutputData:
     identificator: str
     data_df: pd.DataFrame
-    params_df: pd.DataFrame=None
+    extra_df: pd.DataFrame = None
 
 
 def read_chrom_sizes(chrom_sizes):
@@ -38,14 +38,19 @@ def merge_and_add_chromosome(results: list[ProcessorOutputData]) -> ProcessorOut
     categories = [x.identificator for x in results]
     for res in sorted(results, key=lambda x: x.identificator):
         df = res.data_df
+        extra_df = res.extra_df
         df['chrom'] = pd.Categorical(
             [res.identificator] * df.shape[0],
             categories=categories,
         )
         data.append(df)
-        if res.params_df is None:
+        if extra_df is None:
             continue
-        params.append(res.params_df)
+        extra_df['chrom'] = pd.Categorical(
+            [res.identificator] * extra_df.shape[0],
+            categories=categories,
+        )
+        params.append(extra_df)
         
     data = pd.concat(data, ignore_index=True)
     if len(params) == 0:
@@ -106,3 +111,6 @@ def ensure_contig_exists(func):
         except NoContigPresentError:
             return None
     return wrapper
+
+def normalize_density(density, total_cutcounts):
+    return density / total_cutcounts * 1_000_000

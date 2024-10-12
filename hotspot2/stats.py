@@ -224,6 +224,19 @@ def trim_at_threshold(signal, peaks_coordinates):
 
 
 def find_varwidth_peaks(signal, hotspot_starts, hotspot_ends, min_width=20):
+    """
+    Find variable width peaks within hotspots.
+
+    Parameters:
+        - signal: 1D array of smoothed signal values.
+        - hotspot_starts: 1D array of hotspot start positions.
+        - hotspot_ends: 1D array of hotspot end positions.
+        - min_width: Minimum width of peaks.
+    
+    Returns:
+        - peaks_in_hotspots_trimmed: 2D array of start, summit, and end positions for each peak.
+        - threshold_heights: 1D array of threshold heights for each peak.
+    """
     peaks_coordinates = find_closest_min_peaks(signal)
     hs_left, hs_right, in_hs_mask = filter_peaks_summits_within_hotspots(peaks_coordinates, hotspot_starts, hotspot_ends)
     peaks_in_hotspots = peaks_coordinates[in_hs_mask, :]

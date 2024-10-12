@@ -4,7 +4,6 @@ import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
 from utils import read_chrom_sizes, df_to_tabix
 
-
 def main():
     args, logger_level = parse_arguments()
     chrom_sizes = read_chrom_sizes(args.chrom_sizes)
@@ -19,12 +18,14 @@ def main():
         #chromosomes=['chr20', 'chr19']
     )
     precomp_fdrs = args.precomp_fdrs
+    prefix = args.id
+    outdir_pref = f"{args.outdir}/{prefix}"
 
     if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
         pvals_data = genome_processor.calc_pval(args.cutcounts)
         root_logger.debug('Saving P-values')
-        parquet_path = f"{args.prefix}.stats.parquet"
+        parquet_path = f"{outdir_pref}.stats.parquet"
         pvals_data.data_df.to_parquet(
             parquet_path,
             engine='pyarrow',
@@ -33,29 +34,37 @@ def main():
             index=False,
             partition_cols=['chrom'],
         )
-        pvals_data.params_df.to_csv(f"{args.prefix}.params.gz", sep='\t', index=False)
+        pvals_data.extra_df.to_csv(
+            f"{outdir_pref}.params.gz",
+            sep='\t',
+            index=False
+        )
         del pvals_data
         gc.collect()
 
         precomp_fdrs = parquet_path
 
     root_logger.info('Calling hotspots')
-    hotspots = genome_processor.call_hotspots(precomp_fdrs, fdr_tr=args.fdr).data_df
-    hotspots_path = f"{args.prefix}.hotspots.fdr{args.fdr}.bed.gz"
+    hotspots = genome_processor.call_hotspots(precomp_fdrs, prefix, fdr_tr=args.fdr).data_df
+    hotspots_path = f"{outdir_pref}.hotspots.fdr{args.fdr}.bed.gz"
     df_to_tabix(hotspots, hotspots_path)
     del hotspots
     gc.collect()
 
     root_logger.info('Calling peaks')
-    peaks = genome_processor.call_peaks(hotspots_path, args.cutcounts).data_df
-    peaks_path = f"{args.prefix}.peaks.fdr{args.fdr}.bed.gz"
-    df_to_tabix(peaks, peaks_path)
+    peaks = genome_processor.call_peaks(hotspots_path, args.cutcounts, prefix)
+    total_cutcounts = peaks.extra_df['total_cutcounts'].sum()
+    peaks_path = f"{outdir_pref}.peaks.fdr{args.fdr}.bed.gz"
+    df_to_tabix(peaks.data_df, peaks_path)
 
     if args.save_density:
         root_logger.info('Computing densities')
-        density_data = genome_processor.calc_density(args.cutcounts).data_df
+        density_data = genome_processor.calc_normalized_density(
+            args.cutcounts,
+            total_cutcounts=total_cutcounts
+        ).data_df
         root_logger.debug('Saving densities')
-        denisty_path = f"{args.prefix}.density.bed.gz"
+        denisty_path = f"{outdir_pref}.density.bed.gz"
         df_to_tabix(density_data, denisty_path)
     root_logger.info('Program finished')
 
@@ -64,12 +73,13 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Call hotspots from cutcounts")
     
     # common arguments
-    parser.add_argument("prefix", type=str, help="Output prefix")
+    parser.add_argument("id", type=str, help="Unique identifier of the sample")
     parser.add_argument("cutcounts", help="Path to cutcounts tabix file")
 
     parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
     parser.add_argument("--fdr", help="FDR threshold for p-values", type=float, default=0.05)
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
+    parser.add_argument("--outdir", help="Path to output directory", default=".")
     parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
 
     # Arguments for calculating p-values

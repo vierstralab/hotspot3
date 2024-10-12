@@ -9,7 +9,7 @@ import pandas as pd
 import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
-from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom
+from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density
 
 
 root_logger = logging.getLogger(__name__)
@@ -116,19 +116,23 @@ class GenomeProcessor:
         result_columns = ['chrom', 'log10_fdr']
         if self.save_debug or write_raw_pvals:
             result_columns += ['log10_pval', 'sliding_mean', 'sliding_variance']
-        merged_data.data_df = merged_data.data_df[result_columns] 
+        merged_data.data_df = merged_data.data_df[result_columns]
     
         return merged_data
 
 
-    def calc_density(self, cutcounts_file) -> ProcessorOutputData:
+    def calc_normalized_density(self, cutcounts_file, total_cutcounts) -> ProcessorOutputData:
         merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_density, cutcounts_file)
         merged_data.data_df['end'] = merged_data.data_df['start'] + self.density_step
+        merged_data.data_df['density'] = normalize_density(
+            merged_data.data_df['density'], 
+            total_cutcounts
+        )
         merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'density']]
         return merged_data
     
 
-    def call_hotspots(self, fdr_path, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
+    def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
         """
         Call hotspots from path to parquet file containing log10(FDR) values.
 
@@ -146,15 +150,22 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
-        hotspots.data_df['id'] = [f'id-{x}' for x in np.arange(1, len(hotspots.data_df) + 1)]
+        hotspots.data_df['id'] = prefix
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
         hotspots.data_df = hotspots.data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
         return hotspots
 
-    def call_peaks(self, hotspots_path, cutcounts_path):
+
+    def call_peaks(self, hotspots_path, cutcounts_path, prefix) -> ProcessorOutputData:
         merged_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks, cutcounts_path, hotspots_path)
-        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'summit']]
+        total_cutcounts = np.sum(merged_data.extra_df['sum_cutcounts'])
+        merged_data.data_df['id'] = prefix
+        merged_data.data_df['max_norm_density'] = normalize_density(
+            merged_data.data_df['max_density'], 
+            total_cutcounts=total_cutcounts
+        )
+        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'id', 'max_norm_density', 'summit']]
         return merged_data
 
 
@@ -278,7 +289,11 @@ class ChromosomeProcessor:
         if log10_fdr_array.size == 0:
             raise NoContigPresentError
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
-        data = hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold=fdr_threshold, min_width=min_width)
+        data = hotspots_from_log10_fdr_vectorized(
+            log10_fdr_array,
+            fdr_threshold=fdr_threshold,
+            min_width=min_width
+        )
         return ProcessorOutputData(self.chrom_name, data) if data is not None else None
     
 
@@ -301,8 +316,13 @@ class ChromosomeProcessor:
             hotspot_ends
         )
         peaks_df = pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end'])
-
-        return ProcessorOutputData(self.chrom_name, peaks_df)
+        peaks_df['max_density'] = [
+            np.max(agg_counts[start:end]) for start, end in zip(
+                peaks_df['start'], peaks_df['end']
+            )
+        ]
+        extra_df = pd.DataFrame({'sum_cutcounts': [np.sum(cutcounts)]})
+        return ProcessorOutputData(self.chrom_name, peaks_df, extra_df)
 
 
     def read_hotspots_tabix(self, hotspots):
