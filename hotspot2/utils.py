@@ -3,8 +3,6 @@ import dataclasses
 import pysam
 import io
 import functools
-import subprocess
-import numpy as np
 
 
 @dataclasses.dataclass
