@@ -22,6 +22,7 @@ make -C .
 
 mkdir -p $CONDA_PREFIX/bin
 cp bin/modwt $CONDA_PREFIX/bin/
+cp bin/modwt.so $CONDA_PREFIX/bin/
 
 echo "modwt installed successfully to $CONDA_PREFIX/bin/"
 
