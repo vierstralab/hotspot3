@@ -248,6 +248,8 @@ class GenomeProcessor:
         data_df = []
         for chrom_processor in self.chromosome_processors:
             df = read_df_for_chrom(smoothed_signal, chrom_processor.chrom_name, columns=['chrom', 'normalized_density']).iloc[::self.density_step]
+            if df.empty:
+                continue
             df['start'] = np.arange(len(df)) * self.density_step
             data_df.append(df)
         data_df = pd.concat(data_df, ignore_index=True)
