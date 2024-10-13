@@ -11,7 +11,7 @@ import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable
 import sys
-from pympler import asizeof
+from pympler import asizeof # memory usage debugging
 from typing import Generator
 
 root_logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ class GenomeProcessor:
         return [self.chromosome_processors, *res_args]
 
 
-    def parallel_by_chromosome(self, func, *args, cpus=None) -> Generator[ProcessorOutputData]:
+    def parallel_by_chromosome(self, func, *args, cpus=None):
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
