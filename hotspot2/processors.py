@@ -146,7 +146,8 @@ class GenomeProcessor:
                 try:
                     results = list(executor.map(func, *all_args))
                 except Exception as e:
-                    self.logger.critical("Keyboard interrupt detected, shutting down executor...")
+                    self.set_logger()
+                    self.logger.critical("Exception, gracefully shutting down executor...")
                     executor.shutdown(wait=True, cancel_futures=True)
                     raise e
         self.set_logger() # Restore logger after parallel execution
