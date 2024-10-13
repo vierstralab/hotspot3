@@ -44,6 +44,7 @@ def main() -> None:
         genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
     if smoothed_signal_path is None:
+        root_logger.info('Smoothing signal using MODWT')
         smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
         genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
 

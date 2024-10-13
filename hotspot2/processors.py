@@ -143,17 +143,18 @@ class GenomeProcessor:
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
+        results = []
         if self.cpus == 1:
             for func_args in args:
                 result = func(*func_args)
                 if result is not None:
-                    yield result
+                    results.append(result)
         else:
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 try:
                     for result in executor.map(func, *args):
                         if result is not None:
-                            yield result
+                            results.append(result)
                 except Exception as e:
                     self.set_logger()
                     self.logger.critical("Exception, gracefully shutting down executor...")
@@ -161,7 +162,7 @@ class GenomeProcessor:
                     raise e
         self.set_logger() # Restore logger after parallel execution
         self.logger.debug(f'Results of {func.__name__} emitted.')
-
+        return results
 
     def calc_pval(self, cutcounts_file, output_name, write_raw_pvals=False):
         self.parallel_by_chromosome(
@@ -218,7 +219,7 @@ class GenomeProcessor:
             cutcounts_path
         ))
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
-        self.logger.info('Smoothing signal using MODWT')
+
         print(cutcounts_path, total_cutcounts, save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
