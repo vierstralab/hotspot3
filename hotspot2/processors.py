@@ -10,7 +10,7 @@ import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed
-
+from typing import List
 
 root_logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.set_logger()
 
-    def parallel_by_chromosome(self, func, *args) -> ProcessorOutputData:
+    def parallel_by_chromosome(self, func, *args, merge_results=True) -> ProcessorOutputData|List[ProcessorOutputData]:
         all_args = [
             self.chromosome_processors, 
             *[arg_to_list(arg, len(self.chromosome_processors)) for arg in args]
@@ -124,6 +124,8 @@ class GenomeProcessor:
                 results = list(executor.map(func, *all_args))
         self.set_logger() # Restore logger after parallel execution
         self.logger.debug(f'Results of {func.__name__} collected. Merging')
+        if not merge_results:
+            return [x for x in results if x is not None]
         return merge_and_add_chromosome([x for x in results if x is not None])
 
 
@@ -170,27 +172,38 @@ class GenomeProcessor:
     def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
-            cutcounts_path
+            cutcounts_path,
+            merge_results=True
         )
-        modwt_data.data_df['normalized_density'] = normalize_density(
-            modwt_data.data_df['density'],
-            modwt_data.extra_df['total_cutcounts'].sum()
-        )
-        modwt_data.data_df = modwt_data.data_df.drop(columns=['density']).set_index('chrom')
+        total_cutcounts = sum([x.extra_df['total_cutcounts'] for x in modwt_data])
+
+        for data in modwt_data:
+            data.data_df['normalized_density'] = normalize_density(
+                data.data_df['density'],
+                total_cutcounts
+            )
+            data.data_df = data.data_df.drop(columns=['density'])
+
         return modwt_data
 
     def write_cutcounts(self, bam_path, outpath) -> None:
         run_bam2_bed(bam_path, outpath)
 
-    def extract_density(self, smoothed_signal: ProcessorOutputData) -> ProcessorOutputData:
-        data_df = smoothed_signal.data_df
-        data_df['start'] = data_df.groupby(data_df.index, observed=True).cumcount()
-        data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)].reset_index()[['chrom', 'start', 'normalized_density']]
+    def extract_density(self, smoothed_signal: List[ProcessorOutputData]) -> ProcessorOutputData:
+        data = []
+        for proc_out in smoothed_signal:
+            data_df = proc_out.data_df
+            data_df['chrom'] = proc_out.identificator
+            data_df['start'] = np.arange(0, len(data_df))
+            data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)]
+            data.append(data_df)
+        data_df = pd.concat(data, ignore_index=True)
         data_df['end'] = data_df['start'] + self.density_step
+        
         return ProcessorOutputData('all', data_df)
 
 
-    def call_variable_width_peaks(self, smoothed_data: ProcessorOutputData, hotspots_path) -> ProcessorOutputData:
+    def call_variable_width_peaks(self, smoothed_data: List[ProcessorOutputData], hotspots_path) -> ProcessorOutputData:
         """
         Call variable width peaks from smoothed signal and hotspots.
 
@@ -202,9 +215,11 @@ class GenomeProcessor:
             - peaks_data: ProcessorOutputData containing the peaks in bed format
 
         """
+        d = {x.identificator: x.data_df for x in smoothed_data}
+        smoothed_data = [d[x.chrom_name] for x in self.chromosome_processors]
         peaks_data = self.parallel_by_chromosome(
                 ChromosomeProcessor.call_variable_width_peaks,
-                smoothed_data.data_df,
+                smoothed_data,
                 hotspots_path
             )
         return peaks_data
@@ -345,7 +360,6 @@ class ChromosomeProcessor:
         hotspots_coordinates = self.read_hotspots_tabix(hotspots)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
-        signal_df = signal_df.loc[self.chrom_name]
 
         normalized_density = signal_df['normalized_density'].values
 
