@@ -230,7 +230,8 @@ class GenomeProcessor:
             cutcounts_path
         ))
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
-
+        
+        shutil.rmtree(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
@@ -513,7 +514,7 @@ class ChromosomeProcessor:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = os.path.join(temp_dir, 'temp.parquet')
             to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
-            shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
+            shutil.copy2(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
         
     
     @ensure_contig_exists
