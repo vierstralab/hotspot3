@@ -265,11 +265,12 @@ class GenomeProcessor:
             - peaks_data: ProcessorOutputData containing the peaks in bed format
 
         """
-        self.parallel_by_chromosome(
+        peaks_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks,
             smoothed_signal_path,
             hotspots_path
         )
+        return self.merge_and_add_chromosome(peaks_data)
 
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
