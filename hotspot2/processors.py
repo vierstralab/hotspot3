@@ -369,9 +369,10 @@ class ChromosomeProcessor:
 
 
     @ensure_contig_exists
-    def call_variable_width_peaks(self, signal_df: pd.DataFrame, hotspots: str) -> ProcessorOutputData:
-        if signal_df is None:
+    def call_variable_width_peaks(self, signal_data: ProcessorOutputData, hotspots: str) -> ProcessorOutputData:
+        if signal_data is None:
             raise NoContigPresentError
+        signal_df = signal_data.data_df
         hotspots_coordinates = self.read_hotspots_tabix(hotspots)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
