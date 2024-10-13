@@ -330,7 +330,7 @@ class ChromosomeProcessor:
         filters = 'haar'
         level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
-        smoothed = modwt_smooth(agg_counts, filters, level=level)
+        smoothed = modwt_smooth(agg_counts, filters, level=level).astype(np.float32)
         extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
         data = pd.DataFrame({
             #'cutcounts': cutcounts, 
