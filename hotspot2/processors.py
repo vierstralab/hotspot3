@@ -182,6 +182,7 @@ class GenomeProcessor:
             'log10_fdr': fdrs
         })
         fdrs_path = f'{output_name}.fdrs'
+        self.logger.debug('Saving per-bp FDRs')
         to_parquet_high_compression(fdrs, fdrs_path)
         return fdrs_path
 
@@ -211,25 +212,18 @@ class GenomeProcessor:
         return hotspots
 
 
-    def modwt_smooth_signal(self, cutcounts_path) -> Iterable[ProcessorOutputData]:
+    def modwt_smooth_signal(self, cutcounts_path, save_path):
+        total_cutcounts = np.sum(self.parallel_by_chromosome(
+            ChromosomeProcessor.total_cutcounts,
+            cutcounts_path
+        ))
         self.logger.info('Smoothing signal using MODWT')
-        modwt_data = self.parallel_by_chromosome(
+        self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
-        )
-        modwt_data = list(modwt_data)
-        total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
-        
-        self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
-
-        modwt_data = self.parallel_by_chromosome(
-            ChromosomeProcessor.normalize_density,
-            modwt_data,
             total_cutcounts,
-           # cpus=1
+            save_path
         )
-
-        return list(modwt_data)
 
     def write_cutcounts(self, bam_path, outpath) -> None:
         run_bam2_bed(bam_path, outpath)
@@ -244,7 +238,7 @@ class GenomeProcessor:
         return ProcessorOutputData('all', data_df)
 
 
-    def call_variable_width_peaks(self, smoothed_data: list[ProcessorOutputData], hotspots_path) -> ProcessorOutputData:
+    def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
         """
         Call variable width peaks from smoothed signal and hotspots.
 
@@ -256,12 +250,11 @@ class GenomeProcessor:
             - peaks_data: ProcessorOutputData containing the peaks in bed format
 
         """
-        peaks_data = self.parallel_by_chromosome(
+        self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks,
-            smoothed_data,
+            smoothed_signal_path,
             hotspots_path
         )
-        return self.merge_and_add_chromosome(peaks_data)
 
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
@@ -408,7 +401,7 @@ class ChromosomeProcessor:
     
 
     @ensure_contig_exists
-    def modwt_smooth_density(self, cutcounts_path) -> ProcessorOutputData:
+    def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path) -> ProcessorOutputData:
         """
         Run MODWT smoothing on cutcounts.
         """
@@ -418,21 +411,21 @@ class ChromosomeProcessor:
         level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
         smoothed = modwt_smooth(agg_counts, filters, level=level).astype(np.float32)
-        extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
         data = pd.DataFrame({
             #'cutcounts': cutcounts, 
             'smoothed': smoothed,
-            'density': agg_counts # maybe use the same window as for pvals? then cutcounts is redundant
+            'normalized_density': agg_counts / total_cutcounts # maybe use the same window as for pvals? then cutcounts is redundant
         })
-        return ProcessorOutputData(self.chrom_name, data, extra_df)
+        self.to_parquet(data, save_path)
 
 
     @ensure_contig_exists
-    def call_variable_width_peaks(self, signal_data: ProcessorOutputData, hotspots: str) -> ProcessorOutputData:
-        if signal_data is None:
+    def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
+        signal_df = read_df_for_chrom(smoothed_signal_path, self.chrom_name, columns=['smoothed', 'normalized_density'])
+        if signal_df.empty:
             raise NoContigPresentError
-        signal_df = signal_data.data_df
-        hotspots_coordinates = self.read_hotspots_tabix(hotspots)
+
+        hotspots_coordinates = self.read_hotspots_tabix(hotspots_path)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
 
@@ -512,3 +505,7 @@ class ChromosomeProcessor:
     def to_parquet(self, data_df: pd.DataFrame, path):
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
         to_parquet_high_compression(data_df, path)
+    
+    @ensure_contig_exists
+    def total_cutcounts(self, cutcounts):
+        return self.extract_cutcounts(cutcounts).sum()

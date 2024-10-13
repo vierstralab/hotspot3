@@ -45,7 +45,7 @@ def main() -> None:
 
     if smoothed_signal_path is None:
         smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-        smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
+        genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
 
     if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
@@ -67,7 +67,7 @@ def main() -> None:
 
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
         peaks = genome_processor.call_variable_width_peaks(
-            smoothed_data=smoothed_data,
+            smoothed_signal_path,
             hotspots_path=hotspots_path,
         ).data_df
         peaks['id'] = sample_id

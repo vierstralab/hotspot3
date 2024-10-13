@@ -14,7 +14,6 @@ class ProcessorOutputData:
     """
     identificator: str
     data_df: pd.DataFrame
-    extra_df: pd.DataFrame = None
 
 
 def read_chrom_sizes(chrom_sizes):
