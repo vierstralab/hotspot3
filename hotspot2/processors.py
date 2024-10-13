@@ -9,7 +9,7 @@ import pandas as pd
 import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
-from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed
+from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable
 
 
 root_logger = logging.getLogger(__name__)
@@ -114,12 +114,16 @@ class GenomeProcessor:
     def construct_parallel_args(self, *args):
         res_args = []
         for arg in args:
-            reformat_arg = arg_to_list(arg, len(self.chromosome_processors))
-            if isinstance(reformat_arg[0], ProcessorOutputData):
+            if is_iterable(arg) and all(
+                isinstance(x, ProcessorOutputData) 
+                for x in arg
+            ):
                 tmp = {x.identificator: x for x in reformat_arg}
                 reformat_arg = [
                     tmp.get(x, None) for x in self.chromosome_processors
                 ]
+            else:
+                reformat_arg = arg_to_list(arg, len(self.chromosome_processors))
             res_args.append(reformat_arg)
         return [self.chromosome_processors, *res_args]
 
