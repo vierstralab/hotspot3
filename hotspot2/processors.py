@@ -10,7 +10,7 @@ import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density
-
+from typing import List
 
 root_logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class GenomeProcessor:
             cpus=1,
             chromosomes=None,
             save_debug=False,
+            modwt_level=7,
             logger_level=logging.INFO
         ) -> None:
         self.logger = root_logger
@@ -64,6 +65,7 @@ class GenomeProcessor:
         self.cpus = min(cpus, max(1, mp.cpu_count()))
         self.signal_tr = signal_tr
         self.fdr_method = fdr_method
+        self.modwt_level = modwt_level
 
         self.chromosome_processors = sorted(
             [ChromosomeProcessor(self, chrom_name) for chrom_name in self.chrom_sizes.keys()],
@@ -119,17 +121,6 @@ class GenomeProcessor:
         merged_data.data_df = merged_data.data_df[result_columns]
     
         return merged_data
-
-
-    def calc_normalized_density(self, cutcounts_file, total_cutcounts) -> ProcessorOutputData:
-        merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_density, cutcounts_file)
-        merged_data.data_df['end'] = merged_data.data_df['start'] + self.density_step
-        merged_data.data_df['density'] = normalize_density(
-            merged_data.data_df['density'], 
-            total_cutcounts
-        )
-        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'density']]
-        return merged_data
     
 
     def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
@@ -156,17 +147,33 @@ class GenomeProcessor:
         return hotspots
 
 
-    def call_peaks(self, hotspots_path, cutcounts_path, prefix) -> ProcessorOutputData:
-        merged_data = self.parallel_by_chromosome(
-            ChromosomeProcessor.call_variable_width_peaks, cutcounts_path, hotspots_path)
-        total_cutcounts = np.sum(merged_data.extra_df['total_cutcounts'])
-        merged_data.data_df['id'] = prefix
-        merged_data.data_df['max_norm_density'] = normalize_density(
-            merged_data.data_df['max_density'], 
-            total_cutcounts=total_cutcounts
+    def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
+        return self.parallel_by_chromosome(
+            ChromosomeProcessor.modwt_smooth_signal,
+            cutcounts_path
         )
-        merged_data.data_df = merged_data.data_df[['chrom', 'start', 'end', 'id', 'max_norm_density', 'summit']]
-        return merged_data
+
+    def extract_density(self, smoothed_signal: ProcessorOutputData) -> ProcessorOutputData:
+        data_df = smoothed_signal.data_df
+        data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)][['chrom', 'start', 'density']]
+        data_df['end'] = data_df['start'] + self.density_step
+        return ProcessorOutputData('all', data_df)
+
+
+    def call_variable_width_peaks(self, smoothed_signal: ProcessorOutputData, hotspots_path) -> ProcessorOutputData:
+        per_chrom_dfs = {chrom: df for chrom, df in smoothed_signal.data_df.groupby('chrom', sort=False)}
+        sorted_smoothed_signal = [
+            per_chrom_dfs[chrom_processor.chrom_name] 
+            for chrom_processor in self.chromosome_processors 
+        ] # workaround for parallel processing
+        peaks_data = self.parallel_by_chromosome(
+                ChromosomeProcessor.call_variable_width_peaks,
+                sorted_smoothed_signal,
+                hotspots_path
+            )
+
+        peaks_data.data_df = peaks_data.data_df[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
+        return peaks_data
 
 
 class ChromosomeProcessor:
@@ -217,19 +224,6 @@ class ChromosomeProcessor:
             raise NoContigPresentError
         return cutcounts
 
-    @ensure_contig_exists
-    def calc_density(self, cutcounts_file) -> ProcessorOutputData:
-        cutcounts = self.extract_cutcounts(cutcounts_file)
-        self.gp.logger.debug(f'Calculating density {self.chrom_name}')
-        density = self.smooth_counts(
-            cutcounts,
-            self.gp.density_bandwidth
-        )[::self.gp.density_step].filled(0)
-        data = pd.DataFrame({
-            'density': density,
-            'start': np.arange(0, self.chrom_size, self.gp.density_step)
-        })
-        return ProcessorOutputData(self.chrom_name, data)
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file) -> ProcessorOutputData:
@@ -298,31 +292,37 @@ class ChromosomeProcessor:
     
 
     @ensure_contig_exists
-    def call_variable_width_peaks(self, cutcounts_path, hotspots, level=7) -> ProcessorOutputData:
+    def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        self.gp.logger.debug(f"Calling variable width peaks for {self.chrom_name}")
+        self.gp.logger.debug(f"Running modwt smoothing for {self.chrom_name}")
         agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
         filters = 'haar'
+        level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
         smoothed = modwt_smooth(agg_counts, filters, level=level)
+        extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
+        data = pd.DataFrame({
+            'smoothed': smoothed,
+            'density': agg_counts,
+            'start': np.arange(len(agg_counts))
+        })
+        return ProcessorOutputData(self.chrom_name, data, extra_df)
+
+
+    @ensure_contig_exists
+    def call_variable_width_peaks(self, signal_df, hotspots, fdr) -> ProcessorOutputData:
         hotspots_coordinates = self.read_hotspots_tabix(hotspots)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
 
-        self.gp.logger.debug(f"Finding peaks in hotspots for {self.chrom_name}")
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
-            smoothed,
+            signal_df['smoothed'],
             hotspot_starts,
             hotspot_ends
         )
         peaks_df = pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end'])
-        peaks_df['max_density'] = [
-            np.max(agg_counts[start:end]) for start, end in zip(
-                peaks_df['start'], peaks_df['end']
-            )
-        ]
-        extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
-        return ProcessorOutputData(self.chrom_name, peaks_df, extra_df)
+        peaks_df['max_density'] = np.max(signal_df['density'][peaks_df['summit']])
+        return ProcessorOutputData(self.chrom_name, peaks_df)
 
 
     def read_hotspots_tabix(self, hotspots):
