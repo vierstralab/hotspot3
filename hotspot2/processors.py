@@ -116,7 +116,7 @@ class GenomeProcessor:
         for arg in args:
             if is_iterable(arg):
                 if all(isinstance(x, ProcessorOutputData) for x in arg):
-                    tmp = {x.identificator: x for x in reformat_arg}
+                    tmp = {x.identificator: x for x in arg}
                     reformat_arg = [
                         tmp.get(x, None) for x in self.chromosome_processors
                     ]
