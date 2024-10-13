@@ -43,7 +43,7 @@ def main() -> None:
         genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
     smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
-    root_logger.debug(smoothed_data.data_df.memory_usage(deep=True))
+    root_logger.debug([x.data_df.memory_usage(deep=True) for x in smoothed_data])
     if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
         pvals_data = genome_processor.calc_pval(cutcounts_path)
