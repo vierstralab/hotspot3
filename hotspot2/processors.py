@@ -145,7 +145,7 @@ class GenomeProcessor:
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 try:
                     results = list(executor.map(func, *all_args))
-                except KeyboardInterrupt:
+                except:
                     self.logger.critical("Keyboard interrupt detected, shutting down executor...")
                 executor.shutdown(wait=True, cancel_futures=True)
                 raise 
