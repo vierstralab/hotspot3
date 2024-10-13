@@ -66,7 +66,7 @@ def main():
         ).data_df
         peaks['id'] = sample_id
         peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
-        peaks_path = f"{outdir_pref}.peaks.fdr{args.fdr}.bed.gz"
+        peaks_path = f"{outdir_pref}.peaks.fdr{fdr}.bed.gz"
         df_to_tabix(peaks, peaks_path)
         del peaks
         gc.collect()
