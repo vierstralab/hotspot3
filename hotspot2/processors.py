@@ -122,6 +122,7 @@ class GenomeProcessor:
                     ]
                 else:
                     assert len(arg) == len(self.chromosome_processors), f"Length of arguments must be equal to the number of chromosomes ({len(self.chromosome_processors)})."
+                    print(arg)
                     reformat_arg = arg
             else:
                 reformat_arg = [arg] * len(self.chromosome_processors)
