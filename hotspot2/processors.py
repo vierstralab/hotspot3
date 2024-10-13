@@ -303,7 +303,6 @@ class ChromosomeProcessor:
     @ensure_contig_exists
     def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        self.gp.logger.debug(f"Running modwt smoothing for {self.chrom_name}")
         agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
         filters = 'haar'
         level = self.gp.modwt_level

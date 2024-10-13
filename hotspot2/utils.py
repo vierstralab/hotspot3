@@ -58,6 +58,8 @@ def merge_and_add_chromosome(results: list[ProcessorOutputData]) -> ProcessorOut
 
 
 def is_iterable(obj):
+    if isinstance(obj, pd.DataFrame):
+        return False
     try:
         iter(obj)
         return True
