@@ -27,11 +27,12 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def read_df_for_chrom(df_path, chrom_name):
+def read_df_for_chrom(df_path, chrom_name, columns=None):
     return pd.read_parquet(
         df_path,
         filters=[('chrom', '==', chrom_name)],
-        engine='pyarrow'
+        engine='pyarrow',
+        columns=columns
     )
 
 
@@ -90,3 +91,13 @@ def run_bam2_bed(bam_path, tabix_bed_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     script = os.path.join(script_dir, 'extract_cutcounts.sh')
     subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
+
+
+def to_parquet_high_compression(df: pd.DataFrame, outpath):
+    df.to_parquet(
+        outpath,
+        engine='pyarrow',
+        compression='zstd',
+        compression_level=22,
+        index=False
+    )

@@ -30,7 +30,7 @@ def main() -> None:
         save_debug=args.debug,
         window=args.window,
         bg_window=args.background_window,
-        #chromosomes=['chr20', 'chr19']
+        chromosomes=['chr20', 'chr19']
     )
     precomp_fdrs = args.precomp_fdrs
     cutcounts_path = args.cutcounts
@@ -42,28 +42,13 @@ def main() -> None:
         cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
         genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
+    smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
     smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
-    root_logger.debug([x.data_df.memory_usage(deep=True) for x in smoothed_data])
+
     if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
-        pvals_data = genome_processor.calc_pval(cutcounts_path)
-        root_logger.debug('Saving P-values')
-        precomp_fdrs = f"{outdir_pref}.stats.parquet"
-        pvals_data.data_df.to_parquet(
-            precomp_fdrs,
-            engine='pyarrow',
-            compression='zstd',
-            compression_level=22,
-            index=False,
-            partition_cols=['chrom'],
-        )
-        pvals_data.extra_df.to_csv(
-            f"{outdir_pref}.params.gz",
-            sep='\t',
-            index=False
-        )
-        del pvals_data
-        gc.collect()
+        pvals = f"{outdir_pref}.stats.parquet"
+        precomp_fdrs = genome_processor.calc_pval(cutcounts_path, pvals)
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
@@ -90,12 +75,12 @@ def main() -> None:
         del peaks
         gc.collect()
 
-    if args.save_density:
-        root_logger.info('Saving density')
-        density_data = genome_processor.extract_density(smoothed_data).data_df
-        density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
-        denisty_path = f"{outdir_pref}.density.bed.gz"
-        df_to_tabix(density_data, denisty_path)
+    # if args.save_density:
+    #     root_logger.info('Saving density')
+    #     density_data = genome_processor.extract_density(smoothed_data).data_df
+    #     density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
+    #     denisty_path = f"{outdir_pref}.density.bed.gz"
+    #     df_to_tabix(density_data, denisty_path)
     root_logger.info('Program finished')
 
 

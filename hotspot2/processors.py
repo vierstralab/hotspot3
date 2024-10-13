@@ -9,7 +9,7 @@ import pandas as pd
 import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
-from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable
+from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression
 import sys
 from typing import Iterable
 
@@ -163,26 +163,28 @@ class GenomeProcessor:
         self.logger.debug(f'Results of {func.__name__} emitted.')
 
 
-    def calc_pval(self, cutcounts_file, write_raw_pvals=False) -> ProcessorOutputData:
-        merged_data = self.parallel_by_chromosome(
+    def calc_pval(self, cutcounts_file, output_name, write_raw_pvals=False):
+        self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
-            cutcounts_file
-        )
-        merged_data = self.merge_and_add_chromosome(merged_data)
-    
-        self.logger.debug('Results concatenated. Calculating FDR')
-        self.logger.debug(merged_data.data_df.memory_usage(deep=True))
-        merged_data.data_df['log10_fdr'] = calc_log10fdr(
-            merged_data.data_df['log10_pval'],
-            fdr_method=self.fdr_method
+            cutcounts_file,
+            output_name,
+            write_raw_pvals=write_raw_pvals
         )
 
-        result_columns = ['chrom', 'log10_fdr']
-        if self.save_debug or write_raw_pvals:
-            result_columns += ['log10_pval', 'sliding_mean', 'sliding_variance']
-        merged_data.data_df = merged_data.data_df[result_columns]
-    
-        return merged_data
+        log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval'])
+        self.logger.debug('Calculating FDRs')
+        fdrs = calc_log10fdr(
+            log10_pval['log10_pval'].values,
+            fdr_method=self.fdr_method
+        )
+        fdrs = pd.DataFrame({
+            'chrom': log10_pval['chrom'],
+            'log10_fdr': fdrs
+        })
+        fdrs_path = f'{output_name}.fdrs'
+        to_parquet_high_compression(fdrs, )
+        return fdrs_path
+
     
 
     def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
@@ -338,7 +340,7 @@ class ChromosomeProcessor:
 
 
     @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file) -> ProcessorOutputData:
+    def calc_pvals(self, cutcounts_file, outpath, write_raw_pvals=False) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
@@ -368,17 +370,16 @@ class ChromosomeProcessor:
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-        data = {'log10_pval': log_pvals.filled(np.nan)}
-        if self.gp.save_debug:
+        data = {'log10_pval': log_pvals.filled(np.nan).astype(np.float16)}
+        if self.gp.save_debug or write_raw_pvals:
             data.update({
-                'sliding_mean': sliding_mean.filled(np.nan),
-                'sliding_variance': sliding_variance.filled(np.nan),
+                'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
+                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
             })
         else:
             del r0, p0
             gc.collect()
-        data_df = pd.DataFrame.from_dict(data)
-
+        data = pd.DataFrame.from_dict(data)
         params_df = pd.DataFrame({
             'chrom': [self.chrom_name],
             'outliers_tr': [outliers_tr],
@@ -386,12 +387,15 @@ class ChromosomeProcessor:
             'variance': [v0],
             'rmsea': [np.nan],
         })
-        return ProcessorOutputData(self.chrom_name, data_df, params_df)
+
+        self.to_parquet(data, outpath)
+        self.to_parquet(params_df, f'{outpath}.params')
 
 
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05, min_width=50) -> ProcessorOutputData:
-        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name)['log10_fdr'].to_numpy()
+        columns = ['log10_fdr']
+        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name, columns=columns)['log10_fdr'].to_numpy()
         if log10_fdr_array.size == 0:
             raise NoContigPresentError
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
@@ -504,3 +508,7 @@ class ChromosomeProcessor:
         )
         density.data_df.drop(columns=['density'], inplace=True)
         return density
+
+    def to_parquet(self, data_df: pd.DataFrame, path):
+        data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
+        to_parquet_high_compression(data_df, path)
