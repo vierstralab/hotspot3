@@ -219,6 +219,7 @@ class GenomeProcessor:
         ))
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
         self.logger.info('Smoothing signal using MODWT')
+        print(cutcounts_path, total_cutcounts, save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
@@ -416,7 +417,8 @@ class ChromosomeProcessor:
         data = pd.DataFrame({
             #'cutcounts': cutcounts, 
             'smoothed': smoothed,
-            'normalized_density': agg_counts / total_cutcounts # maybe use the same window as for pvals? then cutcounts is redundant
+            'normalized_density': normalize_density(agg_counts, total_cutcounts) 
+            # maybe use the same window as for pvals? then cutcounts is redundant
         })
         self.to_parquet(data, save_path)
         return ProcessorOutputData(self.chrom_name, save_path)
@@ -493,17 +495,6 @@ class ChromosomeProcessor:
             dtype=self.int_dtype,
             position_skip_mask=position_skip_mask
         )
-
-    @ensure_contig_exists
-    def normalize_density(self, density: ProcessorOutputData, total_cutcounts) -> ProcessorOutputData:
-        if density is None:
-            raise NoContigPresentError
-        density.data_df['normalized_density'] = normalize_density(
-            density.data_df['density'],
-            total_cutcounts
-        )
-        density.data_df.drop(columns=['density'], inplace=True)
-        return density
 
     def to_parquet(self, data_df: pd.DataFrame, path):
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
