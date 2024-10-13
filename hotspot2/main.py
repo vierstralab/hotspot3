@@ -47,7 +47,7 @@ def main() -> None:
         genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
 
     if precomp_fdrs is None:
-        pvals = f"{outdir_pref}.stats.parquet"
+        pvals = f"{outdir_pref}.pvals.parquet"
         precomp_fdrs = genome_processor.calc_pval(cutcounts_path, pvals)
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
