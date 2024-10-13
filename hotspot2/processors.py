@@ -333,7 +333,7 @@ class ChromosomeProcessor:
         smoothed = modwt_smooth(agg_counts, filters, level=level)
         extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
         data = pd.DataFrame({
-            'cutcounts': cutcounts, 
+            #'cutcounts': cutcounts, 
             'smoothed': smoothed,
             'density': agg_counts # maybe use the same window as for pvals? then cutcounts is redundant
         })
