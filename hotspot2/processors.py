@@ -12,7 +12,7 @@ from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots
 from utils import ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable
 import sys
 from pympler import asizeof
-
+from typing import Generator
 
 root_logger = logging.getLogger(__name__)
 
@@ -139,25 +139,29 @@ class GenomeProcessor:
         return [self.chromosome_processors, *res_args]
 
 
-    def parallel_by_chromosome(self, func, *args, cpus=None) -> list[ProcessorOutputData]:
+    def parallel_by_chromosome(self, func, *args, cpus=None) -> Generator[ProcessorOutputData]:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
         if self.cpus == 1:
-            results = [func(*func_args) for func_args in args]
+            for func_args in args:
+                result = func(*func_args)
+                if result is not None:
+                    yield result
         else:
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 try:
-                    results = list(executor.map(func, *args))
+                    for result in executor.map(func, *args):
+                        if result is not None:
+                            yield result
                 except Exception as e:
                     self.set_logger()
                     self.logger.critical("Exception, gracefully shutting down executor...")
                     executor.shutdown(wait=True, cancel_futures=True)
                     raise e
         self.set_logger() # Restore logger after parallel execution
-        self.logger.debug(f'Results of {func.__name__} collected.')
-        return [x for x in results if x is not None]
+        self.logger.debug(f'Results of {func.__name__} emitted.')
 
 
     def calc_pval(self, cutcounts_file, write_raw_pvals=False) -> ProcessorOutputData:
@@ -208,10 +212,10 @@ class GenomeProcessor:
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
         )
+        modwt_data = list(modwt_data)
         print(asizeof(modwt_data))
-
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
-        print(sys.getsizeof(total_cutcounts))
+        
         self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
 
         modwt_data = self.parallel_by_chromosome(
@@ -222,7 +226,7 @@ class GenomeProcessor:
         )
         print(asizeof(modwt_data))
 
-        return modwt_data
+        return list(modwt_data)
 
     def write_cutcounts(self, bam_path, outpath) -> None:
         run_bam2_bed(bam_path, outpath)
