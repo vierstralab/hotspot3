@@ -136,7 +136,9 @@ class GenomeProcessor:
             res_args.append(reformat_arg)
         return [self.chromosome_processors, *res_args]
 
-    def parallel_by_chromosome(self, func, *args) -> list[ProcessorOutputData]:
+    def parallel_by_chromosome(self, func, *args, cpus=None) -> list[ProcessorOutputData]:
+        if cpus is None: # override cpus if provided
+            cpus = self.cpus
         all_args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {self.cpus} CPUs')
         if self.cpus == 1:
@@ -210,7 +212,8 @@ class GenomeProcessor:
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.normalize_density,
             modwt_data,
-            total_cutcounts
+            total_cutcounts,
+            cpus=1
         )
         gc.collect()
 
