@@ -59,8 +59,6 @@ def main() -> None:
         ).data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
         hotspots_path = f"{outdir_pref}.hotspots.fdr{fdr}.bed.gz"
         df_to_tabix(hotspots, hotspots_path)
-        del hotspots
-        gc.collect()
 
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
         peaks = genome_processor.call_variable_width_peaks(
@@ -71,15 +69,13 @@ def main() -> None:
         peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
         peaks_path = f"{outdir_pref}.peaks.fdr{fdr}.bed.gz"
         df_to_tabix(peaks, peaks_path)
-        del peaks
-        gc.collect()
 
-    # if args.save_density:
-    #     root_logger.info('Saving density')
-    #     density_data = genome_processor.extract_density(smoothed_signal_path).data_df
-    #     density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
-    #     denisty_path = f"{outdir_pref}.density.bed.gz"
-    #     df_to_tabix(density_data, denisty_path)
+    if args.save_density:
+        root_logger.info('Saving density')
+        density_data = genome_processor.extract_density(smoothed_signal_path).data_df
+        density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
+        denisty_path = f"{outdir_pref}.density.bed.gz"
+        df_to_tabix(density_data, denisty_path)
     root_logger.info('Program finished')
 
 

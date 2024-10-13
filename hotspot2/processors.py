@@ -245,10 +245,12 @@ class GenomeProcessor:
         run_bam2_bed(bam_path, outpath)
 
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
-        for sig in smoothed_signal: # Take every density_step-th element
-            sig.data_df = sig.data_df.iloc[np.arange(0, len(sig.data_df), self.density_step)]
-            sig.data_df['start'] = np.arange(len(sig.data_df)) * self.density_step
-        data_df = self.merge_and_add_chromosome(smoothed_signal).data_df
+        data_df = []
+        for chrom_processor in self.chromosome_processors:
+            df = read_df_for_chrom(smoothed_signal, chrom_processor.chrom_name, columns=['chrom', 'normalized_density']).iloc[::self.density_step]
+            df['start'] = np.arange(len(df)) * self.density_step
+            data_df.append(df)
+        data_df = pd.concat(data_df, ignore_index=True)
         data_df['end'] = data_df['start'] + self.density_step
         return ProcessorOutputData('all', data_df)
 
