@@ -133,7 +133,7 @@ def modwt(x, filters, level):
     wavelet = pywt.Wavelet(filters)
     g = wavelet.dec_lo
     g_t = np.array(g) / np.sqrt(2)
-    v_j_1 = x
+    v_j_1 = x.astype(np.float32)
     for j in range(level):
         v_j_1 = convolve_d(g_t, v_j_1, j + 1)
     return v_j_1
