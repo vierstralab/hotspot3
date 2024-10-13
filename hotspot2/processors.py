@@ -111,7 +111,7 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.set_logger()
 
-    def parallel_by_chromosome(self, func, *args, merge_results=True) -> ProcessorOutputData|List[ProcessorOutputData]:
+    def parallel_by_chromosome(self, func, *args, merge_results=True):
         all_args = [
             self.chromosome_processors, 
             *[arg_to_list(arg, len(self.chromosome_processors)) for arg in args]
