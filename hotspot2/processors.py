@@ -168,9 +168,10 @@ class GenomeProcessor:
             ChromosomeProcessor.calc_pvals,
             cutcounts_file
         )
-        merged_data = merge_and_add_chromosome(merged_data)
+        merged_data = self.merge_and_add_chromosome(merged_data)
     
         self.logger.debug('Results concatenated. Calculating FDR')
+        self.logger.debug(merged_data.data_df.memory_usage(deep=True))
         merged_data.data_df['log10_fdr'] = calc_log10fdr(
             merged_data.data_df['log10_pval'],
             fdr_method=self.fdr_method
@@ -202,7 +203,7 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
-        hotspots = merge_and_add_chromosome(hotspots)
+        hotspots = self.merge_and_add_chromosome(hotspots)
         hotspots.data_df['id'] = prefix
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
         return hotspots
@@ -236,7 +237,7 @@ class GenomeProcessor:
         for sig in smoothed_signal: # Take every density_step-th element
             sig.data_df = sig.data_df.iloc[np.arange(0, len(sig.data_df), self.density_step)]
             sig.data_df['start'] = np.arange(len(sig.data_df)) * self.density_step
-        data_df = merge_and_add_chromosome(smoothed_signal).data_df
+        data_df = self.merge_and_add_chromosome(smoothed_signal).data_df
         data_df['end'] = data_df['start'] + self.density_step
         return ProcessorOutputData('all', data_df)
 
@@ -254,17 +255,18 @@ class GenomeProcessor:
 
         """
         peaks_data = self.parallel_by_chromosome(
-                ChromosomeProcessor.call_variable_width_peaks,
-                smoothed_data,
-                hotspots_path
-            )
+            ChromosomeProcessor.call_variable_width_peaks,
+            smoothed_data,
+            hotspots_path
+        )
         return self.merge_and_add_chromosome(peaks_data)
 
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
         params = []
-        categories = [x.chrom_name for x in self.chromosome_processors]
-        for res in sorted(results, key=lambda x: x.identificator):
+        results = sorted(results, key=lambda x: x.identificator)
+        categories = [x.identificator for x in results]
+        for res in results:
             df = res.data_df
             extra_df = res.extra_df
             df['chrom'] = pd.Categorical(

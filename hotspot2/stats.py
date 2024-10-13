@@ -29,7 +29,7 @@ def calc_log10fdr(log10_pvals, fdr_method='fdr_bh'):
     not_nan = ~np.isnan(log10_pvals)
     log_fdr[~not_nan] = np.nan
     log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -log10_pvals[not_nan].astype(np.float64)), method=fdr_method)[1])
-    return log_fdr.astype(np.float16)
+    return log_fdr
 
 
 def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None) -> ma.MaskedArray:
