@@ -182,7 +182,7 @@ class GenomeProcessor:
             'log10_fdr': fdrs
         })
         fdrs_path = f'{output_name}.fdrs'
-        to_parquet_high_compression(fdrs, )
+        to_parquet_high_compression(fdrs, fdrs_path)
         return fdrs_path
 
     
