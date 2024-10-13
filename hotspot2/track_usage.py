@@ -10,7 +10,6 @@ cmd = [
     "python3", "/home/sabramov/packages/hotspot2/hotspot2/main.py", "AG70782.test",
     "--bam", "../../filtered.cram",
     "--chrom_sizes", "/net/seq/data/genomes/human/GRCh38/noalts/GRCh38_no_alts.chrom_sizes",
-    "--cutcounts", "AG70782.test.cutcounts.gz",
     "--mappable_bases", "/net/seq/data2/projects/sabramov/SuperIndex/GRCh38_no_alts.K36.center_sites.n100.nuclear.merged.bed.gz",
     "--cpus", "19",
     "--debug",
