@@ -111,11 +111,20 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.set_logger()
 
+    def construct_parallel_args(self, *args):
+        res_args = []
+        for arg in args:
+            reformat_arg = arg_to_list(arg)
+            if isinstance(reformat_arg[0], ProcessorOutputData):
+                tmp = {x.identificator: x for x in reformat_arg}
+                reformat_arg = [
+                    tmp.get(x, None) for x in self.chromosome_processors
+                ]
+            res_args.append(reformat_arg)
+        return [self.chromosome_processors, *res_args]
+
     def parallel_by_chromosome(self, func, *args) -> list[ProcessorOutputData]:
-        all_args = [
-            self.chromosome_processors, 
-            *[arg_to_list(arg, len(self.chromosome_processors)) for arg in args]
-        ]
+        all_args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {self.cpus} CPUs')
         if self.cpus == 1:
             results = [func(*func_args) for func_args in all_args]
@@ -176,12 +185,11 @@ class GenomeProcessor:
         )
         total_cutcounts = sum([x.extra_df['total_cutcounts'] for x in modwt_data])
 
-        for data in modwt_data:
-            data.data_df['normalized_density'] = normalize_density(
-                data.data_df['density'],
-                total_cutcounts
-            )
-            data.data_df = data.data_df.drop(columns=['density'])
+        modwt_data = self.parallel_by_chromosome(
+            ChromosomeProcessor.normalize_density,
+            modwt_data,
+            total_cutcounts
+        )
 
         return modwt_data
 
@@ -189,16 +197,11 @@ class GenomeProcessor:
         run_bam2_bed(bam_path, outpath)
 
     def extract_density(self, smoothed_signal: list[ProcessorOutputData]) -> ProcessorOutputData:
-        data = []
-        for proc_out in smoothed_signal:
-            data_df = proc_out.data_df
-            data_df['chrom'] = proc_out.identificator
-            data_df['start'] = np.arange(0, len(data_df))
-            data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)]
-            data.append(data_df)
-        data_df = pd.concat(data, ignore_index=True)
+        for sig in smoothed_signal: # Take every density_step-th element
+            sig.data_df = sig.data_df.iloc[np.arange(0, len(sig.data_df), self.density_step)]
+        data_df = merge_and_add_chromosome(smoothed_signal).data_df
+        data_df['start'] = data_df.groupby('chrom').cumcount() * self.density_step
         data_df['end'] = data_df['start'] + self.density_step
-        
         return ProcessorOutputData('all', data_df)
 
 
@@ -214,8 +217,6 @@ class GenomeProcessor:
             - peaks_data: ProcessorOutputData containing the peaks in bed format
 
         """
-        d = {x.identificator: x.data_df for x in smoothed_data}
-        smoothed_data = [d[x.chrom_name] for x in self.chromosome_processors]
         peaks_data = self.parallel_by_chromosome(
                 ChromosomeProcessor.call_variable_width_peaks,
                 smoothed_data,
@@ -356,6 +357,8 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_variable_width_peaks(self, signal_df: pd.DataFrame, hotspots: str) -> ProcessorOutputData:
+        if signal_df is None:
+            raise NoContigPresentError
         hotspots_coordinates = self.read_hotspots_tabix(hotspots)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
@@ -421,4 +424,18 @@ class ChromosomeProcessor:
             dtype=self.int_dtype,
             position_skip_mask=position_skip_mask
         )
-    
+
+    @ensure_contig_exists
+    @staticmethod
+    def normalize_density(density: ProcessorOutputData, total_cutcounts) -> ProcessorOutputData:
+        if density is None:
+            raise NoContigPresentError
+        density.data_df['density'] = normalize_density(
+            density.data_df['density'],
+            total_cutcounts
+        )
+        density.data_df.drop(columns=['density'], inplace=True)
+        return ProcessorOutputData(
+            density.identificator,
+            density.data_df,
+        )
