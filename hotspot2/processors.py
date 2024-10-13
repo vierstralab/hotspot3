@@ -9,8 +9,9 @@ import pandas as pd
 import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
-from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density
-from typing import List
+from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed
+
+
 
 root_logger = logging.getLogger(__name__)
 
@@ -156,6 +157,9 @@ class GenomeProcessor:
         )
         modwt_data.data_df = modwt_data.data_df.drop(columns=['density']).set_index('chrom')
         return modwt_data
+
+    def write_cutcounts(self, bam_path, outpath) -> None:
+        run_bam2_bed(bam_path, outpath)
 
     def extract_density(self, smoothed_signal: ProcessorOutputData) -> ProcessorOutputData:
         data_df = smoothed_signal.data_df

@@ -2,7 +2,8 @@ import logging
 import gc
 import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
-from utils import read_chrom_sizes, df_to_tabix, normalize_density
+from utils import read_chrom_sizes, df_to_tabix
+
 
 def main():
     args, logger_level = parse_arguments()
@@ -21,6 +22,11 @@ def main():
     cutcounts_path = args.cutcounts
     sample_id = args.id
     outdir_pref = f"{args.outdir}/{sample_id}"
+
+    if cutcounts_path is None:
+        root_logger.info('Extracting cutcounts from bam file')
+        cutcounts_path = f"{outdir_pref}.cutcounts.gz"
+        genome_processor.write_cutcounts(args.bam, outdir_pref)
 
     root_logger.info('Smoothing signal using MODWT')
     smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
@@ -96,7 +102,7 @@ def parse_arguments():
     parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
 
     # Arguments for calculating p-values
-    parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed)", default=None)
+    parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed). Used in fit of background model", default=None)
     parser.add_argument("--window", help="Window size for smoothing cutcounts", type=int, default=201)
     parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
     
@@ -112,15 +118,14 @@ def parse_arguments():
     logger_level = logging.DEBUG if args.debug else logging.INFO
     set_logger_config(root_logger, logger_level)
 
-    if args.precomp_fdrs is not None:
-        for arg_name in ['mappable_bases', 'cutcounts', 'bam']:
-            if getattr(args, arg_name) is not None:
-                root_logger.warning(f"Ignoring {arg_name}. Precomputed FDRs are provided")
-    elif args.cutcounts is not None:
+    if args.precomp_fdrs is not None and args.mappable_bases is not None:
+        root_logger.warning(f"Ignoring mappable_bases. Precomputed FDRs are provided")
+    
+    if args.cutcounts is not None:
         if args.bam is not None:
             root_logger.warning("Ignoring bam file. Precomputed cutcounts are provided")
     elif args.bam is None:
-        parser.error("Either --bam or --cutcounts or --precomp_fdrs should be provided")
+        parser.error("Either --bam or --cutcounts should be provided")
 
     return args, logger_level
 

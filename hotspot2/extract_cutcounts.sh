@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e -o pipefail
+
 AWK_EXE=$(which mawk 2>/dev/null || which awk)
 
 bam2bed --do-not-sort < "$1" \
@@ -19,6 +22,7 @@ bam2bed --do-not-sort < "$1" \
   | sort-bed - \
   | uniq -c \
   | "$AWK_EXE" -v OFS='\t' '{ print $2,$3,$4,$1 }' \
+  | xargs cat <(echo -e "#chr\tstart\tend\tcount") - \
   | bgzip > $2
 
 tabix -p bed $2

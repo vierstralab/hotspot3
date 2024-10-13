@@ -3,6 +3,8 @@ import dataclasses
 import pysam
 import io
 import functools
+import subprocess
+import os
 
 
 @dataclasses.dataclass
@@ -114,3 +116,8 @@ def ensure_contig_exists(func):
 
 def normalize_density(density, total_cutcounts):
     return density / total_cutcounts * 1_000_000
+
+def run_bam2_bed(bam_path, tabix_bed_path):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script = os.path.join(script_dir, 'extract_cutcounts.sh')
+    subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
