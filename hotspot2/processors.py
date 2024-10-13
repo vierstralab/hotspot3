@@ -169,7 +169,7 @@ class GenomeProcessor:
         return hotspots
 
 
-    def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
+    def modwt_smooth_signal(self, cutcounts_path) -> list[ProcessorOutputData]:
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
