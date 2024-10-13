@@ -39,7 +39,7 @@ def main() -> None:
 
     if cutcounts_path is None:
         root_logger.info('Extracting cutcounts from bam file')
-        cutcounts_path = f"{outdir_pref}.cutcounts.gz"
+        cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
         genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
     smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
