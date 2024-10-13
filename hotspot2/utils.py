@@ -35,35 +35,6 @@ def read_df_for_chrom(df_path, chrom_name):
     )
 
 
-def merge_and_add_chromosome(results: list[ProcessorOutputData]) -> ProcessorOutputData:
-    data = []
-    params = []
-    results = list(results)
-    categories = [x.identificator for x in results]
-    for res in sorted(results, key=lambda x: x.identificator):
-        
-        df = res.data_df
-        extra_df = res.extra_df
-        df['chrom'] = pd.Categorical(
-            [res.identificator] * df.shape[0],
-            categories=categories,
-        )
-        data.append(df)
-        if extra_df is None:
-            continue
-        extra_df['chrom'] = pd.Categorical(
-            [res.identificator] * extra_df.shape[0],
-            categories=categories,
-        )
-        params.append(extra_df)
-        
-    data = pd.concat(data, ignore_index=True)
-    if len(params) == 0:
-        return ProcessorOutputData('all', data)
-    params = pd.concat(params, ignore_index=True)
-    return ProcessorOutputData('all', data, params)
-
-
 def is_iterable(obj):
     if isinstance(obj, pd.DataFrame) or isinstance(obj, str):
         return False

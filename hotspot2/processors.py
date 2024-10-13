@@ -11,8 +11,7 @@ import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable
 import sys
-from pympler.asizeof import asizeof # memory usage debugging
-from typing import Generator
+from typing import Iterable
 
 root_logger = logging.getLogger(__name__)
 
@@ -139,7 +138,7 @@ class GenomeProcessor:
         return [self.chromosome_processors, *res_args]
 
 
-    def parallel_by_chromosome(self, func, *args, cpus=None):
+    def parallel_by_chromosome(self, func, *args, cpus=None) -> Iterable[ProcessorOutputData]:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
@@ -165,7 +164,10 @@ class GenomeProcessor:
 
 
     def calc_pval(self, cutcounts_file, write_raw_pvals=False) -> ProcessorOutputData:
-        merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_pvals, cutcounts_file)
+        merged_data = self.parallel_by_chromosome(
+            ChromosomeProcessor.calc_pvals,
+            cutcounts_file
+        )
         merged_data = merge_and_add_chromosome(merged_data)
     
         self.logger.debug('Results concatenated. Calculating FDR')
@@ -206,14 +208,13 @@ class GenomeProcessor:
         return hotspots
 
 
-    def modwt_smooth_signal(self, cutcounts_path) -> list[ProcessorOutputData]:
+    def modwt_smooth_signal(self, cutcounts_path) -> Iterable[ProcessorOutputData]:
         self.logger.info('Smoothing signal using MODWT')
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
         )
         modwt_data = list(modwt_data)
-        print(asizeof(modwt_data))
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
         
         self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
@@ -222,9 +223,8 @@ class GenomeProcessor:
             ChromosomeProcessor.normalize_density,
             modwt_data,
             total_cutcounts,
-            cpus=1
+           # cpus=1
         )
-        print(asizeof(modwt_data))
 
         return list(modwt_data)
 
@@ -258,7 +258,34 @@ class GenomeProcessor:
                 smoothed_data,
                 hotspots_path
             )
-        return merge_and_add_chromosome(peaks_data)
+        return self.merge_and_add_chromosome(peaks_data)
+
+    def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
+        data = []
+        params = []
+        categories = [x.chrom_name for x in self.chromosome_processors]
+        for res in sorted(results, key=lambda x: x.identificator):
+            df = res.data_df
+            extra_df = res.extra_df
+            df['chrom'] = pd.Categorical(
+                [res.identificator] * df.shape[0],
+                categories=categories,
+            )
+            data.append(df)
+            if extra_df is None:
+                continue
+            extra_df['chrom'] = pd.Categorical(
+                [res.identificator] * extra_df.shape[0],
+                categories=categories,
+            )
+            params.append(extra_df)
+            
+        data = pd.concat(data, ignore_index=True)
+        if len(params) == 0:
+            return ProcessorOutputData('all', data)
+
+        params = pd.concat(params, ignore_index=True)
+        return ProcessorOutputData('all', data, params)
 
 
 class ChromosomeProcessor:
