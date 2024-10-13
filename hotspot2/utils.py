@@ -63,20 +63,13 @@ def merge_and_add_chromosome(results: list[ProcessorOutputData]) -> ProcessorOut
 
 
 def is_iterable(obj):
-    if isinstance(obj, pd.DataFrame):
+    if isinstance(obj, pd.DataFrame) or isinstance(obj, str):
         return False
     try:
         iter(obj)
         return True
     except TypeError:
         return False
-
-
-def arg_to_list(arg, size):
-    if not isinstance(arg, str) and is_iterable(arg):
-        assert len(arg) == size, f"Expected {size} elements, got {len(arg)} ({arg})"
-        return arg
-    return [arg] * size
 
 
 def df_to_tabix(df: pd.DataFrame, tabix_path):
