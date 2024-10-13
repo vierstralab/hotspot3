@@ -113,14 +113,14 @@ def parse_arguments():
     set_logger_config(root_logger, logger_level)
 
     if args.precomp_fdrs is not None:
-        for arg_name in ['mappable_bases', 'precomp_cutcounts', 'bam']:
+        for arg_name in ['mappable_bases', 'cutcounts', 'bam']:
             if getattr(args, arg_name) is not None:
                 root_logger.warning(f"Ignoring {arg_name}. Precomputed FDRs are provided")
-    elif args.precomp_cutcounts is not None:
+    elif args.cutcounts is not None:
         if args.bam is not None:
             root_logger.warning("Ignoring bam file. Precomputed cutcounts are provided")
     elif args.bam is None:
-        parser.error("Either --bam or --precomp_cutcounts or --precomp_fdrs should be provided")
+        parser.error("Either --bam or --cutcounts or --precomp_fdrs should be provided")
 
     return args, logger_level
 
