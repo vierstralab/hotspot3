@@ -9,13 +9,12 @@ import pandas as pd
 import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
-from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression
+from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete
 import sys
 from typing import Iterable
 import tempfile
 import shutil
 import os
-import glob
 
 root_logger = logging.getLogger(__name__)
 
@@ -170,9 +169,9 @@ class GenomeProcessor:
 
     def calc_pval(self, cutcounts_file, output_name, write_smoothing_params=False):
         self.logger.info('Calculating p-values')
-        shutil.rmtree(output_name)
+        delete(output_name)
         params_outpath = f'{output_name}.params'
-        shutil.rmtree(params_outpath)
+        delete(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
@@ -192,7 +191,7 @@ class GenomeProcessor:
             'log10_fdr': fdrs
         })
         fdrs_path = f'{output_name}.fdrs'
-        shutil.rmtree(fdrs_path)
+        delete(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         to_parquet_high_compression(fdrs, fdrs_path)
         return fdrs_path
@@ -231,7 +230,7 @@ class GenomeProcessor:
         ))
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
         
-        shutil.rmtree(save_path)
+        delete(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
@@ -244,8 +243,6 @@ class GenomeProcessor:
         run_bam2_bed(bam_path, outpath)
 
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
-        
-
         for sig in smoothed_signal: # Take every density_step-th element
             sig.data_df = sig.data_df.iloc[np.arange(0, len(sig.data_df), self.density_step)]
             sig.data_df['start'] = np.arange(len(sig.data_df)) * self.density_step

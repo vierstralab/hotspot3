@@ -6,6 +6,8 @@ import functools
 import subprocess
 import os
 import numpy as np
+import shutil
+
 
 @dataclasses.dataclass
 class ProcessorOutputData:
@@ -102,3 +104,12 @@ def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
         index=False,
         **kwargs
     )
+
+
+def delete(path):
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+    
