@@ -168,13 +168,17 @@ class GenomeProcessor:
         self.logger.debug(f'Results of {func.__name__} emitted.')
         return results
 
-    def calc_pval(self, cutcounts_file, output_name, write_raw_pvals=False):
+    def calc_pval(self, cutcounts_file, output_name, write_smoothing_params=False):
         self.logger.info('Calculating p-values')
+        shutil.rmtree(output_name)
+        params_outpath = f'{output_name}.params'
+        shutil.rmtree(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
             output_name,
-            write_raw_pvals
+            params_outpath,
+            write_smoothing_params
         )
         log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval'])
 
@@ -188,6 +192,7 @@ class GenomeProcessor:
             'log10_fdr': fdrs
         })
         fdrs_path = f'{output_name}.fdrs'
+        shutil.rmtree(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         to_parquet_high_compression(fdrs, fdrs_path)
         return fdrs_path
@@ -343,7 +348,7 @@ class ChromosomeProcessor:
 
 
     @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file, outpath, write_raw_pvals=False) -> ProcessorOutputData:
+    def calc_pvals(self, cutcounts_file, outpath, params_outpath, write_raw_pvals=False) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
@@ -392,8 +397,7 @@ class ChromosomeProcessor:
         })
 
         self.to_parquet(data, outpath)
-        self.to_parquet(params_df, f'{outpath}.params')
-        return outpath
+        self.to_parquet(params_df, params_outpath)
 
 
     @ensure_contig_exists
@@ -506,7 +510,6 @@ class ChromosomeProcessor:
 
     def to_parquet(self, data_df: pd.DataFrame, path):
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
-        os.makedirs(path, exist_ok=True)
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = os.path.join(temp_dir, 'temp.parquet')
             to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
