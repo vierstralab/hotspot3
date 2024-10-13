@@ -10,7 +10,7 @@ import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable
-
+import sys
 
 root_logger = logging.getLogger(__name__)
 
@@ -136,6 +136,7 @@ class GenomeProcessor:
             res_args.append(reformat_arg)
         return [self.chromosome_processors, *res_args]
 
+
     def parallel_by_chromosome(self, func, *args, cpus=None) -> list[ProcessorOutputData]:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
@@ -205,9 +206,10 @@ class GenomeProcessor:
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
         )
+        print(sys.getsizeof(modwt_data))
         gc.collect()
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
-
+        print(sys.getsizeof(total_cutcounts))
         self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
 
         modwt_data = self.parallel_by_chromosome(
@@ -216,7 +218,7 @@ class GenomeProcessor:
             total_cutcounts,
             cpus=1
         )
-        gc.collect()
+        print(sys.getsizeof(modwt_data))
 
         return modwt_data
 
