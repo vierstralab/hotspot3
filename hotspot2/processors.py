@@ -517,11 +517,13 @@ class ChromosomeProcessor:
             dtype=self.int_dtype,
             position_skip_mask=position_skip_mask
         )
-
-    def to_parquet(self, data_df: pd.DataFrame, path):
+    
+    def to_parquet(self, data_df, path):
         """
         Workaround for writing parquet files for chromosomes in parallel.
         """
+        if isinstance(data_df, ProcessorOutputData):
+            data_df = data_df.data_df
         data_df['chrom'] = pd.Categorical(
             [self.chrom_name] * data_df.shape[0],
             categories=[x for x in self.gp.chrom_sizes.keys()]
