@@ -5,7 +5,7 @@ import io
 import functools
 import subprocess
 import os
-
+import numpy as np
 
 @dataclasses.dataclass
 class ProcessorOutputData:
@@ -111,7 +111,7 @@ def ensure_contig_exists(func):
     return wrapper
 
 def normalize_density(density, total_cutcounts):
-    return density / total_cutcounts * 1_000_000
+    return (density / total_cutcounts * 1_000_000).astype(np.float16)
 
 def run_bam2_bed(bam_path, tabix_bed_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))

@@ -204,13 +204,14 @@ class GenomeProcessor:
         )
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
 
-        self.logger.info('Normalizing density')
+        self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
 
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.normalize_density,
             modwt_data,
             total_cutcounts
         )
+        gc.collect()
 
         return modwt_data
 
@@ -460,7 +461,4 @@ class ChromosomeProcessor:
             total_cutcounts
         )
         density.data_df.drop(columns=['density'], inplace=True)
-        return ProcessorOutputData(
-            density.identificator,
-            density.data_df,
-        )
+        return density
