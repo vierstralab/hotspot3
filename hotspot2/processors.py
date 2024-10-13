@@ -508,10 +508,11 @@ class ChromosomeProcessor:
 
     def to_parquet(self, data_df: pd.DataFrame, path):
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = os.path.join(temp_dir, 'temp.parquet')
             to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
-            shutil.copytree(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
+            shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
         
     
     @ensure_contig_exists
