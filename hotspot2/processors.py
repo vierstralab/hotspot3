@@ -252,6 +252,7 @@ class GenomeProcessor:
             data_df.append(df)
         data_df = pd.concat(data_df, ignore_index=True)
         data_df['end'] = data_df['start'] + self.density_step
+        data_df['id'] = 'id'
         return ProcessorOutputData('all', data_df)
 
 
