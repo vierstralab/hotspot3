@@ -22,6 +22,9 @@ def main():
     sample_id = args.id
     outdir_pref = f"{args.outdir}/{sample_id}"
 
+    root_logger.info('Smoothing signal using MODWT')
+    smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
+
     if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
         pvals_data = genome_processor.calc_pval(cutcounts_path)
@@ -43,33 +46,30 @@ def main():
         del pvals_data
         gc.collect()
 
-    root_logger.info('Smoothing signal using MODWT')
-    smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
-
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
-    # for fdr in args.fdrs:
-    #     root_logger.debug(f'Calling hotspots at FDR={fdr}')
-    #     hotspots = genome_processor.call_hotspots(
-    #         precomp_fdrs,
-    #         sample_id,
-    #         fdr_tr=fdr
-    #     ).data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
-    #     hotspots_path = f"{outdir_pref}.hotspots.fdr{fdr}.bed.gz"
-    #     df_to_tabix(hotspots, hotspots_path)
-    #     del hotspots
-    #     gc.collect()
+    for fdr in args.fdrs:
+        root_logger.debug(f'Calling hotspots at FDR={fdr}')
+        hotspots = genome_processor.call_hotspots(
+            precomp_fdrs,
+            sample_id,
+            fdr_tr=fdr
+        ).data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
+        hotspots_path = f"{outdir_pref}.hotspots.fdr{fdr}.bed.gz"
+        df_to_tabix(hotspots, hotspots_path)
+        del hotspots
+        gc.collect()
 
-    #     root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
-    #     peaks = genome_processor.call_variable_width_peaks(
-    #         smoothed_data=smoothed_data,
-    #         hotspots_path=hotspots_path,
-    #     ).data_df
-    #     peaks['id'] = sample_id
-    #     peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
-    #     peaks_path = f"{outdir_pref}.peaks.fdr{fdr}.bed.gz"
-    #     df_to_tabix(peaks, peaks_path)
-    #     del peaks
-    #     gc.collect()
+        root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
+        peaks = genome_processor.call_variable_width_peaks(
+            smoothed_data=smoothed_data,
+            hotspots_path=hotspots_path,
+        ).data_df
+        peaks['id'] = sample_id
+        peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
+        peaks_path = f"{outdir_pref}.peaks.fdr{fdr}.bed.gz"
+        df_to_tabix(peaks, peaks_path)
+        del peaks
+        gc.collect()
 
     if args.save_density:
         root_logger.info('Saving density')

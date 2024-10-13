@@ -109,7 +109,6 @@ class GenomeProcessor:
         merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_pvals, cutcounts_file)
     
         self.logger.debug('Results concatenated. Calculating FDR')
-
         merged_data.data_df['log10_fdr'] = calc_log10fdr(
             merged_data.data_df['log10_pval'],
             fdr_method=self.fdr_method
@@ -160,6 +159,7 @@ class GenomeProcessor:
 
     def extract_density(self, smoothed_signal: ProcessorOutputData) -> ProcessorOutputData:
         data_df = smoothed_signal.data_df
+        data_df['start'] = data_df.groupby(data_df.index).cumcount()
         data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)].reset_index()[['chrom', 'start', 'normalized_density']]
         data_df['end'] = data_df['start'] + self.density_step
         return ProcessorOutputData('all', data_df)
@@ -310,9 +310,9 @@ class ChromosomeProcessor:
         smoothed = modwt_smooth(agg_counts, filters, level=level)
         extra_df = pd.DataFrame({'total_cutcounts': [np.sum(cutcounts)]})
         data = pd.DataFrame({
+            'cutcounts': cutcounts, 
             'smoothed': smoothed,
-            'density': agg_counts,
-            'start': np.arange(len(agg_counts))
+            'density': agg_counts # maybe use the same window as for pvals? then cutcounts is redundant
         })
         return ProcessorOutputData(self.chrom_name, data, extra_df)
 
