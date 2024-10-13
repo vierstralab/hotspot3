@@ -10,7 +10,7 @@ import sys
 import gc
 from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed
-from typing import List
+
 
 root_logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.set_logger()
 
-    def parallel_by_chromosome(self, func, *args, merge_results=True):
+    def parallel_by_chromosome(self, func, *args) -> list[ProcessorOutputData]:
         all_args = [
             self.chromosome_processors, 
             *[arg_to_list(arg, len(self.chromosome_processors)) for arg in args]
@@ -124,13 +124,12 @@ class GenomeProcessor:
                 results = list(executor.map(func, *all_args))
         self.set_logger() # Restore logger after parallel execution
         self.logger.debug(f'Results of {func.__name__} collected. Merging')
-        if not merge_results:
-            return [x for x in results if x is not None]
-        return merge_and_add_chromosome([x for x in results if x is not None])
+        return [x for x in results if x is not None]
 
 
     def calc_pval(self, cutcounts_file, write_raw_pvals=False) -> ProcessorOutputData:
         merged_data = self.parallel_by_chromosome(ChromosomeProcessor.calc_pvals, cutcounts_file)
+        merged_data = merge_and_add_chromosome(merged_data)
     
         self.logger.debug('Results concatenated. Calculating FDR')
         merged_data.data_df['log10_fdr'] = calc_log10fdr(
@@ -164,6 +163,7 @@ class GenomeProcessor:
             fdr_tr,
             min_width
         )
+        hotspots = merge_and_add_chromosome(hotspots)
         hotspots.data_df['id'] = prefix
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
         return hotspots
@@ -189,7 +189,7 @@ class GenomeProcessor:
     def write_cutcounts(self, bam_path, outpath) -> None:
         run_bam2_bed(bam_path, outpath)
 
-    def extract_density(self, smoothed_signal: List[ProcessorOutputData]) -> ProcessorOutputData:
+    def extract_density(self, smoothed_signal: list[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
         for proc_out in smoothed_signal:
             data_df = proc_out.data_df
@@ -203,7 +203,7 @@ class GenomeProcessor:
         return ProcessorOutputData('all', data_df)
 
 
-    def call_variable_width_peaks(self, smoothed_data: List[ProcessorOutputData], hotspots_path) -> ProcessorOutputData:
+    def call_variable_width_peaks(self, smoothed_data: list[ProcessorOutputData], hotspots_path) -> ProcessorOutputData:
         """
         Call variable width peaks from smoothed signal and hotspots.
 
@@ -222,7 +222,7 @@ class GenomeProcessor:
                 smoothed_data,
                 hotspots_path
             )
-        return peaks_data
+        return merge_and_add_chromosome(peaks_data)
 
 
 class ChromosomeProcessor:
