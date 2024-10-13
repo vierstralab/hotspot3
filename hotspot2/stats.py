@@ -4,6 +4,7 @@ import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
 from statsmodels.stats.multitest import multipletests
+from scipy.stats import false_discovery_control
 import pywt
 import pandas as pd
 
@@ -24,11 +25,11 @@ def negbin_neglog10pvalue(x, r, p):
     return result.astype(np.float32)
 
 
-def calc_log10fdr(log10_pvals, fdr_method='fdr_bh'):
+def calc_log10fdr(log10_pvals, fdr_method='bh'):
     log_fdr = np.empty(log10_pvals.shape, dtype=np.float16)
     not_nan = ~np.isnan(log10_pvals)
     log_fdr[~not_nan] = np.nan
-    log_fdr[not_nan] = -np.log10(multipletests(np.power(10, -log10_pvals[not_nan].astype(np.float64)), method=fdr_method)[1])
+    log_fdr[not_nan] = -np.log10(false_discovery_control(np.power(10, -log10_pvals[not_nan].astype(np.float64)), method='bh'))
     return log_fdr
 
 

@@ -4,7 +4,6 @@ import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
 from utils import read_chrom_sizes, df_to_tabix
 
-
 def main() -> None:
     """
     Main function to run hotspot2 from command line. Uses argparse to parse arguments
