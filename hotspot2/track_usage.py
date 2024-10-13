@@ -39,6 +39,8 @@ try:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             total_rss = python_process.memory_info().rss
             for child in python_process.children(recursive=True):
+                if not child.is_running():
+                    continue
                 total_rss += child.memory_info().rss
 
             total_rss_human = format_memory(total_rss)
