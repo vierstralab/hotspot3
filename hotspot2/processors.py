@@ -251,7 +251,7 @@ class ChromosomeProcessor:
             with TabixExtractor(cutcounts_file) as cutcounts_loader:
                 data = cutcounts_loader[self.genomic_interval]
                 assert data.eval('end - start == 1').all(), "Cutcounts are expected to be at basepair resolution"
-                cutcounts[data['start']] = data['cutcounts'].to_numpy()
+                cutcounts[data['start']] = data['count'].to_numpy()
         except ValueError:
             raise NoContigPresentError
         return cutcounts
