@@ -207,7 +207,7 @@ class GenomeProcessor:
             cutcounts_path,
         )
         print(sys.getsizeof(modwt_data))
-        gc.collect()
+        
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
         print(sys.getsizeof(total_cutcounts))
         self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
