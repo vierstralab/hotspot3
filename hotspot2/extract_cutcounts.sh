@@ -26,8 +26,8 @@ bam2bed --do-not-sort < "$1" \
     }' \
   | sort-bed - \
   | uniq -c \
-  | "$AWK_EXE" -v OFS='\t' '{ print $2,$3,$4,$1 }' \
-  | { echo -e "#chr\tstart\tend\tcount"; cat; } \
+  | "$AWK_EXE" -v OFS='\t' '{ print $2,$3,$4,"id",$1 }' \
+  | { echo -e "#chr\tstart\tend\tid\tcount"; cat; } \
   | bgzip > "$2"
 
 tabix -p bed "$2"

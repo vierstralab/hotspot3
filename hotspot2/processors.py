@@ -32,7 +32,7 @@ class GenomeProcessor:
     Parameters:
         - chrom_sizes: Dictionary containing chromosome sizes.
         - mappable_bases_file: Path to the tabix-indexed file containing mappable bases or None.
-        
+
         - window: Window size for aggregating cutcounts.
         - min_mappable: Minimum number of mappable bases for a window to be considered.
         - bg_window: Window size for aggregating background cutcounts.
@@ -248,11 +248,9 @@ class ChromosomeProcessor:
         self.extract_mappable_bases()
         try:
             self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
-            with TabixExtractor(
-                cutcounts_file, columns=['#chr', 'start', 'end', 'id', 'cutcounts']
-            ) as cutcounts_loader:
+            with TabixExtractor(cutcounts_file) as cutcounts_loader:
                 data = cutcounts_loader[self.genomic_interval]
-                assert data.eval('end - start == 1').all(), "Cutcounts should be in basepair resolution"
+                assert data.eval('end - start == 1').all(), "Cutcounts are expected to be at basepair resolution"
                 cutcounts[data['start']] = data['cutcounts'].to_numpy()
         except ValueError:
             raise NoContigPresentError

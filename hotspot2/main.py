@@ -5,7 +5,21 @@ from processors import GenomeProcessor, root_logger, set_logger_config
 from utils import read_chrom_sizes, df_to_tabix
 
 
-def main():
+def main() -> None:
+    """
+    Main function to run hotspot2 from command line. Uses argparse to parse arguments
+
+    Saves following files:
+        - cutcounts: {sample_id}.cutcounts.gz
+        - per-bp FDR estimates: {sample_id}.stats.parquet
+        - parameters used for background per-chromosome fits: {sample_id}.params.gz
+        - hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
+        - peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
+    
+    Optional:
+        - density of cutcounts: {sample_id}.density.bed.gz if --save_density is provided
+
+    """
     args, logger_level = parse_arguments()
     chrom_sizes = read_chrom_sizes(args.chrom_sizes)
     genome_processor = GenomeProcessor(
