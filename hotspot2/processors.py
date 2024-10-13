@@ -188,7 +188,6 @@ class GenomeProcessor:
         ends = [*starts[1:], log10_pval.shape[0]]
         log10_pval = log10_pval['log10_pval'].values
        
-
         self.logger.info('Calculating FDRs')
         fdrs = calc_log10fdr(
             log10_pval,
@@ -203,7 +202,7 @@ class GenomeProcessor:
                 pd.DataFrame({'log10_fdr': fdrs[start:end]})
             )
             for chrom, start, end
-            in zip(chrom_pos_mapping['chrom'], starts, ends)
+            in zip(chrom_pos_mapping, starts, ends)
         ]
         fdrs_path = f'{output_name}.fdrs'
         delete(fdrs_path)
