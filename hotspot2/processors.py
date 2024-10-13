@@ -335,13 +335,12 @@ class ChromosomeProcessor:
             peaks_in_hotspots_trimmed,
             columns=['start', 'summit', 'end']
         )
-        peaks_df['summit_density'] = np.max(
-            normalized_density[peaks_df['summit']]
-        )
-        peaks_df['max_density'] = np.max([
-            normalized_density[row['start']:row['end']] 
-            for _, row in peaks_df.iterrows()
-        ])
+        peaks_df['summit_density'] = normalized_density[peaks_df['summit']]
+        
+        peaks_df['max_density'] = [
+            np.max(normalized_density[start:end])
+            for start, end in zip(peaks_df['start'], peaks_df['end'])]
+
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
 
