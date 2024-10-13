@@ -324,8 +324,10 @@ class ChromosomeProcessor:
         hotspot_ends = hotspots_coordinates['end'].values
         signal_df = signal_df.loc[self.chrom_name]
 
+        normalized_density = signal_df['normalized_density'].values
+
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
-            signal_df['smoothed'],
+            signal_df['smoothed'].values,
             hotspot_starts,
             hotspot_ends
         )
@@ -334,10 +336,10 @@ class ChromosomeProcessor:
             columns=['start', 'summit', 'end']
         )
         peaks_df['summit_density'] = np.max(
-            signal_df['normalized_density'].iloc[peaks_df['summit']]
+            normalized_density[peaks_df['summit']]
         )
         peaks_df['max_density'] = np.max([
-            signal_df['normalized_density'].loc[row['start']:row['end']] 
+            normalized_density[row['start']:row['end']] 
             for _, row in peaks_df.iterrows()
         ])
         return ProcessorOutputData(self.chrom_name, peaks_df)

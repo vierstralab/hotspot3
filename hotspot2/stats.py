@@ -223,7 +223,7 @@ def trim_at_threshold(signal, peaks_coordinates):
     return peaks_in_hotspots_trimmed, threshold_heights
 
 
-def find_varwidth_peaks(signal, hotspot_starts, hotspot_ends, min_width=20):
+def find_varwidth_peaks(signal: np.ndarray, hotspot_starts, hotspot_ends, min_width=20):
     """
     Find variable width peaks within hotspots.
 
