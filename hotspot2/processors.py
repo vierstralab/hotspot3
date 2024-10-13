@@ -510,7 +510,7 @@ class ChromosomeProcessor:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with tempfile.TemporaryDirectory(dir=self.gp.tmp_dir) as temp_dir:
             temp_path = os.path.join(temp_dir, 'temp.parquet')
-            to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
+            to_parquet_high_compression(data_df, temp_path)
             shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
         
     

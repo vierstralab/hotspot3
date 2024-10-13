@@ -102,6 +102,7 @@ def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
         compression_level=22,
         use_dictionary=True,
         index=False,
+        partition_cols=['chrom']
         **kwargs
     )
 
