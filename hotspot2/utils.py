@@ -38,8 +38,10 @@ def read_df_for_chrom(df_path, chrom_name):
 def merge_and_add_chromosome(results: list[ProcessorOutputData]) -> ProcessorOutputData:
     data = []
     params = []
+    results = list(results)
     categories = [x.identificator for x in results]
     for res in sorted(results, key=lambda x: x.identificator):
+        
         df = res.data_df
         extra_df = res.extra_df
         df['chrom'] = pd.Categorical(
