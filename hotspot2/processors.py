@@ -138,7 +138,7 @@ class GenomeProcessor:
         return [self.chromosome_processors, *res_args]
 
 
-    def parallel_by_chromosome(self, func, *args, cpus=None) -> Iterable[ProcessorOutputData]:
+    def parallel_by_chromosome(self, func, *args, cpus=None):
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
@@ -217,6 +217,7 @@ class GenomeProcessor:
             ChromosomeProcessor.total_cutcounts,
             cutcounts_path
         ))
+        self.logger.debug('Total cutcounts = %d', total_cutcounts)
         self.logger.info('Smoothing signal using MODWT')
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
@@ -383,6 +384,7 @@ class ChromosomeProcessor:
 
         self.to_parquet(data, outpath)
         self.to_parquet(params_df, f'{outpath}.params')
+        return outpath
 
 
     @ensure_contig_exists
@@ -417,6 +419,7 @@ class ChromosomeProcessor:
             'normalized_density': agg_counts / total_cutcounts # maybe use the same window as for pvals? then cutcounts is redundant
         })
         self.to_parquet(data, save_path)
+        return ProcessorOutputData(self.chrom_name, save_path)
 
 
     @ensure_contig_exists

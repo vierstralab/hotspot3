@@ -13,7 +13,7 @@ class ProcessorOutputData:
     Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
     """
     identificator: str
-    data_df: pd.DataFrame
+    data_df: pd.DataFrame|str
 
 
 def read_chrom_sizes(chrom_sizes):
