@@ -173,7 +173,6 @@ class GenomeProcessor:
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
-            merge_results=True
         )
         total_cutcounts = sum([x.extra_df['total_cutcounts'] for x in modwt_data])
 
