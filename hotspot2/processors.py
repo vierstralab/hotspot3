@@ -181,21 +181,38 @@ class GenomeProcessor:
             params_outpath,
             write_smoothing_params
         )
-        log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval'])
+        log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval']) 
+        # file is always sorted within chromosomes
+        chrom_pos_mapping = log10_pval['chrom'].drop_duplicates()
+        starts = chrom_pos_mapping.index
+        ends = [*starts[1:], log10_pval.shape[0]]
+        log10_pval = log10_pval['log10_pval'].values
+       
 
         self.logger.info('Calculating FDRs')
         fdrs = calc_log10fdr(
-            log10_pval['log10_pval'].values,
+            log10_pval,
             fdr_method=self.fdr_method
         )
-        fdrs = pd.DataFrame({
-            'chrom': log10_pval['chrom'],
-            'log10_fdr': fdrs
-        })
+        del log10_pval
+        gc.collect()
+
+        fdrs = [
+            ProcessorOutputData(
+                chrom, 
+                pd.DataFrame({'log10_fdr': fdrs[start:end]})
+            )
+            for chrom, start, end
+            in zip(chrom_pos_mapping['chrom'], starts, ends)
+        ]
         fdrs_path = f'{output_name}.fdrs'
         delete(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
-        to_parquet_high_compression(fdrs, fdrs_path)
+        self.parallel_by_chromosome(
+            ChromosomeProcessor.to_parquet,
+            fdrs,
+            fdrs_path
+        )
         return fdrs_path
 
     
