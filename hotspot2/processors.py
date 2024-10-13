@@ -140,7 +140,7 @@ class GenomeProcessor:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         all_args = self.construct_parallel_args(*args)
-        self.logger.debug(f'Using {self.cpus} CPUs')
+        self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
         if self.cpus == 1:
             results = [func(*func_args) for func_args in all_args]
         else:
