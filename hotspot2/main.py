@@ -77,7 +77,7 @@ def main() -> None:
 
     # if args.save_density:
     #     root_logger.info('Saving density')
-    #     density_data = genome_processor.extract_density(smoothed_data).data_df
+    #     density_data = genome_processor.extract_density(smoothed_signal_path).data_df
     #     density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
     #     denisty_path = f"{outdir_pref}.density.bed.gz"
     #     df_to_tabix(density_data, denisty_path)

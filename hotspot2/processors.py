@@ -233,8 +233,9 @@ class GenomeProcessor:
         self.logger.info('Extracting cutcounts from bam file')
         run_bam2_bed(bam_path, outpath)
 
-    def extract_density(self, smoothed_signal: list[ProcessorOutputData]) -> ProcessorOutputData:
-        # Optimization to avoid storing full pd.concat in memory
+    def extract_density(self, smoothed_signal) -> ProcessorOutputData:
+        
+
         for sig in smoothed_signal: # Take every density_step-th element
             sig.data_df = sig.data_df.iloc[np.arange(0, len(sig.data_df), self.density_step)]
             sig.data_df['start'] = np.arange(len(sig.data_df)) * self.density_step
@@ -501,7 +502,7 @@ class ChromosomeProcessor:
 
     def to_parquet(self, data_df: pd.DataFrame, path):
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
-        to_parquet_high_compression(data_df, path)
+        to_parquet_high_compression(data_df, path, partition_cols=['chrom'])
     
     @ensure_contig_exists
     def total_cutcounts(self, cutcounts):

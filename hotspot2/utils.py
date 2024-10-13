@@ -92,11 +92,12 @@ def run_bam2_bed(bam_path, tabix_bed_path):
     subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
 
 
-def to_parquet_high_compression(df: pd.DataFrame, outpath):
+def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
     df.to_parquet(
         outpath,
         engine='pyarrow',
         compression='zstd',
         compression_level=22,
-        index=False
+        index=False,
+        **kwargs
     )
