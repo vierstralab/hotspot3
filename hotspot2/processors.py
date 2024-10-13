@@ -12,6 +12,10 @@ from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots
 from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression
 import sys
 from typing import Iterable
+import tempfile
+import shutil
+import os
+import glob
 
 root_logger = logging.getLogger(__name__)
 
@@ -502,7 +506,12 @@ class ChromosomeProcessor:
 
     def to_parquet(self, data_df: pd.DataFrame, path):
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
-        to_parquet_high_compression(data_df, path, partition_cols=['chrom'])
+        os.makedirs(path, exist_ok=True)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = os.path.join(temp_dir, 'temp.parquet')
+            to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
+            shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
+        
     
     @ensure_contig_exists
     def total_cutcounts(self, cutcounts):
