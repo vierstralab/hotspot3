@@ -45,7 +45,6 @@ def main():
 
     root_logger.info('Smoothing signal using MODWT')
     smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
-    total_cutcounts = smoothed_data.extra_df['total_cutcounts'].sum()
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
@@ -54,7 +53,7 @@ def main():
             precomp_fdrs,
             sample_id,
             fdr_tr=fdr
-        ).data_df
+        ).data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
         hotspots_path = f"{outdir_pref}.hotspots.fdr{fdr}.bed.gz"
         df_to_tabix(hotspots, hotspots_path)
         del hotspots
@@ -62,14 +61,11 @@ def main():
 
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
         peaks = genome_processor.call_variable_width_peaks(
-            smoothed_signal=smoothed_data,
+            smoothed_data=smoothed_data,
             hotspots_path=hotspots_path,
         ).data_df
         peaks['id'] = sample_id
-        peaks['max_density'] = normalize_density(
-            peaks['max_density'], 
-            total_cutcounts=total_cutcounts
-        )
+        peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
         peaks_path = f"{outdir_pref}.peaks.fdr{args.fdr}.bed.gz"
         df_to_tabix(peaks, peaks_path)
         del peaks
@@ -78,10 +74,6 @@ def main():
     if args.save_density:
         root_logger.info('Saving density')
         density_data = genome_processor.extract_density(smoothed_data).data_df
-        density_data['density'] = normalize_density(
-            density_data['density'],
-            total_cutcounts=total_cutcounts
-        )
         root_logger.debug('Saving densities')
         denisty_path = f"{outdir_pref}.density.bed.gz"
         df_to_tabix(density_data, denisty_path)

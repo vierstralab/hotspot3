@@ -143,36 +143,45 @@ class GenomeProcessor:
         )
         hotspots.data_df['id'] = prefix
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
-        hotspots.data_df = hotspots.data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
         return hotspots
 
 
     def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
-        return self.parallel_by_chromosome(
+        modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_signal,
             cutcounts_path
         )
+        modwt_data.data_df['normalized_density'] = normalize_density(
+            modwt_data.data_df['density'],
+            modwt_data.extra_df['total_cutcounts'].sum()
+        )
+        modwt_data.data_df = modwt_data.data_df.drop(columns=['density']).set_index('chrom')
+        return modwt_data
 
     def extract_density(self, smoothed_signal: ProcessorOutputData) -> ProcessorOutputData:
         data_df = smoothed_signal.data_df
-        data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)][['chrom', 'start', 'density']]
+        data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)].reset_index()[['chrom', 'start', 'normalized_density']]
         data_df['end'] = data_df['start'] + self.density_step
         return ProcessorOutputData('all', data_df)
 
 
-    def call_variable_width_peaks(self, smoothed_signal: ProcessorOutputData, hotspots_path) -> ProcessorOutputData:
-        per_chrom_dfs = {chrom: df for chrom, df in smoothed_signal.data_df.groupby('chrom', sort=False)}
-        sorted_smoothed_signal = [
-            per_chrom_dfs[chrom_processor.chrom_name] 
-            for chrom_processor in self.chromosome_processors 
-        ] # workaround for parallel processing
+    def call_variable_width_peaks(self, smoothed_data: ProcessorOutputData, hotspots_path) -> ProcessorOutputData:
+        """
+        Call variable width peaks from smoothed signal and hotspots.
+
+        Parameters:
+            - smoothed_signal: ProcessorOutputData containing the smoothed signal. (Output of GenomeProcessor.modwt_smooth_signal)
+            - hotspots_path: Path to the tabix hotspots file.
+        
+        Returns:
+            - peaks_data: ProcessorOutputData containing the peaks in bed format
+
+        """
         peaks_data = self.parallel_by_chromosome(
                 ChromosomeProcessor.call_variable_width_peaks,
-                sorted_smoothed_signal,
+                smoothed_data.data_df,
                 hotspots_path
             )
-
-        peaks_data.data_df = peaks_data.data_df[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
         return peaks_data
 
 
@@ -310,18 +319,28 @@ class ChromosomeProcessor:
 
 
     @ensure_contig_exists
-    def call_variable_width_peaks(self, signal_df, hotspots, fdr) -> ProcessorOutputData:
+    def call_variable_width_peaks(self, signal_df: pd.DataFrame, hotspots: str) -> ProcessorOutputData:
         hotspots_coordinates = self.read_hotspots_tabix(hotspots)
         hotspot_starts = hotspots_coordinates['start'].values
         hotspot_ends = hotspots_coordinates['end'].values
+        signal_df = signal_df.loc[self.chrom_name]
 
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
             signal_df['smoothed'],
             hotspot_starts,
             hotspot_ends
         )
-        peaks_df = pd.DataFrame(peaks_in_hotspots_trimmed, columns=['start', 'summit', 'end'])
-        peaks_df['max_density'] = np.max(signal_df['density'][peaks_df['summit']])
+        peaks_df = pd.DataFrame(
+            peaks_in_hotspots_trimmed,
+            columns=['start', 'summit', 'end']
+        )
+        peaks_df['summit_density'] = np.max(
+            signal_df['normalized_density'].iloc[peaks_df['summit']]
+        )
+        peaks_df['max_density'] = np.max([
+            signal_df['normalized_density'].loc[row['start']:row['end']] 
+            for _, row in peaks_df.iterrows()
+        ])
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
 
