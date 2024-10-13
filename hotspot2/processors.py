@@ -143,7 +143,12 @@ class GenomeProcessor:
             results = [func(*func_args) for func_args in all_args]
         else:
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
-                results = list(executor.map(func, *all_args))
+                try:
+                    results = list(executor.map(func, *all_args))
+                except KeyboardInterrupt:
+                    self.logger.critical("Keyboard interrupt detected, shutting down executor...")
+                executor.shutdown(wait=True, cancel_futures=True)
+                raise 
         self.set_logger() # Restore logger after parallel execution
         self.logger.debug(f'Results of {func.__name__} collected.')
         return [x for x in results if x is not None]
