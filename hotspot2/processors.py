@@ -506,12 +506,15 @@ class ChromosomeProcessor:
         """
         Workaround for writing parquet files for chromosomes in parallel.
         """
-        data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        data_df['chrom'] = pd.Categorical(
+            [self.chrom_name] * data_df.shape[0],
+            categories=[x for x in self.gp.chrom_sizes.keys()]
+        )
+        os.makedirs(path, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=self.gp.tmp_dir) as temp_dir:
-            temp_path = os.path.join(temp_dir, 'temp.parquet')
+            temp_path = os.path.join(temp_dir, f'{self.chrom_name}temp.parquet')
             to_parquet_high_compression(data_df, temp_path)
-            shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
+            shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)
         
     
     @ensure_contig_exists
