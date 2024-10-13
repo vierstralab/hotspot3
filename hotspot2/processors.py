@@ -116,6 +116,8 @@ class GenomeProcessor:
         for arg in args:
             if is_iterable(arg):
                 if all(isinstance(x, ProcessorOutputData) for x in arg):
+                     # if arg consits of ProcessorOutputData - 
+                     # sort by chromosome name to match chromosome_processors
                     tmp = {x.identificator: x for x in arg}
                     reformat_arg = []
                     for x in self.chromosome_processors:
@@ -127,7 +129,6 @@ class GenomeProcessor:
                         reformat_arg.append(d)
 
                 else:
-                    print(arg)
                     assert len(arg) == len(self.chromosome_processors), f"Length of arguments must be equal to the number of chromosomes ({len(self.chromosome_processors)})."
                     reformat_arg = arg
             else:
@@ -443,7 +444,7 @@ class ChromosomeProcessor:
     def normalize_density(self, density: ProcessorOutputData, total_cutcounts) -> ProcessorOutputData:
         if density is None:
             raise NoContigPresentError
-        density.data_df['density'] = normalize_density(
+        density.data_df['normalized_density'] = normalize_density(
             density.data_df['density'],
             total_cutcounts
         )
