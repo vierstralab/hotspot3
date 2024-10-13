@@ -511,7 +511,7 @@ class ChromosomeProcessor:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = os.path.join(temp_dir, 'temp.parquet')
             to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
-            shutil.copy2(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
+            shutil.copytree(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
         
     
     @ensure_contig_exists
