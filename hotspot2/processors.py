@@ -205,6 +205,7 @@ class GenomeProcessor:
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
         )
+        gc.collect()
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
 
         self.logger.info(f'Normalizing density with total cutcounts={total_cutcounts}')
