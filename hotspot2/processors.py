@@ -12,7 +12,6 @@ from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots
 from utils import arg_to_list, ProcessorOutputData, merge_and_add_chromosome,  NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed
 
 
-
 root_logger = logging.getLogger(__name__)
 
 
