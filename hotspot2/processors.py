@@ -432,8 +432,7 @@ class ChromosomeProcessor:
         )
 
     @ensure_contig_exists
-    @staticmethod
-    def normalize_density(density: ProcessorOutputData, total_cutcounts) -> ProcessorOutputData:
+    def normalize_density(self, density: ProcessorOutputData, total_cutcounts) -> ProcessorOutputData:
         if density is None:
             raise NoContigPresentError
         density.data_df['density'] = normalize_density(
