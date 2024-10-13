@@ -159,7 +159,7 @@ class GenomeProcessor:
 
     def extract_density(self, smoothed_signal: ProcessorOutputData) -> ProcessorOutputData:
         data_df = smoothed_signal.data_df
-        data_df['start'] = data_df.groupby(data_df.index).cumcount()
+        data_df['start'] = data_df.groupby(data_df.index, observed=True).cumcount()
         data_df = data_df.iloc[np.arange(0, len(data_df), self.density_step)].reset_index()[['chrom', 'start', 'normalized_density']]
         data_df['end'] = data_df['start'] + self.density_step
         return ProcessorOutputData('all', data_df)
