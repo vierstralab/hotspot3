@@ -58,6 +58,7 @@ class GenomeProcessor:
     def __init__(
             self, chrom_sizes,
             mappable_bases_file=None,
+            tmp_dir=None,
             window=201, min_mappable=101,
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, density_bandwidth=151,
@@ -77,6 +78,7 @@ class GenomeProcessor:
         if chromosomes is not None:
             self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
         self.mappable_bases_file = mappable_bases_file
+        self.tmp_dir = tmp_dir
         
         self.bg_window = bg_window
         self.window = window
@@ -271,31 +273,19 @@ class GenomeProcessor:
 
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
-        params = []
         results = sorted(results, key=lambda x: x.identificator)
         categories = [x.identificator for x in results]
         for res in results:
             df = res.data_df
-            extra_df = res.extra_df
             df['chrom'] = pd.Categorical(
                 [res.identificator] * df.shape[0],
                 categories=categories,
             )
             data.append(df)
-            if extra_df is None:
-                continue
-            extra_df['chrom'] = pd.Categorical(
-                [res.identificator] * extra_df.shape[0],
-                categories=categories,
-            )
-            params.append(extra_df)
             
         data = pd.concat(data, ignore_index=True)
-        if len(params) == 0:
-            return ProcessorOutputData('all', data)
+        return ProcessorOutputData('all', data)
 
-        params = pd.concat(params, ignore_index=True)
-        return ProcessorOutputData('all', data, params)
 
 
 class ChromosomeProcessor:
@@ -507,9 +497,12 @@ class ChromosomeProcessor:
         )
 
     def to_parquet(self, data_df: pd.DataFrame, path):
+        """
+        Workaround for writing parquet files for chromosomes in parallel.
+        """
         data_df['chrom'] = pd.Categorical([self.chrom_name] * data_df.shape[0], categories=self.gp.chrom_sizes.keys())
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(dir=self.gp.tmp_dir) as temp_dir:
             temp_path = os.path.join(temp_dir, 'temp.parquet')
             to_parquet_high_compression(data_df, temp_path, partition_cols=['chrom'])
             shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)          
