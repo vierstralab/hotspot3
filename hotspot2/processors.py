@@ -117,9 +117,15 @@ class GenomeProcessor:
             if is_iterable(arg):
                 if all(isinstance(x, ProcessorOutputData) for x in arg):
                     tmp = {x.identificator: x for x in arg}
-                    reformat_arg = [
-                        tmp.get(x, None) for x in self.chromosome_processors
-                    ]
+                    reformat_arg = []
+                    for x in self.chromosome_processors:
+                        if x.chrom_name in tmp:
+                            d = tmp[x.chrom_name]
+                        else:
+                            self.logger.debug(f"Chromosome {x.chrom_name} not found in input data. Skipping.")
+                            d = None
+                        reformat_arg.append(d)
+
                 else:
                     print(arg)
                     assert len(arg) == len(self.chromosome_processors), f"Length of arguments must be equal to the number of chromosomes ({len(self.chromosome_processors)})."
