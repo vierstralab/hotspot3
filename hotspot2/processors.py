@@ -148,7 +148,7 @@ class GenomeProcessor:
 
     def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
         modwt_data = self.parallel_by_chromosome(
-            ChromosomeProcessor.modwt_smooth_signal,
+            ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path
         )
         modwt_data.data_df['normalized_density'] = normalize_density(
@@ -301,7 +301,7 @@ class ChromosomeProcessor:
     
 
     @ensure_contig_exists
-    def modwt_smooth_signal(self, cutcounts_path) -> ProcessorOutputData:
+    def modwt_smooth_density(self, cutcounts_path) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_path)
         agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
         filters = 'haar'
