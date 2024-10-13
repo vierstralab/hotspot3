@@ -139,14 +139,14 @@ class GenomeProcessor:
     def parallel_by_chromosome(self, func, *args, cpus=None) -> list[ProcessorOutputData]:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
-        all_args = self.construct_parallel_args(*args)
+        args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
         if self.cpus == 1:
-            results = [func(*func_args) for func_args in all_args]
+            results = [func(*func_args) for func_args in args]
         else:
             with ProcessPoolExecutor(max_workers=self.cpus) as executor:
                 try:
-                    results = list(executor.map(func, *all_args))
+                    results = list(executor.map(func, *args))
                 except Exception as e:
                     self.set_logger()
                     self.logger.critical("Exception, gracefully shutting down executor...")
