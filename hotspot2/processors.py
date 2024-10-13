@@ -168,7 +168,7 @@ class GenomeProcessor:
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
             output_name,
-            write_raw_pvals=write_raw_pvals
+            write_raw_pvals
         )
 
         log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval'])

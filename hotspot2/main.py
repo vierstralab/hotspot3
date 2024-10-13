@@ -36,14 +36,16 @@ def main() -> None:
     cutcounts_path = args.cutcounts
     sample_id = args.id
     outdir_pref = f"{args.outdir}/{sample_id}"
+    smoothed_signal_path = None
 
     if cutcounts_path is None:
         root_logger.info('Extracting cutcounts from bam file')
         cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
         genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
-    smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-    smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
+    if smoothed_signal_path is None:
+        smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
+        smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
 
     if precomp_fdrs is None:
         root_logger.info('Calculating p-values')
