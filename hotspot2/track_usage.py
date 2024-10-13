@@ -11,7 +11,7 @@ cmd = [
     "--bam", "../../filtered.cram",
     "--chrom_sizes", "/net/seq/data/genomes/human/GRCh38/noalts/GRCh38_no_alts.chrom_sizes",
     "--mappable_bases", "/net/seq/data2/projects/sabramov/SuperIndex/GRCh38_no_alts.K36.center_sites.n100.nuclear.merged.bed.gz",
-    "--cpus", "19",
+    "--cpus", "8",
     "--debug",
     "--fdrs", "0.1", "0.05",
     "--save_density"
