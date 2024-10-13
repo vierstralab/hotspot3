@@ -213,7 +213,7 @@ class GenomeProcessor:
 
 
     def modwt_smooth_signal(self, cutcounts_path, save_path):
-        total_cutcounts = np.sum(self.parallel_by_chromosome(
+        total_cutcounts = sum(self.parallel_by_chromosome(
             ChromosomeProcessor.total_cutcounts,
             cutcounts_path
         ))
