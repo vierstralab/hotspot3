@@ -508,4 +508,5 @@ class ChromosomeProcessor:
     
     @ensure_contig_exists
     def total_cutcounts(self, cutcounts):
+        self.gp.logger.debug(f"Calculating total cutcounts for {self.chrom_name}")
         return self.extract_cutcounts(cutcounts).sum()
