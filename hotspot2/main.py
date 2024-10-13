@@ -42,7 +42,6 @@ def main() -> None:
         cutcounts_path = f"{outdir_pref}.cutcounts.gz"
         genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
-    root_logger.info('Smoothing signal using MODWT')
     smoothed_data = genome_processor.modwt_smooth_signal(cutcounts_path)
 
     if precomp_fdrs is None:

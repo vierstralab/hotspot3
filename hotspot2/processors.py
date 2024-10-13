@@ -192,11 +192,14 @@ class GenomeProcessor:
 
 
     def modwt_smooth_signal(self, cutcounts_path) -> list[ProcessorOutputData]:
+        self.logger.info('Smoothing signal using MODWT')
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
         )
         total_cutcounts = np.sum([x.extra_df['total_cutcounts'].values for x in modwt_data])
+
+        self.logger.info('Normalizing density')
 
         modwt_data = self.parallel_by_chromosome(
             ChromosomeProcessor.normalize_density,
