@@ -165,15 +165,16 @@ class GenomeProcessor:
         return results
 
     def calc_pval(self, cutcounts_file, output_name, write_raw_pvals=False):
+        self.logger.info('Calculating p-values')
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
             output_name,
             write_raw_pvals
         )
-
         log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval'])
-        self.logger.debug('Calculating FDRs')
+
+        self.logger.info('Calculating FDRs')
         fdrs = calc_log10fdr(
             log10_pval['log10_pval'].values,
             fdr_method=self.fdr_method
@@ -214,13 +215,13 @@ class GenomeProcessor:
 
 
     def modwt_smooth_signal(self, cutcounts_path, save_path):
+        self.logger.info('Smoothing signal using MODWT')
         total_cutcounts = sum(self.parallel_by_chromosome(
             ChromosomeProcessor.total_cutcounts,
             cutcounts_path
         ))
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
 
-        print(cutcounts_path, total_cutcounts, save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
@@ -229,6 +230,7 @@ class GenomeProcessor:
         )
 
     def write_cutcounts(self, bam_path, outpath) -> None:
+        self.logger.info('Extracting cutcounts from bam file')
         run_bam2_bed(bam_path, outpath)
 
     def extract_density(self, smoothed_signal: list[ProcessorOutputData]) -> ProcessorOutputData:
