@@ -114,7 +114,7 @@ class GenomeProcessor:
     def construct_parallel_args(self, *args):
         res_args = []
         for arg in args:
-            reformat_arg = arg_to_list(arg)
+            reformat_arg = arg_to_list(arg, len(self.chromosome_processors))
             if isinstance(reformat_arg[0], ProcessorOutputData):
                 tmp = {x.identificator: x for x in reformat_arg}
                 reformat_arg = [
