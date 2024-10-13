@@ -9,6 +9,9 @@ import os
 
 @dataclasses.dataclass
 class ProcessorOutputData:
+    """
+    Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
+    """
     identificator: str
     data_df: pd.DataFrame
     extra_df: pd.DataFrame = None

@@ -28,6 +28,28 @@ def set_logger_config(logger: logging.Logger, level: int):
 class GenomeProcessor:
     """
     Main class to run hotspot2-related functions and store parameters.
+
+    Parameters:
+        - chrom_sizes: Dictionary containing chromosome sizes.
+        - mappable_bases_file: Path to the tabix-indexed file containing mappable bases or None.
+        
+        - window: Window size for aggregating cutcounts.
+        - min_mappable: Minimum number of mappable bases for a window to be considered.
+        - bg_window: Window size for aggregating background cutcounts.
+        - min_mappable_bg: Minimum number of mappable bases for a window to be considered in background.
+
+        - density_step: Step size for extracting density.
+        - density_bandwidth: Bandwidth for MODWT smoothing.
+
+        - signal_tr: Quantile threshold for outlier detection for background distribution fit.
+        - int_dtype: Integer type for cutcounts. int32 (default) should be sufficient for most cases.
+        - fdr_method: Method for FDR calculation. 'fdr_bh' (default) is tested.
+        - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
+
+        - chromosomes: List of chromosomes to process or None. Used mostly for debugging. Will generate wrong FDR corrections (only for these chromosomes).
+        - save_debug: Save debug information.
+        - modwt_level: Level of MODWT decomposition. 7 is tested.
+        - logger_level: Logging level.
     """
     def __init__(
             self, chrom_sizes,
