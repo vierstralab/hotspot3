@@ -203,10 +203,11 @@ class GenomeProcessor:
         run_bam2_bed(bam_path, outpath)
 
     def extract_density(self, smoothed_signal: list[ProcessorOutputData]) -> ProcessorOutputData:
+        # Optimization to avoid storing full pd.concat in memory
         for sig in smoothed_signal: # Take every density_step-th element
             sig.data_df = sig.data_df.iloc[np.arange(0, len(sig.data_df), self.density_step)]
+            sig.data_df['start'] = np.arange(len(sig.data_df)) * self.density_step
         data_df = merge_and_add_chromosome(smoothed_signal).data_df
-        data_df['start'] = data_df.groupby('chrom').cumcount() * self.density_step
         data_df['end'] = data_df['start'] + self.density_step
         return ProcessorOutputData('all', data_df)
 
