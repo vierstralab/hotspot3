@@ -88,9 +88,12 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
         - tabix indexed hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
         - tabix indexed peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
     
-    To quickly find hotspots and peaks at other FDRs than initially provided,
-    specify --fdrs_parquet {sample_id}.fdrs.parquet and --signal_parquet {sample_id}.smoothed_signal.parquet.
-    Or just --fdrs_parquet if the disk space is limited (will take more time smoothing the signal).
+    To quickly find hotspots and peaks at other FDRs than initially provided, specify 
+    --fdrs_parquet {sample_id}.fdrs.parquet 
+    and 
+    --signal_parquet {sample_id}.smoothed_signal.parquet.
+
+    Or just --fdrs_parquet {sample_id}.fdrs.parquet if the disk space is limited and signal_parquet was deleted (will take more time smoothing the signal).
     
     Optional if --save_density is provided:
         - tabix indexed normalized density of cutcounts: {sample_id}.density.bed.gz (~700MB)
