@@ -246,10 +246,13 @@ class GenomeProcessor:
 
     def modwt_smooth_signal(self, cutcounts_path, save_path):
         self.logger.info('Smoothing signal using MODWT')
-        total_cutcounts = sum(self.parallel_by_chromosome(
-            ChromosomeProcessor.total_cutcounts,
-            cutcounts_path
-        ))
+        print(cutcounts_path)
+        total_cutcounts = sum(
+            self.parallel_by_chromosome(
+                ChromosomeProcessor.total_cutcounts,
+                cutcounts_path
+            )
+        )
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
         
         delete(save_path)
