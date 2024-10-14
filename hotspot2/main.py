@@ -6,25 +6,6 @@ from utils import read_chrom_sizes, df_to_tabix
 
 
 def main() -> None:
-    """
-    Main function to run hotspot2 from command line. Uses argparse to parse arguments
-
-    Saves following files:
-        - cutcounts: {sample_id}.cutcounts.bed.gz
-        - smoothed signal: {sample_id}.smoothed_signal.parquet
-        - p-values: {sample_id}.pvals.parquet
-        - parameters used for background per-chromosome fits: {sample_id}.pvals.params.parquet
-        - per-bp FDR estimates: {sample_id}.fdrs
-        
-    
-    For each FDR threshold:
-        - hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
-        - peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
-    
-    Optional:
-        - density of cutcounts: {sample_id}.density.bed.gz if --save_density is provided
-
-    """
     args, logger_level = parse_arguments()
     chrom_sizes = read_chrom_sizes(args.chrom_sizes)
     genome_processor = GenomeProcessor(
@@ -88,7 +69,31 @@ def main() -> None:
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Run hotspot2 to call hotspots and peaks from bam file")
+    parser = argparse.ArgumentParser(
+        description="""
+    Run hotspot2 peak calling
+    
+    Saves the following temporary files in the output directory:
+        - tabix indexed cutcounts: {sample_id}.cutcounts.bed.gz (~200MB)
+        - per-bp smoothed signal: {sample_id}.smoothed_signal.parquet (large ~10GB)
+        - per-bp raw p-values: {sample_id}.pvals.parquet (large, ~1.5GB)
+        - parameters used for background per-chromosome fits: {sample_id}.pvals.params.parquet (~1.5MB)
+        - per-bp FDR estimates: {sample_id}.fdrs.parquet (~400MB)
+    
+    Note:
+        Multiple FDR thresholds can be provided as a space-separated list.
+
+    For each FDR threshold:
+        - tabix indexed hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
+        - tabix indexed peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
+    
+    To quickly find hotspots and peaks at other FDRs than initially provided,
+    specify --fdrs_parquet {sample_id}.fdrs.parquet and --signal_parquet {sample_id}.smoothed_signal.parquet. Or just --fdrs_parquet if the disk space is limited (will take more time smoothing the signal).
+    
+    Optional if --save_density is provided:
+        - tabix indexed normalized density of cutcounts: {sample_id}.density.bed.gz (~700MB)
+    """
+    )
     
     # common arguments
     parser.add_argument("id", type=str, help="Unique identifier of the sample")
