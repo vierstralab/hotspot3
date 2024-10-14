@@ -198,10 +198,7 @@ class GenomeProcessor:
         log10_pval = log10_pval['log10_pval'].values
        
         self.logger.info('Calculating FDRs')
-        fdrs = calc_neglog10fdr(
-            log10_pval,
-            fdr_method=self.fdr_method
-        )
+        fdrs = calc_neglog10fdr(log10_pval,fdr_method=self.fdr_method)
         del log10_pval
         gc.collect()
 

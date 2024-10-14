@@ -27,11 +27,11 @@ def negbin_neglog10pvalue(x, r, p):
 
 
 def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
-    log_fdr = np.empty(neglog10_pvals.shape, dtype=np.float16)
+    neglog10_fdr = np.empty(neglog10_pvals.shape, dtype=np.float16)
     not_nan = ~np.isnan(neglog10_pvals)
-    log_fdr[~not_nan] = np.nan
-    log_fdr[not_nan] = -logfdr_from_logpvals(-neglog10_pvals * np.log(10), method=fdr_method) / np.log(10)
-    return log_fdr
+    neglog10_fdr[~not_nan] = np.nan
+    neglog10_fdr[not_nan] = -logfdr_from_logpvals(-neglog10_pvals * np.log(10), method=fdr_method) / np.log(10)
+    return neglog10_fdr
 
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
