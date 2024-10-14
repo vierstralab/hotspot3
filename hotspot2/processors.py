@@ -187,7 +187,8 @@ class GenomeProcessor:
             write_smoothing_params
         )
         log10_pval = pd.read_parquet(
-            pvals_path,engine='pyarrow', 
+            pvals_path,
+            engine='pyarrow', 
             columns=['chrom', 'log10_pval']
         ) 
         # file is always sorted within chromosomes
