@@ -148,11 +148,10 @@ class GenomeProcessor:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
-        print(args)
         self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
         results = []
         if self.cpus == 1:
-            for func_args in zip(args):
+            for func_args in zip(*args):
                 result = func(*func_args)
                 if result is not None:
                     results.append(result)
@@ -247,7 +246,6 @@ class GenomeProcessor:
 
     def modwt_smooth_signal(self, cutcounts_path, save_path):
         self.logger.info('Smoothing signal using MODWT')
-        print(cutcounts_path)
         total_cutcounts = sum(
             self.parallel_by_chromosome(
                 ChromosomeProcessor.total_cutcounts,
