@@ -145,6 +145,9 @@ class GenomeProcessor:
 
 
     def parallel_by_chromosome(self, func, *args, cpus=None):
+        """
+        Basic function that handles parallel execution of a function by chromosome.
+        """
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
@@ -170,11 +173,12 @@ class GenomeProcessor:
         self.logger.debug(f'Results of {func.__name__} emitted.')
         return results
 
+
     def calc_pval(self, cutcounts_file, fdrs_path, write_smoothing_params=False):
         self.logger.info('Calculating p-values')
         pvals_path = fdrs_path.replace('.fdrs', '.pvals')
         delete(pvals_path)
-        params_outpath = pvals_path.replace('.pvals', '.pvals.params.parquet')
+        params_outpath = pvals_path.replace('.pvals', '.pvals.params')
         delete(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
@@ -219,7 +223,6 @@ class GenomeProcessor:
         return fdrs_path
 
     
-
     def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
         """
         Call hotspots from path to parquet file containing log10(FDR) values.
@@ -364,7 +367,7 @@ class ChromosomeProcessor:
 
 
     @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file, outpath, params_outpath, write_raw_pvals=False) -> ProcessorOutputData:
+    def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_raw_pvals=False) -> ProcessorOutputData:
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
@@ -404,15 +407,16 @@ class ChromosomeProcessor:
             del r0, p0
             gc.collect()
         data = pd.DataFrame.from_dict(data)
+        vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         params_df = pd.DataFrame({
-            'chrom': [self.chrom_name],
-            'outliers_tr': [outliers_tr],
-            'mean': [m0],
-            'variance': [v0],
-            'rmsea': [np.nan],
+            'cutcounts': vals,
+            'count': counts,
+            'outliers_tr': [outliers_tr] * len(vals),
+            'mean': [m0] * len(vals),
+            'variance': [v0] * len(vals),
         })
 
-        self.to_parquet(data, outpath)
+        self.to_parquet(data, pvals_outpath)
         self.to_parquet(params_df, params_outpath)
 
 
