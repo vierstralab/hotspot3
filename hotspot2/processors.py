@@ -241,7 +241,10 @@ class GenomeProcessor:
         hotspots = self.merge_and_add_chromosome(hotspots)
         hotspots.data_df['id'] = prefix
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
-        self.logger.debug(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
+        if len(hotspots.data_df) == 0:
+            self.logger.critical(f"No hotspots called at FDR={fdr_tr}. Most likely something went wrong!")
+        else:
+            self.logger.debug(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
         return hotspots
 
 
