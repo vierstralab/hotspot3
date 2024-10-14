@@ -52,7 +52,7 @@ class GenomeProcessor:
         - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
 
-        - chromosomes: List of chromosomes to process or None. Used mostly for debugging. Will generate wrong FDR corrections (only for these chromosomes).
+        - chromosomes: List of chromosomes to process or None. Used mostly for debugging. Will generate FDR corrections only for these chromosomes.
         - save_debug: Save debug information.
         - modwt_level: Level of MODWT decomposition. 7 is tested.
         - logger_level: Logging level.
