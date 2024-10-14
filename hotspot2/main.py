@@ -68,11 +68,11 @@ def main() -> None:
     root_logger.info('Program finished')
 
 
-def parse_arguments():
+def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
+    name = "Run hotspot2 peak calling" + extra_desc
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
-        description="""
-    Run hotspot2 peak calling
+        description=name + """
     
     Saves the following temporary files in the output directory:
         - tabix indexed cutcounts: {sample_id}.cutcounts.bed.gz (~200MB)
