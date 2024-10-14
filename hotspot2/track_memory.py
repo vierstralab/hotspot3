@@ -3,7 +3,7 @@ import time
 import subprocess
 import sys
 from main import parse_arguments
-
+import os
 """
 This script is used to call main.py with memory tracking.
 """
@@ -57,10 +57,10 @@ def run_process_with_memory_tracking(cmd, log_file):
 
 def main():
     args, _ = parse_arguments()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cmd = ["python3", f"{script_dir}/main.py", *sys.argv[1:]]
 
-    cmd = ["python3", "/home/sabramov/packages/hotspot2/hotspot2/main.py"] + sys.argv[1:]
-
-    memory_log = "memory_usage.tsv"
+    memory_log = f"{args.id}.memory_usage.tsv"
     run_process_with_memory_tracking(cmd, memory_log)
 
     print("Memory tracking finished.")
