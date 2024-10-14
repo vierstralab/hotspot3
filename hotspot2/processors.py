@@ -120,6 +120,7 @@ class GenomeProcessor:
 
     def construct_parallel_args(self, *args):
         res_args = []
+        print(args)
         for arg in args:
             if is_iterable(arg):
                 if all(isinstance(x, ProcessorOutputData) for x in arg):
