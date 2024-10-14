@@ -76,7 +76,7 @@ def parse_arguments():
     
     Saves the following temporary files in the output directory:
         - tabix indexed cutcounts: {sample_id}.cutcounts.bed.gz (~200MB)
-        - per-bp smoothed signal: {sample_id}.smoothed_signal.parquet (large ~10GB)
+        - per-bp smoothed signal: {sample_id}.smoothed_signal.parquet (large, ~10GB)
         - per-bp raw p-values: {sample_id}.pvals.parquet (large, ~1.5GB)
         - parameters used for background per-chromosome fits: {sample_id}.pvals.params.parquet (~1.5MB)
         - per-bp FDR estimates: {sample_id}.fdrs.parquet (~400MB)
