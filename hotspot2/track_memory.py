@@ -8,6 +8,7 @@ import threading
 """
 This script is used to call main.py with memory tracking.
 Inefficient to use this script in a pipeline, didn't optimize too much.
+Also time estimates from logger are not accurate due to output buffering.
 """
 
 def format_memory(size_in_bytes):
