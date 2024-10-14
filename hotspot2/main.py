@@ -30,7 +30,7 @@ def main() -> None:
     genome_processor = GenomeProcessor(
         chrom_sizes=chrom_sizes,
         mappable_bases_file=args.mappable_bases,
-        tempdir=args.tempdir,
+        tmp_dir=args.tempdir,
         cpus=args.cpus,
         logger_level=logger_level,
         save_debug=args.debug,
