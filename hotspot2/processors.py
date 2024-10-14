@@ -176,16 +176,16 @@ class GenomeProcessor:
     def calc_pval(self, cutcounts_file, fdrs_path, write_smoothing_params=False):
         self.logger.info('Calculating p-values')
         pvals_path = fdrs_path.replace('.fdrs', '.pvals')
-        delete(pvals_path)
         params_outpath = pvals_path.replace('.pvals', '.pvals.params')
-        delete(params_outpath)
-        self.parallel_by_chromosome(
-            ChromosomeProcessor.calc_pvals,
-            cutcounts_file,
-            pvals_path,
-            params_outpath,
-            write_smoothing_params
-        )
+        # delete(pvals_path)
+        # delete(params_outpath)
+        # self.parallel_by_chromosome(
+        #     ChromosomeProcessor.calc_pvals,
+        #     cutcounts_file,
+        #     pvals_path,
+        #     params_outpath,
+        #     write_smoothing_params
+        # )
         log10_pval = pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
@@ -198,7 +198,7 @@ class GenomeProcessor:
         log10_pval = log10_pval['log10_pval'].values
        
         self.logger.info('Calculating FDRs')
-        fdrs = calc_neglog10fdr(log10_pval,fdr_method=self.fdr_method)
+        fdrs = calc_neglog10fdr(log10_pval, fdr_method=self.fdr_method)
         del log10_pval
         gc.collect()
 
