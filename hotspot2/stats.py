@@ -3,7 +3,6 @@ from scipy.signal import convolve, find_peaks
 import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
-from scipy.stats import false_discovery_control
 import pywt
 import pandas as pd
 import gc
@@ -23,7 +22,7 @@ def negbin_neglog10pvalue(x, r, p):
         p = p[~resulting_mask]
     result = ma.masked_where(resulting_mask, np.zeros(x.shape, dtype=np.float32))
     result[~resulting_mask] = -st.nbinom.logsf(x[~resulting_mask] - 1, r, 1 - p) / np.log(10)
-    return result.astype(np.float32)
+    return result
 
 
 def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):

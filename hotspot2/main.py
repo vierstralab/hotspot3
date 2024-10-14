@@ -1,5 +1,4 @@
 import logging
-import gc
 import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
 from utils import read_chrom_sizes, df_to_tabix
