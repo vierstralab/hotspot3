@@ -8,7 +8,7 @@ import multiprocessing as mp
 import pandas as pd
 import sys
 import gc
-from stats import calc_log10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
+from stats import calc_neglog10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
 from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete
 import sys
 from typing import Iterable
@@ -198,7 +198,7 @@ class GenomeProcessor:
         log10_pval = log10_pval['log10_pval'].values
        
         self.logger.info('Calculating FDRs')
-        fdrs = calc_log10fdr(
+        fdrs = calc_neglog10fdr(
             log10_pval,
             fdr_method=self.fdr_method
         )

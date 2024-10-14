@@ -6,6 +6,8 @@ import scipy.stats as st
 from scipy.stats import false_discovery_control
 import pywt
 import pandas as pd
+import gc
+from scipy.special import logsumexp
 
 
 def negbin_neglog10pvalue(x, r, p):
@@ -24,12 +26,48 @@ def negbin_neglog10pvalue(x, r, p):
     return result.astype(np.float32)
 
 
-def calc_log10fdr(log10_pvals, fdr_method='bh'):
-    log_fdr = np.empty(log10_pvals.shape, dtype=np.float16)
-    not_nan = ~np.isnan(log10_pvals)
+def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
+    log_fdr = np.empty(neglog10_pvals.shape, dtype=np.float16)
+    not_nan = ~np.isnan(neglog10_pvals)
     log_fdr[~not_nan] = np.nan
-    log_fdr[not_nan] = -np.log10(false_discovery_control(np.power(10, -log10_pvals[not_nan].astype(np.float64)), method='bh'))
+    log_fdr[not_nan] = -logfdr_from_logpvals(-neglog10_pvals * np.log(10), method=fdr_method) / np.log(10)
     return log_fdr
+
+
+def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
+    """
+    Reimplementation of scipy.stats.false_discovery_control to work with neglog-transformed p-values.
+    Accepts log-transformed p-values and returns log-transformed FDR values.
+    NOTE: Not log10-transformed and not negated!
+
+    Parameters:
+        - log_pvals: 1D array of log-transformed p-values. Most of them will be negative.
+        - fdr_method: Method to use for FDR calculation. 'bh' = Benjamini-Hochberg, 'by' = Benjamini-Yekutieli.
+    
+    Returns:
+        - log_fdr: 1D array of log-transformed FDR values. 
+    """
+    assert method in ['bh', 'by'], "Only 'bh' and 'by' methods are supported."
+    # TODO: make work with log10 p-values
+    log_pvals = np.asarray(log_pvals).astype(dtype=dtype) # no further input checking yet
+    if log_pvals.ndim != 1:
+        raise NotImplementedError("Only 1D arrays are supported.")
+
+    m = log_pvals.shape[0]
+    order = np.argsort(log_pvals) # ascending order, so that the lowest p-values are first
+    
+    log_pvals = log_pvals[order]
+
+    log_i = np.log(np.arange(1, m + 1, dtype=dtype))
+    log_pvals += np.log(m) - log_i  # p_adj = p * m / i => log10(p_adj) = log10(p) + log10(m) - log10(i)
+    if method == 'by':
+        log_pvals += logsumexp(-log_i)
+    del log_i # optimization to free memory
+    gc.collect()
+    np.minimum.accumulate(log_pvals[::-1], out=log_pvals[::-1])
+    log_pvals_copy = log_pvals.copy() # since array is float32, copying is more memory effient than argsort int64
+    log_pvals[order] = log_pvals_copy
+    return np.clip(log_pvals, a_min=None, a_max=0)
 
 
 def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None) -> ma.MaskedArray:
