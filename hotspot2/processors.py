@@ -18,6 +18,8 @@ import os
 
 root_logger = logging.getLogger(__name__)
 
+counts_dtype = np.float32
+
 
 def set_logger_config(logger: logging.Logger, level: int):
     logger.setLevel(level)
@@ -47,8 +49,7 @@ class GenomeProcessor:
         - density_bandwidth: Bandwidth for MODWT smoothing.
 
         - signal_tr: Quantile threshold for outlier detection for background distribution fit.
-        - int_dtype: Integer type for cutcounts. int32 (default) should be sufficient for most cases.
-        - fdr_method: Method for FDR calculation. 'fdr_bh' (default) is tested.
+        - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
 
         - chromosomes: List of chromosomes to process or None. Used mostly for debugging. Will generate wrong FDR corrections (only for these chromosomes).
@@ -64,8 +65,7 @@ class GenomeProcessor:
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, density_bandwidth=151,
             signal_tr=0.975,
-            int_dtype = np.int32,
-            fdr_method='fdr_bh',
+            fdr_method='bh',
             cpus=1,
             chromosomes=None,
             save_debug=False,
@@ -90,7 +90,6 @@ class GenomeProcessor:
         self.density_step = density_step
         self.density_bandwidth = density_bandwidth
 
-        self.int_dtype = int_dtype
         self.cpus = min(cpus, max(1, mp.cpu_count()))
         self.signal_tr = signal_tr
         self.fdr_method = fdr_method
@@ -326,7 +325,6 @@ class ChromosomeProcessor:
         self.gp = genome_processor
         self.chrom_size = self.gp.chrom_sizes[chrom_name]
         self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
-        self.int_dtype = self.gp.int_dtype
         self.mappable_bases = None
     
     def extract_mappable_bases(self, force=False):
@@ -350,7 +348,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
     
     def extract_cutcounts(self, cutcounts_file):
-        cutcounts = np.zeros(self.chrom_size, dtype=self.int_dtype)
+        cutcounts = np.zeros(self.chrom_size, dtype=counts_dtype)
         self.extract_mappable_bases()
         try:
             self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
@@ -369,7 +367,7 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
-        agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts).astype(np.float32)
+        agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
@@ -442,7 +440,7 @@ class ChromosomeProcessor:
         filters = 'haar'
         level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
-        smoothed = modwt_smooth(agg_counts, filters, level=level).astype(np.float32)
+        smoothed = modwt_smooth(agg_counts, filters, level=level)
         data = pd.DataFrame({
             #'cutcounts': cutcounts, 
             'smoothed': smoothed,
@@ -515,8 +513,8 @@ class ChromosomeProcessor:
             bg_sum = np.sum(compressed_cutcounts)
             bg_sum_sq = np.sum(compressed_cutcounts * compressed_cutcounts)
 
-        sliding_mean = (bg_sum / bg_sum_mappable).astype(np.float32)
-        sliding_variance = ((bg_sum_sq - bg_sum * sliding_mean) / (bg_sum_mappable - 1)).astype(np.float32)
+        sliding_mean = (bg_sum / bg_sum_mappable)
+        sliding_variance = ((bg_sum_sq - bg_sum * sliding_mean) / (bg_sum_mappable - 1))
 
         return sliding_mean, sliding_variance
         
