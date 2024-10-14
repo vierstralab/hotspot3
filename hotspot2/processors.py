@@ -518,14 +518,15 @@ class ChromosomeProcessor:
             position_skip_mask=position_skip_mask
         )
     
+    @ensure_contig_exists
     def to_parquet(self, data_df, path):
         """
         Workaround for writing parquet files for chromosomes in parallel.
         """
+        if data_df is None:
+            raise NoContigPresentError
         if isinstance(data_df, ProcessorOutputData):
-            print(data_df)
             data_df = data_df.data_df
-            print(data_df)
         data_df['chrom'] = pd.Categorical(
             [self.chrom_name] * data_df.shape[0],
             categories=[x for x in self.gp.chrom_sizes.keys()]
