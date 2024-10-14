@@ -368,8 +368,8 @@ class ChromosomeProcessor:
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        agg_cutcounts = self.smooth_int_counts(cutcounts, self.gp.window)
-        agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
+        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
+        agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts).astype(np.float32)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
@@ -438,7 +438,7 @@ class ChromosomeProcessor:
         Run MODWT smoothing on cutcounts.
         """
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        agg_counts = self.smooth_int_counts(cutcounts, self.gp.density_bandwidth).filled(0)
+        agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
         filters = 'haar'
         level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
@@ -490,7 +490,7 @@ class ChromosomeProcessor:
 
     def fit_background_negbin_model(self, agg_cutcounts, high_signal_mask, in_window=True):
         if in_window:
-            bg_sum_mappable = self.smooth_int_counts(
+            bg_sum_mappable = self.smooth_counts(
                 self.mappable_bases,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
@@ -498,8 +498,12 @@ class ChromosomeProcessor:
             bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
             self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
             
-            bg_sum = self.smooth_int_counts(agg_cutcounts, self.gp.bg_window, position_skip_mask=high_signal_mask)
-            bg_sum_sq = self.smooth_int_counts(
+            bg_sum = self.smooth_counts(
+                agg_cutcounts,
+                self.gp.bg_window,
+                position_skip_mask=high_signal_mask
+            )
+            bg_sum_sq = self.smooth_counts(
                 agg_cutcounts * agg_cutcounts,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
@@ -517,11 +521,15 @@ class ChromosomeProcessor:
         return sliding_mean, sliding_variance
         
     
-    def smooth_int_counts(self, signal, window, position_skip_mask=None):
+    def smooth_counts(self, signal: np.ndarray, window: int, dtype=None, position_skip_mask: np.ndarray=None):
+        """
+        Wrapper for nan_moving_sum to smooth cutcounts.
+        Might need to remove the method and call nan_moving_sum directly.
+        """
         return nan_moving_sum(
             signal,
             window=window,
-            dtype=self.int_dtype,
+            dtype=dtype,
             position_skip_mask=position_skip_mask
         )
     
