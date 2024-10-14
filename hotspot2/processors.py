@@ -398,9 +398,8 @@ class ChromosomeProcessor:
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
             })
-        else:
-            del r0, p0
-            gc.collect()
+        del r0, p0
+        gc.collect()
         data = pd.DataFrame.from_dict(data)
         vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         params_df = pd.DataFrame({
@@ -410,7 +409,7 @@ class ChromosomeProcessor:
             'mean': [m0] * len(vals),
             'variance': [v0] * len(vals),
         })
-
+        self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         self.to_parquet(data, pvals_outpath)
         self.to_parquet(params_df, params_outpath)
 
