@@ -25,7 +25,7 @@ def track_memory(process, log_file, interval=2):
         f.write("timestamp\ttotal_memory_rss_bytes\ttotal_memory_rss_human\n")
     
     while process.poll() is None:  # While the process is still running
-        with open(log_file, "a") as log_file:
+        with open(log_file, "a") as f:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             total_rss = python_process.memory_info().rss
             for child in python_process.children(recursive=True):
@@ -34,7 +34,7 @@ def track_memory(process, log_file, interval=2):
                 total_rss += child.memory_info().rss
 
             total_rss_human = format_memory(total_rss)
-            log_file.write(f"{timestamp}\t{total_rss}\t{total_rss_human}\n")
+            f.write(f"{timestamp}\t{total_rss}\t{total_rss_human}\n")
         time.sleep(interval)
 
 
