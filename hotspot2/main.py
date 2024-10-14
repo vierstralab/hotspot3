@@ -31,23 +31,24 @@ def main() -> None:
         bg_window=args.background_window,
         #chromosomes=['chr20', 'chr19']
     )
-    precomp_fdrs = args.precomp_fdrs
+    precomp_fdrs = args.fdrs_parquet
     cutcounts_path = args.cutcounts
+    smoothed_signal_path = args.signal_parquet
     sample_id = args.id
     outdir_pref = f"{args.outdir}/{sample_id}"
-    smoothed_signal_path = None
 
-    if cutcounts_path is None:
-        cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
-        genome_processor.write_cutcounts(args.bam, cutcounts_path)
+    if smoothed_signal_path is None or precomp_fdrs is None:
+        if cutcounts_path is None:
+            cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
+            genome_processor.write_cutcounts(args.bam, cutcounts_path)
 
-    if smoothed_signal_path is None:
-        smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-        genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
+        if smoothed_signal_path is None:
+            smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
+            genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
 
-    if precomp_fdrs is None:
-        pvals = f"{outdir_pref}.pvals.parquet"
-        precomp_fdrs = genome_processor.calc_pval(cutcounts_path, pvals)
+        if precomp_fdrs is None:
+            pvals = f"{outdir_pref}.pvals.parquet"
+            precomp_fdrs = genome_processor.calc_pval(cutcounts_path, pvals)
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
@@ -102,7 +103,8 @@ def parse_arguments():
     # Arguments to skip previous steps if provided
     parser.add_argument("--bam", help="Path to input bam/cram file", default=None)
     parser.add_argument("--cutcounts", help="Path to pre-calculated cutcounts tabix file. Skip extracting cutcounts from bam file", default=None)
-    parser.add_argument("--precomp_fdrs", help="Path to pre-calculated partitioned parquet file(s) with per-bp FDRs. Skips p-value calculation", default=None)
+    parser.add_argument("--signal_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips modwt signal smoothing", default=None)
+    parser.add_argument("--fdrs_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp FDRs. Skips p-value calculation", default=None)
 
     # Optional - save density
     parser.add_argument("--save_density", action='store_true', help="Save density of cutcounts", default=False)
@@ -111,15 +113,17 @@ def parse_arguments():
     logger_level = logging.DEBUG if args.debug else logging.INFO
     set_logger_config(root_logger, logger_level)
 
-    if args.precomp_fdrs is not None and args.mappable_bases is not None:
-        root_logger.warning(f"Ignoring mappable_bases. Precomputed FDRs are provided")
     
-    if args.cutcounts is not None:
-        if args.bam is not None:
+    if args.signal_parquet is not None and args.fdrs_parquet is not None:
+        ignored_atrs = ['cutcounts', 'bam', 'mappable_bases']
+        for atr in ignored_atrs:
+            if getattr(args, atr) is not None:
+                root_logger.warning(f"Ignoring {atr}. Precomputed smoothed signal and per-bp FDRs are provided")
+    
+    elif args.cutcounts is not None and args.bam is not None:
             root_logger.warning("Ignoring bam file. Precomputed cutcounts are provided")
-    elif args.bam is None:
-        parser.error("Either --bam or --cutcounts should be provided")
-
+    else:
+        parser.error("Either provide both precomputed FDRs and smoothed signal or bam/cutcounts")
     return args, logger_level
 
 

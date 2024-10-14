@@ -3,7 +3,6 @@ from scipy.signal import convolve, find_peaks
 import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
-from statsmodels.stats.multitest import multipletests
 from scipy.stats import false_discovery_control
 import pywt
 import pandas as pd
