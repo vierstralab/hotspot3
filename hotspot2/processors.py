@@ -186,6 +186,7 @@ class GenomeProcessor:
             params_outpath,
             write_mean_and_var
         )
+        self.logger.info('Calculating FDRs')
         log10_pval = pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
@@ -197,7 +198,6 @@ class GenomeProcessor:
         ends = [*starts[1:], log10_pval.shape[0]]
         log10_pval = log10_pval['log10_pval'].values
        
-        self.logger.info('Calculating FDRs')
         fdrs = calc_neglog10fdr(log10_pval, fdr_method=self.fdr_method)
         del log10_pval
         gc.collect()
