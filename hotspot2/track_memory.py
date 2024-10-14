@@ -4,6 +4,7 @@ import subprocess
 import sys
 from main import parse_arguments
 import os
+import threading
 """
 This script is used to call main.py with memory tracking.
 """
@@ -42,10 +43,16 @@ def run_process_with_memory_tracking(cmd, log_file):
     """Run a subprocess and track its memory usage."""
     try:
         process = subprocess.Popen(cmd)  # Start the process
-        track_memory(process, log_file)  # Start tracking memory usage
+
+        memory_thread = threading.Thread(target=track_memory, args=(process, log_file))
+        memory_thread.start()
+        process.wait()
+        memory_thread.join()
     except (psutil.NoSuchProcess, subprocess.SubprocessError, KeyboardInterrupt):
         print("Process interrupted or failed. Terminating...")
     finally:
+        if memory_thread.is_alive():
+            memory_thread.join()
         if process.poll() is None:
             process.terminate()
             try:
@@ -59,6 +66,8 @@ def main():
     args, _ = parse_arguments(" with memory tracking. Outputs {args.id}.memory_usage.tsv in output folder.")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cmd = ["python3", f"{script_dir}/main.py", *sys.argv[1:]]
+
+    print(f"CPU Count: {os.cpu_count()}")
 
     memory_log = f"{args.outdir}/{args.id}.memory_usage.tsv"
     run_process_with_memory_tracking(cmd, memory_log)
