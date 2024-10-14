@@ -100,7 +100,7 @@ def parse_arguments():
 
     parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
     parser.add_argument(
-        "--fdrs", help="List of FDR thresholds, comma separated", type=float, 
+        "--fdrs", help="List of FDR thresholds, space separated", type=float, 
         nargs='+', default=[0.05]
     )
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
