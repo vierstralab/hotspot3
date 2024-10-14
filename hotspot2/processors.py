@@ -120,7 +120,6 @@ class GenomeProcessor:
 
     def construct_parallel_args(self, *args):
         res_args = []
-        print(args)
         for arg in args:
             if is_iterable(arg):
                 if all(isinstance(x, ProcessorOutputData) for x in arg):
@@ -149,6 +148,7 @@ class GenomeProcessor:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
+        print(args)
         self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
         results = []
         if self.cpus == 1:
