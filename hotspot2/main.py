@@ -70,6 +70,7 @@ def main() -> None:
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
         description="""
     Run hotspot2 peak calling
     
