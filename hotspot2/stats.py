@@ -113,16 +113,16 @@ def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width
     region_starts = region_starts[valid_widths]
     region_ends = region_ends[valid_widths]
 
-    min_log10_fdr_values = np.empty(region_ends.shape)
+    max_log10_fdrs = np.empty(region_ends.shape)
     for i in range(len(region_starts)):
         start = region_starts[i]
         end = region_ends[i]
-        min_log10_fdr_values[i] = np.max(log10_fdr_array[start:end])
+        max_log10_fdrs[i] = np.max(log10_fdr_array[start:end])
 
     return pd.DataFrame({
         'start': region_starts,
         'end': region_ends,
-        'max_neglog10_fdr': min_log10_fdr_values
+        'max_neglog10_fdr': max_log10_fdrs
     })
 
 
