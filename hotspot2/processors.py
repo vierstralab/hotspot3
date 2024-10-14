@@ -152,7 +152,7 @@ class GenomeProcessor:
         self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
         results = []
         if self.cpus == 1:
-            for func_args in args:
+            for func_args in zip(args):
                 result = func(*func_args)
                 if result is not None:
                     results.append(result)
