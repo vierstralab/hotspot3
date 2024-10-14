@@ -121,8 +121,8 @@ def parse_arguments():
                 root_logger.warning(f"Ignoring {atr}. Precomputed smoothed signal and per-bp FDRs are provided")
     
     elif args.cutcounts is not None and args.bam is not None:
-            root_logger.warning("Ignoring bam file. Precomputed cutcounts are provided")
-    else:
+        root_logger.warning("Ignoring bam file. Precomputed cutcounts are provided")
+    elif args.cutcounts is None and args.bam is None:
         parser.error("Either provide both precomputed FDRs and smoothed signal or bam/cutcounts")
     return args, logger_level
 
