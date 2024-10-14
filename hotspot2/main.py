@@ -93,12 +93,13 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     and 
     --signal_parquet {sample_id}.smoothed_signal.parquet.
 
-    Or just --fdrs_parquet {sample_id}.fdrs.parquet 
-    if the disk space is limited and signal_parquet was deleted 
-    (will take more time smoothing the signal).
+    Or --fdrs_parquet {sample_id}.fdrs.parquet 
+    and
+    --cutcounts {sample_id}.cutcounts.bed.gz or --bam input.bam
+    if signal_parquet was deleted (will take more time smoothing the signal).
     
     Optional if --save_density is provided:
-        - tabix indexed normalized density of cutcounts: {sample_id}.density.bed.gz (~700MB)
+        - tabix indexed normalized density of cutcounts: {sample_id}.density.bed.gz
     """
     )
     
