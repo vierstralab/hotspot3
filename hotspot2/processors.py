@@ -36,6 +36,7 @@ class GenomeProcessor:
     Parameters:
         - chrom_sizes: Dictionary containing chromosome sizes.
         - mappable_bases_file: Path to the tabix-indexed file containing mappable bases or None.
+        - tmp_dir: Temporary directory for intermediate files. Will use system default if None.
 
         - window: Window size for aggregating cutcounts.
         - min_mappable: Minimum number of mappable bases for a window to be considered.
@@ -169,19 +170,20 @@ class GenomeProcessor:
         self.logger.debug(f'Results of {func.__name__} emitted.')
         return results
 
-    def calc_pval(self, cutcounts_file, output_name, write_smoothing_params=False):
+    def calc_pval(self, cutcounts_file, fdrs_path, write_smoothing_params=False):
         self.logger.info('Calculating p-values')
-        delete(output_name)
-        params_outpath = f'{output_name}.params'
+        pvals_path = fdrs_path.replace('.fdrs', '.pvals')
+        delete(pvals_path)
+        params_outpath = f'{pvals_path}.params'
         delete(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
-            output_name,
+            pvals_path,
             params_outpath,
             write_smoothing_params
         )
-        log10_pval = pd.read_parquet(output_name, engine='pyarrow', columns=['chrom', 'log10_pval']) 
+        log10_pval = pd.read_parquet(pvals_path, engine='pyarrow', columns=['chrom', 'log10_pval']) 
         # file is always sorted within chromosomes
         chrom_pos_mapping = log10_pval['chrom'].drop_duplicates()
         starts = chrom_pos_mapping.index
@@ -204,7 +206,6 @@ class GenomeProcessor:
             for chrom, start, end
             in zip(chrom_pos_mapping, starts, ends)
         ]
-        fdrs_path = f'{output_name}.fdrs'
         delete(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(

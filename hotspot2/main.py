@@ -9,9 +9,11 @@ def main() -> None:
     Main function to run hotspot2 from command line. Uses argparse to parse arguments
 
     Saves following files:
-        - cutcounts: {sample_id}.cutcounts.gz
-        - per-bp FDR estimates: {sample_id}.stats.parquet
-        - parameters used for background per-chromosome fits: {sample_id}.params.gz
+        - cutcounts: {sample_id}.cutcounts.bed.gz
+        - smoothed signal: {sample_id}.smoothed_signal.parquet
+        - p-values: {sample_id}.pvals.parquet
+        - per-bp FDR estimates: {sample_id}.pvals.parquet.fdrs
+        - parameters used for background per-chromosome fits: {sample_id}.stats.parquet.params
         - hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
         - peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
     
@@ -24,6 +26,7 @@ def main() -> None:
     genome_processor = GenomeProcessor(
         chrom_sizes=chrom_sizes,
         mappable_bases_file=args.mappable_bases,
+        tempdir=args.tempdir,
         cpus=args.cpus,
         logger_level=logger_level,
         save_debug=args.debug,
@@ -47,8 +50,8 @@ def main() -> None:
             genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
 
         if precomp_fdrs is None:
-            pvals = f"{outdir_pref}.pvals.parquet"
-            precomp_fdrs = genome_processor.calc_pval(cutcounts_path, pvals)
+            precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
+            genome_processor.calc_pval(cutcounts_path, precomp_fdrs)
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
@@ -94,6 +97,7 @@ def parse_arguments():
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--outdir", help="Path to output directory", default=".")
     parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
+    parser.add_argument("--tempdir", help="Path to temporary directory. Defaults to system temp directory", default=None)
 
     # Arguments for calculating p-values
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed). Used in fit of background model", default=None)
