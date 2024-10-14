@@ -210,6 +210,7 @@ class GenomeProcessor:
             for chrom, start, end
             in zip(chrom_pos_mapping, starts, ends)
         ]
+        gc.collect()
         delete(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(
