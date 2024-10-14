@@ -4,6 +4,9 @@ import subprocess
 import sys
 from main import parse_arguments
 
+"""
+This script is used to call main.py with memory tracking.
+"""
 
 def format_memory(size_in_bytes):
     """Format the memory size from bytes to a human-readable format."""
