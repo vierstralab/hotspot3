@@ -28,7 +28,7 @@ def calc_log10fdr(log10_pvals, fdr_method='bh'):
     log_fdr = np.empty(log10_pvals.shape, dtype=np.float16)
     not_nan = ~np.isnan(log10_pvals)
     log_fdr[~not_nan] = np.nan
-    log_fdr[not_nan] = -np.log10(false_discovery_control(np.power(10, -log10_pvals[not_nan].astype(np.float32)), method='bh'))
+    log_fdr[not_nan] = -np.log10(false_discovery_control(np.power(10, -log10_pvals[not_nan].astype(np.float64)), method='bh'))
     return log_fdr
 
 

@@ -174,7 +174,7 @@ class GenomeProcessor:
         self.logger.info('Calculating p-values')
         pvals_path = fdrs_path.replace('.fdrs', '.pvals')
         delete(pvals_path)
-        params_outpath = f'{pvals_path}.params'
+        params_outpath = pvals_path.replace('.pvals', '.pvals.params.parquet')
         delete(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
@@ -183,7 +183,10 @@ class GenomeProcessor:
             params_outpath,
             write_smoothing_params
         )
-        log10_pval = pd.read_parquet(pvals_path, engine='pyarrow', columns=['chrom', 'log10_pval']) 
+        log10_pval = pd.read_parquet(
+            pvals_path,engine='pyarrow', 
+            columns=['chrom', 'log10_pval']
+        ) 
         # file is always sorted within chromosomes
         chrom_pos_mapping = log10_pval['chrom'].drop_duplicates()
         starts = chrom_pos_mapping.index

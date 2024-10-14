@@ -4,6 +4,7 @@ import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
 from utils import read_chrom_sizes, df_to_tabix
 
+
 def main() -> None:
     """
     Main function to run hotspot2 from command line. Uses argparse to parse arguments
@@ -12,8 +13,11 @@ def main() -> None:
         - cutcounts: {sample_id}.cutcounts.bed.gz
         - smoothed signal: {sample_id}.smoothed_signal.parquet
         - p-values: {sample_id}.pvals.parquet
-        - per-bp FDR estimates: {sample_id}.pvals.parquet.fdrs
-        - parameters used for background per-chromosome fits: {sample_id}.stats.parquet.params
+        - parameters used for background per-chromosome fits: {sample_id}.pvals.params.parquet
+        - per-bp FDR estimates: {sample_id}.fdrs
+        
+    
+    For each FDR threshold:
         - hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
         - peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
     
