@@ -1,42 +1,28 @@
 import psutil
 import time
 import subprocess
+import sys
+from main import parse_arguments
 
-# Path to the output memory log file (tab-separated)
-MEMORY_LOG = "memory_usage.tsv"
-
-# Command to run your Python script
-cmd = [
-    "python3", "/home/sabramov/packages/hotspot2/hotspot2/main.py", "AG70782.test",
-    "--bam", "../../filtered.cram",
-    "--chrom_sizes", "/net/seq/data/genomes/human/GRCh38/noalts/GRCh38_no_alts.chrom_sizes",
-    "--mappable_bases", "/net/seq/data2/projects/sabramov/SuperIndex/GRCh38_no_alts.K36.center_sites.n100.nuclear.merged.bed.gz",
-    "--signal_parquet", "AG70782.test.smoothed_signal.parquet",
-    "--cutcounts", "AG70782.test.cutcounts.bed.gz",
-    "--cpus", "8",
-    "--debug",
-    "--fdrs", "0.1", "0.05",
-    "--save_density"
-]
 
 def format_memory(size_in_bytes):
+    """Format the memory size from bytes to a human-readable format."""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size_in_bytes < 1024:
             return f"{size_in_bytes:.2f} {unit}"
         size_in_bytes /= 1024
     return f"{size_in_bytes:.2f} PB"
 
-# Clear the log file before starting and write header with \t separation
-with open(MEMORY_LOG, "w") as f:
-    f.write("timestamp\ttotal_memory_rss_bytes\ttotal_memory_rss_human\n")
 
-# Start the Python script as a subprocess and track memory usage
-try:
-    process = subprocess.Popen(cmd)
+
+def track_memory(process, log_file, interval=2):
+    """Track memory usage of a subprocess and log it."""
     python_process = psutil.Process(process.pid)
-
+    with open(log_file, "w") as f:
+        f.write("timestamp\ttotal_memory_rss_bytes\ttotal_memory_rss_human\n")
+    
     while process.poll() is None:  # While the process is still running
-        with open(MEMORY_LOG, "a") as log_file:
+        with open(log_file, "a") as log_file:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             total_rss = python_process.memory_info().rss
             for child in python_process.children(recursive=True):
@@ -46,18 +32,36 @@ try:
 
             total_rss_human = format_memory(total_rss)
             log_file.write(f"{timestamp}\t{total_rss}\t{total_rss_human}\n")
-        time.sleep(2)
+        time.sleep(interval)
 
-except (psutil.NoSuchProcess, subprocess.SubprocessError, KeyboardInterrupt):
-    print("Process interrupted or failed. Terminating...")
 
-finally:
-    if process.poll() is None:  # If the process is still running
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            print("Forcefully killing the subprocess...")
-            process.kill()
+def run_process_with_memory_tracking(cmd, log_file):
+    """Run a subprocess and track its memory usage."""
+    try:
+        process = subprocess.Popen(cmd)  # Start the process
+        track_memory(process, log_file)  # Start tracking memory usage
+    except (psutil.NoSuchProcess, subprocess.SubprocessError, KeyboardInterrupt):
+        print("Process interrupted or failed. Terminating...")
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("Forcefully killing the subprocess...")
+                process.kill()
 
-print("Memory tracking finished.")
+
+def main():
+    args, _ = parse_arguments()
+
+    cmd = ["python3", "/home/sabramov/packages/hotspot2/hotspot2/main.py"] + sys.argv[1:]
+
+    memory_log = "memory_usage.tsv"
+    run_process_with_memory_tracking(cmd, memory_log)
+
+    print("Memory tracking finished.")
+
+
+if __name__ == "__main__":
+    main()
