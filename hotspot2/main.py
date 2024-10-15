@@ -112,7 +112,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     )
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--outdir", help="Path to output directory", default=".")
-    parser.add_argument("--debug", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", action='store_true', default=False)
+    parser.add_argument("--debug", help="Run in debug mode. Adds additional prints and saves background window fit params", action='store_true', default=False)
     parser.add_argument("--tempdir", help="Path to temporary directory. Defaults to system temp directory", default=None)
 
     # Arguments for calculating p-values
