@@ -8,7 +8,7 @@ import multiprocessing as mp
 import pandas as pd
 import sys
 import gc
-from hotspot2.hotspot2.signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
+from signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
 from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks
 from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_parquet_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete_path
 import sys
