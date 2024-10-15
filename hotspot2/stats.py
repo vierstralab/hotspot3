@@ -10,8 +10,8 @@ from scipy.special import logsumexp
 
 # Calculate p-values and FDR
 def p_and_r_from_mean_and_var(mean, var):
-    r = mean**2 / (var - mean)
-    p = 1 - mean / var
+    r = mean**2 / (var - mean) # mean
+    p = 1 - mean / var # (var - mean) / var
     return r, p
 
 
@@ -58,21 +58,20 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
         - log_fdr: 1D array of log-transformed FDR values. 
     """
     assert method in ['bh', 'by'], "Only 'bh' and 'by' methods are supported."
-    # TODO: make work with log10 p-values
     log_pvals = np.asarray(log_pvals).astype(dtype=dtype) # no further input checking yet
     if log_pvals.ndim != 1:
         raise NotImplementedError("Only 1D arrays are supported.")
 
     m = log_pvals.shape[0]
-    order = np.argsort(log_pvals) # ascending order, so that the lowest p-values are first
+    order = np.argsort(log_pvals)
     
     log_pvals = log_pvals[order]
 
     log_i = np.log(np.arange(1, m + 1, dtype=dtype))
-    log_pvals += np.log(m) - log_i  # p_adj = p * m / i => log10(p_adj) = log10(p) + log10(m) - log10(i)
+    log_pvals += np.log(m).astype(dtype) - log_i  # p_adj = p * m / i => log10(p_adj) = log10(p) + log10(m) - log10(i)
     if method == 'by':
         log_pvals += logsumexp(-log_i)
-    del log_i # optimization to free memory
+    del log_i
     gc.collect()
     np.minimum.accumulate(log_pvals[::-1], out=log_pvals[::-1])
     log_pvals_copy = log_pvals.copy() # since array is float32, copying is more memory effient than argsort int64
