@@ -517,7 +517,7 @@ class ChromosomeProcessor:
                 self.mappable_bases,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask,
-                dtype=np.int16
+                dtype=np.int32
             )
             bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
             self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
@@ -528,7 +528,7 @@ class ChromosomeProcessor:
                 position_skip_mask=high_signal_mask
             )
             bg_sum_sq = self.smooth_counts(
-                agg_cutcounts * agg_cutcounts,
+                agg_cutcounts ** 2,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
             )
