@@ -9,12 +9,13 @@ import gc
 from scipy.special import logsumexp
 
 
-def negbin_neglog10pvalue(x, r, p) -> np.ndarray:
+def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
     x = ma.asarray(x)
     r = ma.asarray(r)
     p = ma.asarray(p)
     assert r.shape == p.shape, "r and p should have the same shape"
     resulting_mask = x.mask.copy()
+    # in masked arrays, mask is True for masked values
     if len(r.shape) != 0:
         resulting_mask = reduce(ma.mask_or, [resulting_mask, r.mask, p.mask])
         r = r[~resulting_mask].compressed()
