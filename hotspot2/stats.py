@@ -25,7 +25,7 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
     result = np.empty(resulting_mask.shape, dtype=np.float16)
     result[resulting_mask] = np.nan
     result[~resulting_mask] = -st.nbinom.logsf(x - 1, r, 1 - p) / np.log(10)
-    print(result.shape, ~np.isfinite(result).sum(), np.isnan(result).sum())
+    print(result.shape, (~np.isfinite(result)).sum(), np.isnan(result).sum())
     return result
 
 

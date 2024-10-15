@@ -175,7 +175,7 @@ class GenomeProcessor:
         return results
 
 
-    def calc_pval(self, cutcounts_file, fdrs_path, write_mean_and_var=False):
+    def calc_pval(self, cutcounts_file, fdrs_path: str, write_mean_and_var=False):
         self.logger.info('Calculating per-bp p-values')
         pvals_path = fdrs_path.replace('.fdrs', '.pvals')
         params_outpath = pvals_path.replace('.pvals', '.pvals.params')
@@ -440,8 +440,7 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05, min_width=50) -> ProcessorOutputData:
-        columns = ['log10_fdr']
-        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name, columns=columns)['log10_fdr'].to_numpy()
+        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name, columns=['log10_fdr'])['log10_fdr'].to_numpy()
         if log10_fdr_array.size == 0:
             raise NoContigPresentError
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
