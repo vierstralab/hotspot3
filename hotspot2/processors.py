@@ -349,7 +349,7 @@ class ChromosomeProcessor:
                     for _, row in mappable_loader[self.genomic_interval].iterrows():
                         if row['end'] > self.genomic_interval.end:
                             raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end} for {self.chrom_name}")
-                        mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = True
+                        mappable[row['start']:row['end']] = True
             except ValueError:
                 raise NoContigPresentError
         
