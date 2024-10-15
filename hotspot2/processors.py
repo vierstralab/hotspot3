@@ -376,6 +376,10 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
+
+        del cutcounts
+        gc.collect()
+
         agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
@@ -402,7 +406,7 @@ class ChromosomeProcessor:
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
 
         if not write_mean_and_var:
-            del sliding_mean, sliding_variance
+            del sliding_mean, sliding_variance, high_signal_mask
             gc.collect()
 
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
@@ -513,7 +517,7 @@ class ChromosomeProcessor:
                 self.mappable_bases,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask,
-                dtype=np.float32
+                dtype=np.int16
             )
             bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
             self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
@@ -535,8 +539,14 @@ class ChromosomeProcessor:
             bg_sum = np.sum(compressed_cutcounts)
             bg_sum_sq = np.sum(compressed_cutcounts * compressed_cutcounts)
 
+        del agg_cutcounts, high_signal_mask
+        gc.collect()
+
         sliding_mean = (bg_sum / bg_sum_mappable)
-        sliding_variance = ((bg_sum_sq - bg_sum * sliding_mean) / (bg_sum_mappable - 1))
+        del bg_sum
+        gc.collect()
+
+        sliding_variance = ((bg_sum_sq - bg_sum_mappable * sliding_mean * sliding_mean) / (bg_sum_mappable - 1))
 
         return sliding_mean, sliding_variance
         
