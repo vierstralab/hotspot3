@@ -9,7 +9,7 @@ import pandas as pd
 import sys
 import gc
 from signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
-from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks
+from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
 from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_parquet_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete_path
 import sys
 from typing import Iterable
@@ -410,16 +410,15 @@ class ChromosomeProcessor:
         del mappable_bases
         gc.collect()
 
-        r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
-        p0 = (sliding_variance - sliding_mean) / (sliding_variance)
-
+        p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
+        if not write_mean_and_var:
+            del sliding_mean, sliding_variance, high_signal_mask
+            gc.collect()
+        
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
         )
-        if not write_mean_and_var:
-            del sliding_mean, sliding_variance, high_signal_mask
-            gc.collect()
 
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
@@ -445,14 +444,14 @@ class ChromosomeProcessor:
         if write_mean_and_var:
             log_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
-                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
+                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float32),
             })
             del sliding_mean, sliding_variance
             gc.collect()
 
         log_pvals = pd.DataFrame.from_dict(log_pvals)
 
-        p_global = 1 - m0 / v0
+        p_global, r_global = p_and_r_from_mean_and_var(m0, v0)
         r_global = m0 ** 2 / (v0 - m0)
         rmsea = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
         epsilon = calc_epsilon(r_global, p_global, tr=outliers_tr)
@@ -573,11 +572,11 @@ class ChromosomeProcessor:
         del agg_cutcounts, high_signal_mask, mappable_bases
         gc.collect()
 
-        sliding_mean = (bg_sum / bg_sum_mappable)
+        sliding_mean = (bg_sum / bg_sum_mappable).astype(np.float32)
         del bg_sum
         gc.collect()
 
-        sliding_variance = ((bg_sum_sq - bg_sum_mappable * (sliding_mean ** 2)) / (bg_sum_mappable - 1))
+        sliding_variance = ((bg_sum_sq - bg_sum_mappable * (sliding_mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
 
         return sliding_mean, sliding_variance
         

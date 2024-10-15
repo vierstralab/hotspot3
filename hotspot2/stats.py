@@ -9,6 +9,12 @@ from scipy.special import logsumexp
 
 
 # Calculate p-values and FDR
+def p_and_r_from_mean_and_var(mean, var):
+    r = mean**2 / (var - mean)
+    p = 1 - mean / var
+    return r, p
+
+
 def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
     x = ma.asarray(x)
     r = ma.asarray(r)
