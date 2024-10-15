@@ -8,7 +8,7 @@ import multiprocessing as mp
 import pandas as pd
 import sys
 import gc
-from stats import calc_neglog10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks
+from stats import calc_neglog10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks, calc_rmsea, calc_epsilon
 from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete
 import sys
 from typing import Iterable
@@ -200,14 +200,14 @@ class GenomeProcessor:
         ends = [*starts[1:], log10_pval.shape[0]]
         log10_pval = log10_pval['log10_pval'].values
        
-        fdrs = calc_neglog10fdr(log10_pval, fdr_method=self.fdr_method)
+        log10_fdrs = calc_neglog10fdr(log10_pval, fdr_method=self.fdr_method)
         del log10_pval
         gc.collect()
 
-        fdrs = [
+        log10_fdrs = [
             ProcessorOutputData(
                 chrom, 
-                pd.DataFrame({'log10_fdr': fdrs[start:end]})
+                pd.DataFrame({'log10_fdr': log10_fdrs[start:end]})
             )
             for chrom, start, end
             in zip(chrom_pos_mapping, starts, ends)
@@ -217,7 +217,7 @@ class GenomeProcessor:
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(
             ChromosomeProcessor.to_parquet,
-            fdrs,
+            log10_fdrs,
             fdrs_path,
         )
         return fdrs_path
@@ -404,17 +404,31 @@ class ChromosomeProcessor:
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
 
-        vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
+        unique_cutcounts, n_obs = np.unique(
+            agg_cutcounts[~high_signal_mask].compressed(),
+            return_counts=True
+        )
         if not write_mean_and_var:
             del sliding_mean, sliding_variance, high_signal_mask
             gc.collect()
 
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
-        log_pvals = {'log10_pval': log_pvals}
 
         del r0, p0
         gc.collect()
+        infs = np.isinf(log_pvals)
+        n_infs = np.sum(infs) 
+        if n_infs > 0:
+            self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300.")
+            np.savetxt(f'{self.chrom_name}_positions_with_infs.txt.gz', np.where(infs, 300, log_pvals), fmt='%d')
+            
+            log_pvals[infs] = 300
+        del infs
+        gc.collect()
+
+        log_pvals = {'log10_pval': log_pvals}
+
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
         if write_mean_and_var:
@@ -426,12 +440,19 @@ class ChromosomeProcessor:
             gc.collect()
 
         log_pvals = pd.DataFrame.from_dict(log_pvals)
+
+        p_global = 1 - m0 / v0
+        r_global = m0 ** 2 / (v0 - m0)
+        rmsea = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
+        epsilon = calc_epsilon(r_global, p_global, tr=outliers_tr)
         params_df = pd.DataFrame({
-            'cutcounts': vals,
-            'count': counts,
-            'outliers_tr': [outliers_tr] * len(vals),
-            'mean': [m0] * len(vals),
-            'variance': [v0] * len(vals),
+            'unique_cutcounts': unique_cutcounts,
+            'count': n_obs,
+            'outliers_tr': [outliers_tr] * len(unique_cutcounts),
+            'mean': [m0] * len(unique_cutcounts),
+            'variance': [v0] * len(unique_cutcounts),
+            'rmsea': [rmsea] * len(unique_cutcounts),
+            'epsilon': [epsilon] * len(unique_cutcounts)
         })
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         self.to_parquet(log_pvals, pvals_outpath)

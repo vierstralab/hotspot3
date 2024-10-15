@@ -25,7 +25,6 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
     result = np.empty(resulting_mask.shape, dtype=np.float16)
     result[resulting_mask] = np.nan
     result[~resulting_mask] = -st.nbinom.logsf(x - 1, r, 1 - p) / np.log(10)
-    print(result.shape, (~np.isfinite(result)).sum(), np.isnan(result).sum())
     return result
 
 
@@ -95,6 +94,19 @@ def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None) ->
     return ma.array(result, mask=masked_array.mask)
 
 
+def find_stretches(arr: np.ndarray):
+    """
+    Find stretches of True values in a boolean array.
+    Returns:
+        - start: start positions of stretches
+        - end: end positions of stretches
+    """
+    boundaries = np.diff(arr.astype(np.int8), prepend=0, append=0)
+    start = np.where(boundaries == 1)[0]
+    end = np.where(boundaries == -1)[0]
+    return start, end
+
+
 def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width):
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
@@ -111,9 +123,8 @@ def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width
     # Diff returns -1 for transitions from True to False, 1 for transitions from False to True
     boundaries = np.diff(below_threshold.astype(np.int8), prepend=0, append=0).astype(np.int8)
 
-    region_starts = np.where(boundaries == 1)[0]
-    region_ends = np.where(boundaries == -1)[0]
-
+    region_starts, region_ends = find_stretches(below_threshold)
+    
     valid_widths = (region_ends - region_starts) >= min_width
     region_starts = region_starts[valid_widths]
     region_ends = region_ends[valid_widths]
@@ -290,3 +301,16 @@ def find_varwidth_peaks(signal: np.ndarray, hotspot_starts, hotspot_ends, min_wi
     
     width_mask = (peaks_in_hotspots_trimmed[:, 2] - peaks_in_hotspots_trimmed[:, 0]) >= min_width
     return peaks_in_hotspots_trimmed[width_mask], threshold_heights[width_mask]
+
+
+def calc_rmsea(obs, unique_cutcounts, r, p, tr):
+    N = sum(obs)
+    exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
+    # chisq = sum((obs - exp) ** 2 / exp)
+    G_sq = 2 * sum(obs * np.log(obs / exp))
+    df = len(obs) - 2
+    return np.sqrt((G_sq / df - 1) / (N - 1))
+
+
+def calc_epsilon(r, p, tr):
+    return st.nbinom(r, 1 - p).pmf(tr) / (1 - p)
