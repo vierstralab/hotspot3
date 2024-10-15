@@ -32,6 +32,7 @@ def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
     neglog10_fdr[not_nan] = -logfdr_from_logpvals(
         -neglog10_pvals[not_nan] * np.log(10), method=fdr_method
     ) / np.log(10)
+    print(np.isnan(neglog10_fdr), np.isnan(neglog10_pvals))
     return neglog10_fdr
 
 
