@@ -176,7 +176,7 @@ class GenomeProcessor:
 
 
     def calc_pval(self, cutcounts_file, fdrs_path, write_mean_and_var=False):
-        self.logger.info('Calculating p-values')
+        self.logger.info('Calculating per-bp p-values')
         pvals_path = fdrs_path.replace('.fdrs', '.pvals')
         params_outpath = pvals_path.replace('.pvals', '.pvals.params')
         delete(pvals_path)
@@ -188,7 +188,7 @@ class GenomeProcessor:
             params_outpath,
             write_mean_and_var
         )
-        self.logger.info('Calculating FDRs')
+        self.logger.info('Calculating per-bp FDRs')
         log10_pval = pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
@@ -371,6 +371,7 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_mean_and_var=False) -> ProcessorOutputData:
+        write_mean_and_var = write_mean_and_var or self.gp.save_debug
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
@@ -400,7 +401,7 @@ class ChromosomeProcessor:
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
 
-        if not self.gp.save_debug:
+        if not write_mean_and_var:
             del sliding_mean, sliding_variance
             gc.collect()
 
@@ -412,12 +413,11 @@ class ChromosomeProcessor:
         gc.collect()
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-        if self.gp.save_debug or write_mean_and_var:
+        if write_mean_and_var:
             log_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan),
             })
-        if self.gp.save_debug:
             del sliding_mean, sliding_variance
             gc.collect()
 
