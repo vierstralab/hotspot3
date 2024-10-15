@@ -173,6 +173,9 @@ class GenomeProcessor:
                     self.logger.critical("Exception, gracefully shutting down executor...")
                     executor.shutdown(wait=True, cancel_futures=True)
                     raise e
+                finally:
+                    executor.shutdown(wait=True, cancel_futures=True)
+
         self.set_logger() # Restore logger after parallel execution
         self.logger.debug(f'Results of {func.__name__} emitted.')
         return results
