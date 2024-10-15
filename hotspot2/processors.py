@@ -383,7 +383,7 @@ class ChromosomeProcessor:
         del cutcounts
         gc.collect()
 
-        agg_cutcounts = np.ma.masked_where(mappable_bases, agg_cutcounts)
+        agg_cutcounts = np.ma.masked_where(mappable_bases.mask, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
