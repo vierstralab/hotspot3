@@ -421,11 +421,11 @@ class ChromosomeProcessor:
         
 
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
-        log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
+        neglog_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
         del r0, p0
         gc.collect()
-        infs = np.isinf(log_pvals)
+        infs = np.isinf(neglog_pvals)
         n_infs = np.sum(infs) 
         if n_infs > 0:
             outdir = pvals_outpath.replace('.pvals.parquet', '')
@@ -433,23 +433,23 @@ class ChromosomeProcessor:
             self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
             np.savetxt(fname, np.where(infs)[0], fmt='%d')
             
-            log_pvals[infs] = 300
+            neglog_pvals[infs] = 300
         del infs
         gc.collect()
 
-        log_pvals = {'log10_pval': log_pvals}
+        neglog_pvals = {'log10_pval': neglog_pvals}
 
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
         if write_mean_and_var:
-            log_pvals.update({
+            neglog_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float32),
             })
             del sliding_mean, sliding_variance
             gc.collect()
 
-        log_pvals = pd.DataFrame.from_dict(log_pvals)
+        neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
 
         p_global, r_global = p_and_r_from_mean_and_var(m0, v0)
         r_global = m0 ** 2 / (v0 - m0)
@@ -465,7 +465,7 @@ class ChromosomeProcessor:
             'epsilon': [epsilon] * len(unique_cutcounts)
         })
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
-        self.to_parquet(log_pvals, pvals_outpath)
+        self.to_parquet(neglog_pvals, pvals_outpath)
         self.to_parquet(params_df, params_outpath)
 
 
