@@ -69,8 +69,6 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cmd = ["python3", f"{script_dir}/main.py", *sys.argv[1:]]
 
-    print(f"CPU Count: {os.cpu_count()}")
-
     memory_log = f"{args.outdir}/{args.id}.memory_usage.tsv"
     run_process_with_memory_tracking(cmd, memory_log)
 
