@@ -414,7 +414,7 @@ class ChromosomeProcessor:
         if self.gp.save_debug or write_mean_and_var:
             log_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
-                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
+                'sliding_variance': sliding_variance.filled(np.nan),
             })
         log_pvals = pd.DataFrame.from_dict(log_pvals)
         vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
