@@ -171,7 +171,6 @@ class GenomeProcessor:
                 except Exception as e:
                     self.set_logger()
                     self.logger.critical("Exception, gracefully shutting down executor...")
-                    executor.shutdown(wait=True, cancel_futures=True)
                     raise e
                 finally:
                     executor.shutdown(wait=True, cancel_futures=True)
