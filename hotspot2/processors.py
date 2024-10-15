@@ -334,45 +334,47 @@ class ChromosomeProcessor:
         self.gp = genome_processor
         self.chrom_size = self.gp.chrom_sizes[chrom_name]
         self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
-        self.mappable_bases = None
     
-    def extract_mappable_bases(self, force=False):
-        if self.mappable_bases is not None and not force:
-            return
+    def extract_mappable_bases(self) -> ma.MaskedArray:
+        """
+        Extract mappable bases for the chromosome.
+        """
         mappable_file = self.gp.mappable_bases_file
         if mappable_file is None:
-            mappable = np.ones(self.chrom_size, dtype=bool)
+            mappable = np.ones(self.chrom_size, dtype=np.int8)
         else:
             try:
                 with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
-                    mappable = np.zeros(self.chrom_size, dtype=bool)
+                    mappable = np.zeros(self.chrom_size, dtype=np.int8)
                     for _, row in mappable_loader[self.genomic_interval].iterrows():
                         if row['end'] > self.genomic_interval.end:
                             raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end} for {self.chrom_name}")
                         mappable[row['start'] - self.genomic_interval.start:row['end'] - self.genomic_interval.end] = 1
             except ValueError:
                 raise NoContigPresentError
-
-        self.mappable_bases = ma.masked_where(~mappable, mappable)
+        
         self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
+        return ma.masked_where(~mappable, mappable)
+
     
     def extract_cutcounts(self, cutcounts_file):
         cutcounts = np.zeros(self.chrom_size, dtype=counts_dtype)
-        self.extract_mappable_bases()
+        self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
         try:
-            self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
             with TabixExtractor(cutcounts_file) as cutcounts_loader:
                 data = cutcounts_loader[self.genomic_interval]
                 assert data.eval('end - start == 1').all(), "Cutcounts are expected to be at basepair resolution"
                 cutcounts[data['start']] = data['count'].to_numpy()
         except ValueError:
             raise NoContigPresentError
+
         return cutcounts
 
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_mean_and_var=False) -> ProcessorOutputData:
         write_mean_and_var = write_mean_and_var or self.gp.save_debug
+        mappable_bases = self.extract_mappable_bases()
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
@@ -381,7 +383,7 @@ class ChromosomeProcessor:
         del cutcounts
         gc.collect()
 
-        agg_cutcounts = np.ma.masked_where(self.mappable_bases.mask, agg_cutcounts)
+        agg_cutcounts = np.ma.masked_where(mappable_bases, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
@@ -393,6 +395,7 @@ class ChromosomeProcessor:
 
         m0, v0 = self.fit_background_negbin_model(
             agg_cutcounts,
+            mappable_bases,
             high_signal_mask,
             in_window=False
         )
@@ -400,8 +403,13 @@ class ChromosomeProcessor:
 
         sliding_mean, sliding_variance = self.fit_background_negbin_model(
             agg_cutcounts,
+            mappable_bases,
             high_signal_mask
         )
+
+        del mappable_bases
+        gc.collect()
+
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
 
@@ -473,7 +481,8 @@ class ChromosomeProcessor:
             fdr_threshold=fdr_threshold,
             min_width=min_width
         )
-        return ProcessorOutputData(self.chrom_name, data) if data is not None else None
+
+        return ProcessorOutputData(self.chrom_name, data)
     
 
     @ensure_contig_exists
@@ -532,11 +541,11 @@ class ChromosomeProcessor:
             df = hotspots_loader[self.genomic_interval]
         return df
 
-    def fit_background_negbin_model(self, agg_cutcounts, high_signal_mask, in_window=True):
+    def fit_background_negbin_model(self, agg_cutcounts, mappable_bases, high_signal_mask, in_window=True):
         agg_cutcounts = np.asarray(agg_cutcounts, dtype=np.float32)
         if in_window:
             bg_sum_mappable = self.smooth_counts(
-                self.mappable_bases,
+                mappable_bases,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask,
                 dtype=np.int32
@@ -556,12 +565,12 @@ class ChromosomeProcessor:
             )
             self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
-            bg_sum_mappable = np.sum(self.mappable_bases[~high_signal_mask].compressed())
+            bg_sum_mappable = np.sum(mappable_bases[~high_signal_mask].compressed())
             agg_cutcounts = agg_cutcounts[~high_signal_mask]
             bg_sum = np.sum(agg_cutcounts)
             bg_sum_sq = np.sum(agg_cutcounts ** 2)
 
-        del agg_cutcounts, high_signal_mask
+        del agg_cutcounts, high_signal_mask, mappable_bases
         gc.collect()
 
         sliding_mean = (bg_sum / bg_sum_mappable)
