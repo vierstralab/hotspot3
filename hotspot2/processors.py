@@ -406,12 +406,12 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
+        log_pvals = {'log10_pval': log_pvals}
 
         del r0, p0
         gc.collect()
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-        log_pvals = {'log10_pval': log_pvals}
         if self.gp.save_debug or write_mean_and_var:
             log_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
