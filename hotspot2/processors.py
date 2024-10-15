@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import numpy.ma as ma
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor
 import multiprocessing as mp
@@ -143,10 +143,11 @@ class GenomeProcessor:
         return [self.chromosome_processors, *res_args]
 
 
-    def parallel_by_chromosome(self, func, *args, cpus=None):
+    def parallel_by_chromosome(self, func, *args, cpus=None, executor='process'):
         """
         Basic function that handles parallel execution of a function by chromosome.
         """
+        assert executor in ['process', 'thread'], "Executor must be one of 'process', 'thread'"
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
@@ -158,7 +159,11 @@ class GenomeProcessor:
                 if result is not None:
                     results.append(result)
         else:
-            with ProcessPoolExecutor(max_workers=self.cpus) as executor:
+            if executor == 'process':
+                executor = ProcessPoolExecutor
+            elif executor == 'thread':
+                executor = ThreadPoolExecutor
+            with executor(max_workers=self.cpus) as executor:
                 try:
                     for result in executor.map(func, *args):
                         if result is not None:
@@ -216,7 +221,8 @@ class GenomeProcessor:
         self.parallel_by_chromosome(
             ChromosomeProcessor.to_parquet,
             fdrs,
-            fdrs_path
+            fdrs_path,
+            executor='thread'
         )
         return fdrs_path
 
