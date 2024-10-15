@@ -399,6 +399,7 @@ class ChromosomeProcessor:
 
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
+
         if not self.gp.save_debug:
             del sliding_mean, sliding_variance
             gc.collect()
@@ -410,12 +411,16 @@ class ChromosomeProcessor:
         gc.collect()
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-        log_pvals = {'log10_pval': log_pvals.filled(np.nan)}
+        log_pvals = {'log10_pval': log_pvals}
         if self.gp.save_debug or write_mean_and_var:
             log_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan),
             })
+        if self.gp.save_debug:
+            del sliding_mean, sliding_variance
+            gc.collect()
+
         log_pvals = pd.DataFrame.from_dict(log_pvals)
         vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         params_df = pd.DataFrame({
