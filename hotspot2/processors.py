@@ -401,7 +401,7 @@ class ChromosomeProcessor:
             agg_cutcounts,
             high_signal_mask
         )
-
+        print(r0.shape, r0.count(), np.isfinite(r0).sum())
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
 
@@ -535,9 +535,9 @@ class ChromosomeProcessor:
             self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
             bg_sum_mappable = np.sum(self.mappable_bases[~high_signal_mask].compressed())
-            compressed_cutcounts = agg_cutcounts[~high_signal_mask]
-            bg_sum = np.sum(compressed_cutcounts)
-            bg_sum_sq = np.sum(compressed_cutcounts * compressed_cutcounts)
+            agg_cutcounts = agg_cutcounts[~high_signal_mask]
+            bg_sum = np.sum(agg_cutcounts)
+            bg_sum_sq = np.sum(agg_cutcounts ** 2)
 
         del agg_cutcounts, high_signal_mask
         gc.collect()
@@ -546,7 +546,7 @@ class ChromosomeProcessor:
         del bg_sum
         gc.collect()
 
-        sliding_variance = ((bg_sum_sq - bg_sum_mappable * sliding_mean * sliding_mean) / (bg_sum_mappable - 1))
+        sliding_variance = ((bg_sum_sq - bg_sum_mappable * (sliding_mean ** 2)) / (bg_sum_mappable - 1))
 
         return sliding_mean, sliding_variance
         
