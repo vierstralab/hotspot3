@@ -401,9 +401,9 @@ class ChromosomeProcessor:
             agg_cutcounts,
             high_signal_mask
         )
-        print(r0.shape, r0.count(), np.isfinite(r0).sum())
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
+        print(r0.shape, r0.count(), np.isfinite(r0).sum())
 
         vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         if not write_mean_and_var:

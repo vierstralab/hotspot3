@@ -11,17 +11,20 @@ from scipy.special import logsumexp
 
 def negbin_neglog10pvalue(x, r, p) -> np.ndarray:
     x = ma.asarray(x)
+    r = ma.asarray(r)
+    p = ma.asarray(p)
     assert r.shape == p.shape, "r and p should have the same shape"
-    if len(r.shape) == 0:
-        resulting_mask = x.mask
-    else:
-        resulting_mask = reduce(ma.mask_or, [x.mask, r.mask, p.mask])
-        r = ma.asarray(r)[~resulting_mask]
-        p = ma.asarray(p)[~resulting_mask]
-    result = np.empty(x.shape, dtype=np.float16)
+    resulting_mask = x.mask.copy()
+    if len(r.shape) != 0:
+        resulting_mask = reduce(ma.mask_or, [resulting_mask, r.mask, p.mask])
+        r = r[~resulting_mask].compressed()
+        p = p[~resulting_mask].compressed()
+    x = x[~resulting_mask].compressed()
+
+    result = np.empty(resulting_mask, dtype=np.float16)
     print(resulting_mask.sum(), resulting_mask.shape)
     result[resulting_mask] = np.nan
-    result[~resulting_mask] = -st.nbinom.logsf(x[~resulting_mask] - 1, r, 1 - p) / np.log(10)
+    result[~resulting_mask] = -st.nbinom.logsf(x - 1, r, 1 - p) / np.log(10)
     return result
 
 
