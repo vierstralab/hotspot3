@@ -420,8 +420,9 @@ class ChromosomeProcessor:
         infs = np.isinf(log_pvals)
         n_infs = np.sum(infs) 
         if n_infs > 0:
-            self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300.")
-            np.savetxt(f'{self.chrom_name}_positions_with_infs.txt.gz', np.where(infs, 300, log_pvals), fmt='%d')
+            fname = f'{self.chrom_name}_positions_with_inf_pvals.txt.gz'
+            self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
+            np.savetxt(fname, np.where(infs)[0], fmt='%d')
             
             log_pvals[infs] = 300
         del infs
