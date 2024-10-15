@@ -9,6 +9,10 @@ import numpy as np
 import shutil
 
 
+class NoContigPresentError(Exception):
+    ...
+
+
 @dataclasses.dataclass
 class ProcessorOutputData:
     """
@@ -17,6 +21,16 @@ class ProcessorOutputData:
     identificator: str
     data_df: pd.DataFrame
 
+
+def is_iterable(obj):
+    if isinstance(obj, pd.DataFrame) or isinstance(obj, str):
+        return False
+    try:
+        iter(obj)
+        return True
+    except TypeError:
+        return False
+    
 
 def read_chrom_sizes(chrom_sizes):
     if chrom_sizes is None:
@@ -28,23 +42,13 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def read_df_for_chrom(df_path, chrom_name, columns=None):
+def read_parquet_for_chrom(df_path, chrom_name, columns=None):
     return pd.read_parquet(
         df_path,
         filters=[('chrom', '==', chrom_name)],
         engine='pyarrow',
         columns=columns
     )
-
-
-def is_iterable(obj):
-    if isinstance(obj, pd.DataFrame) or isinstance(obj, str):
-        return False
-    try:
-        iter(obj)
-        return True
-    except TypeError:
-        return False
 
 
 def df_to_tabix(df: pd.DataFrame, tabix_path):
@@ -66,10 +70,6 @@ def df_to_tabix(df: pd.DataFrame, tabix_path):
     pysam.tabix_index(tabix_path, preset='bed', force=True)
 
 
-class NoContigPresentError(Exception):
-    ...
-
-
 def ensure_contig_exists(func):
     """
     Decorator for functions that require a contig to be present in the input data.
@@ -87,6 +87,7 @@ def ensure_contig_exists(func):
 
 def normalize_density(density, total_cutcounts):
     return (density / total_cutcounts * 1_000_000).astype(np.float32)
+
 
 def run_bam2_bed(bam_path, tabix_bed_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -107,7 +108,7 @@ def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
     )
 
 
-def delete(path):
+def delete_path(path):
     if os.path.exists(path):
         if os.path.isdir(path):
             shutil.rmtree(path)

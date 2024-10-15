@@ -1,15 +1,16 @@
 import logging
 import numpy as np
 import numpy.ma as ma
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor
 import multiprocessing as mp
 import pandas as pd
 import sys
 import gc
-from stats import calc_neglog10fdr, negbin_neglog10pvalue, nan_moving_sum, hotspots_from_log10_fdr_vectorized, modwt_smooth, find_varwidth_peaks, calc_rmsea, calc_epsilon
-from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_df_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete
+from hotspot2.hotspot2.signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
+from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks
+from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_parquet_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete_path
 import sys
 from typing import Iterable
 import tempfile
@@ -179,8 +180,8 @@ class GenomeProcessor:
         self.logger.info('Calculating per-bp p-values')
         pvals_path = fdrs_path.replace('.fdrs', '.pvals')
         params_outpath = pvals_path.replace('.pvals', '.pvals.params')
-        delete(pvals_path)
-        delete(params_outpath)
+        delete_path(pvals_path)
+        delete_path(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
@@ -213,7 +214,7 @@ class GenomeProcessor:
             in zip(chrom_pos_mapping, starts, ends)
         ]
         gc.collect()
-        delete(fdrs_path)
+        delete_path(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(
             ChromosomeProcessor.to_parquet,
@@ -261,7 +262,7 @@ class GenomeProcessor:
         )
         self.logger.debug('Total cutcounts = %d', total_cutcounts)
         
-        delete(save_path)
+        delete_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
             cutcounts_path,
@@ -276,7 +277,7 @@ class GenomeProcessor:
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
         data_df = []
         for chrom_processor in self.chromosome_processors:
-            df = read_df_for_chrom(smoothed_signal, chrom_processor.chrom_name, columns=['chrom', 'normalized_density']).iloc[::self.density_step]
+            df = read_parquet_for_chrom(smoothed_signal, chrom_processor.chrom_name, columns=['chrom', 'normalized_density']).iloc[::self.density_step]
             if df.empty:
                 continue
             df['start'] = np.arange(len(df)) * self.density_step
@@ -463,7 +464,7 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05, min_width=50) -> ProcessorOutputData:
-        log10_fdr_array = read_df_for_chrom(fdr_path, self.chrom_name, columns=['log10_fdr'])['log10_fdr'].to_numpy()
+        log10_fdr_array = read_parquet_for_chrom(fdr_path, self.chrom_name, columns=['log10_fdr'])['log10_fdr'].to_numpy()
         if log10_fdr_array.size == 0:
             raise NoContigPresentError
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
@@ -498,7 +499,7 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
-        signal_df = read_df_for_chrom(smoothed_signal_path, self.chrom_name, columns=['smoothed', 'normalized_density'])
+        signal_df = read_parquet_for_chrom(smoothed_signal_path, self.chrom_name, columns=['smoothed', 'normalized_density'])
         if signal_df.empty:
             raise NoContigPresentError
 
