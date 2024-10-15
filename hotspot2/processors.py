@@ -411,14 +411,14 @@ class ChromosomeProcessor:
         gc.collect()
 
         p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
-        if not write_mean_and_var:
-            del sliding_mean, sliding_variance, high_signal_mask
-            gc.collect()
-        
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
         )
+        if not write_mean_and_var:
+            del sliding_mean, sliding_variance, high_signal_mask
+            gc.collect()
+        
 
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
