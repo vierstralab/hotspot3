@@ -9,7 +9,7 @@ import gc
 from scipy.special import logsumexp
 
 
-def negbin_neglog10pvalue(x, r, p):
+def negbin_neglog10pvalue(x, r, p) -> np.ndarray:
     x = ma.asarray(x)
     r = ma.asarray(r)
     p = ma.asarray(p)
@@ -20,7 +20,8 @@ def negbin_neglog10pvalue(x, r, p):
         resulting_mask = reduce(ma.mask_or, [x.mask, r.mask, p.mask])
         r = r[~resulting_mask]
         p = p[~resulting_mask]
-    result = ma.masked_where(resulting_mask, np.zeros(x.shape, dtype=np.float32))
+    result = np.empty(x.shape, dtype=np.float16)
+    result[resulting_mask] = np.nan
     result[~resulting_mask] = -st.nbinom.logsf(x[~resulting_mask] - 1, r, 1 - p) / np.log(10)
     return result
 

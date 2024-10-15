@@ -406,16 +406,17 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         log_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
+        del r0, p0
+        gc.collect()
+
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-        data = {'log10_pval': log_pvals.filled(np.nan)}
+        log_pvals = {'log10_pval': log_pvals.filled(np.nan)}
         if self.gp.save_debug or write_mean_and_var:
-            data.update({
+            log_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
             })
-        del r0, p0
-        gc.collect()
-        data = pd.DataFrame.from_dict(data)
+        log_pvals = pd.DataFrame.from_dict(log_pvals)
         vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         params_df = pd.DataFrame({
             'cutcounts': vals,
@@ -425,7 +426,7 @@ class ChromosomeProcessor:
             'variance': [v0] * len(vals),
         })
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
-        self.to_parquet(data, pvals_outpath)
+        self.to_parquet(log_pvals, pvals_outpath)
         self.to_parquet(params_df, params_outpath)
 
 
