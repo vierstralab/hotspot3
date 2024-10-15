@@ -18,7 +18,7 @@ import os
 
 root_logger = logging.getLogger(__name__)
 
-counts_dtype = np.float32
+counts_dtype = np.int32
 
 
 def set_logger_config(logger: logging.Logger, level: int):
@@ -385,10 +385,17 @@ class ChromosomeProcessor:
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
         self.gp.logger.debug(f'Fit model for {self.chrom_name}')
 
-        m0, v0 = self.fit_background_negbin_model(agg_cutcounts, high_signal_mask, in_window=False)
+        m0, v0 = self.fit_background_negbin_model(
+            agg_cutcounts,
+            high_signal_mask,
+            in_window=False
+        )
         self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
 
-        sliding_mean, sliding_variance = self.fit_background_negbin_model(agg_cutcounts, high_signal_mask)
+        sliding_mean, sliding_variance = self.fit_background_negbin_model(
+            agg_cutcounts,
+            high_signal_mask
+        )
 
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
@@ -494,6 +501,7 @@ class ChromosomeProcessor:
         return df
 
     def fit_background_negbin_model(self, agg_cutcounts, high_signal_mask, in_window=True):
+        agg_cutcounts = np.asarray(agg_cutcounts, dtype=np.float32)
         if in_window:
             bg_sum_mappable = self.smooth_counts(
                 self.mappable_bases,
