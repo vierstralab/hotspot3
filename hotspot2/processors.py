@@ -405,6 +405,7 @@ class ChromosomeProcessor:
         r0 = (sliding_mean * sliding_mean) / (sliding_variance - sliding_mean)
         p0 = (sliding_variance - sliding_mean) / (sliding_variance)
 
+        vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         if not write_mean_and_var:
             del sliding_mean, sliding_variance, high_signal_mask
             gc.collect()
@@ -426,7 +427,6 @@ class ChromosomeProcessor:
             gc.collect()
 
         log_pvals = pd.DataFrame.from_dict(log_pvals)
-        vals, counts = np.unique(agg_cutcounts[~high_signal_mask].compressed(), return_counts=True)
         params_df = pd.DataFrame({
             'cutcounts': vals,
             'count': counts,
