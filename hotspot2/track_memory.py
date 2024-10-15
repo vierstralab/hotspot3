@@ -65,7 +65,7 @@ def run_process_with_memory_tracking(cmd, log_file):
 
 
 def main():
-    args, _ = parse_arguments(" with memory tracking. Outputs {args.id}.memory_usage.tsv in output folder.")
+    args, _ = parse_arguments(" with memory tracking. Creates {args.id}.memory_usage.tsv in output folder.")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cmd = ["python3", f"{script_dir}/main.py", *sys.argv[1:]]
 
