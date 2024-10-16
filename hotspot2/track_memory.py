@@ -52,6 +52,7 @@ def run_process_with_memory_tracking(cmd, log_file):
         memory_thread.join()
     except (psutil.NoSuchProcess, subprocess.SubprocessError, KeyboardInterrupt):
         print("Process interrupted or failed. Terminating...")
+        exit(143)
     finally:
         if memory_thread.is_alive():
             memory_thread.join()
