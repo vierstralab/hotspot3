@@ -210,12 +210,14 @@ def find_varwidth_peaks(signal: np.ndarray, hotspot_starts, hotspot_ends, min_wi
         - threshold_heights: 1D array of threshold heights for each peak.
     """
     peaks_coordinates = find_closest_min_peaks(signal)
-    hs_left, hs_right, in_hs_mask = filter_peaks_summits_within_hotspots(peaks_coordinates, hotspot_starts, hotspot_ends)
+    _, _, in_hs_mask = filter_peaks_summits_within_hotspots(
+        peaks_coordinates,
+        hotspot_starts,
+        hotspot_ends,
+    )
     peaks_in_hotspots = peaks_coordinates[in_hs_mask, :]
 
     peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_hotspots)
-    peaks_in_hotspots_trimmed[:, 0] = np.maximum(peaks_in_hotspots_trimmed[:, 0], hs_left)
-    peaks_in_hotspots_trimmed[:, 2] = np.minimum(peaks_in_hotspots_trimmed[:, 2], hs_right)
     
     width_mask = (peaks_in_hotspots_trimmed[:, 2] - peaks_in_hotspots_trimmed[:, 0]) >= min_width
     return peaks_in_hotspots_trimmed[width_mask], threshold_heights[width_mask]

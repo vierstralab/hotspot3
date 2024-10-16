@@ -506,7 +506,11 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
-        signal_df = read_parquet_for_chrom(smoothed_signal_path, self.chrom_name, columns=['smoothed', 'normalized_density'])
+        signal_df = read_parquet_for_chrom(
+            smoothed_signal_path,
+            self.chrom_name,
+            columns=['smoothed', 'normalized_density']
+        )
         if signal_df.empty:
             raise NoContigPresentError
 
