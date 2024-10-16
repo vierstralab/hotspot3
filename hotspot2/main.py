@@ -14,8 +14,8 @@ def main() -> None:
         cpus=args.cpus,
         logger_level=logger_level,
         save_debug=args.debug,
-        window=args.window,
         bg_window=args.background_window,
+        window=args.window,
         # chromosomes=['chr20', 'chr19']
     )
     precomp_fdrs = args.fdrs_parquet

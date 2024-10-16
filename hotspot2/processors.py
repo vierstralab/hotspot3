@@ -41,14 +41,13 @@ class GenomeProcessor:
         - mappable_bases_file: Path to the tabix-indexed file containing mappable bases or None.
         - tmp_dir: Temporary directory for intermediate files. Will use system default if None.
 
-        - window: Window size for aggregating cutcounts.
-        - min_mappable: Minimum number of mappable bases for a window to be considered.
+        - window: Bandwidth for signal smoothing.
+        - min_mappable: Minimum number of mappable bases for a window to be tested.
+    
         - bg_window: Window size for aggregating background cutcounts.
         - min_mappable_bg: Minimum number of mappable bases for a window to be considered in background.
 
         - density_step: Step size for extracting density.
-        - density_bandwidth: Bandwidth for MODWT smoothing.
-
         - signal_tr: Quantile threshold for outlier detection for background distribution fit.
         - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
@@ -62,9 +61,9 @@ class GenomeProcessor:
             self, chrom_sizes,
             mappable_bases_file=None,
             tmp_dir=None,
-            window=201, min_mappable=101,
+            window=151, min_mappable=76,
             bg_window=50001, min_mappable_bg=10000,
-            density_step=20, density_bandwidth=151,
+            density_step=20, 
             signal_tr=0.975,
             fdr_method='bh',
             cpus=1,
@@ -82,14 +81,13 @@ class GenomeProcessor:
         self.mappable_bases_file = mappable_bases_file
         self.tmp_dir = tmp_dir
         
-        self.bg_window = bg_window
         self.window = window
-
         self.min_mappable = min_mappable
+
+        self.bg_window = bg_window
         self.min_mappable_bg = min_mappable_bg
 
         self.density_step = density_step
-        self.density_bandwidth = density_bandwidth
 
         self.cpus = min(cpus, max(1, mp.cpu_count()))
         self.signal_tr = signal_tr
@@ -407,19 +405,19 @@ class ChromosomeProcessor:
             high_signal_mask
         )
 
-        del mappable_bases
-        gc.collect()
-
-        p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
         )
+        del mappable_bases, high_signal_mask
+        gc.collect()
+
+        p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
+
         if not write_mean_and_var:
-            del sliding_mean, sliding_variance, high_signal_mask
+            del sliding_mean, sliding_variance
             gc.collect()
         
-
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         neglog_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
@@ -489,7 +487,7 @@ class ChromosomeProcessor:
         Run MODWT smoothing on cutcounts.
         """
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        agg_counts = self.smooth_counts(cutcounts, self.gp.density_bandwidth).filled(0)
+        agg_counts = self.smooth_counts(cutcounts, self.gp.window).filled(0)
         filters = 'haar'
         level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
