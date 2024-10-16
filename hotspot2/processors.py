@@ -174,9 +174,8 @@ class GenomeProcessor:
         return results
 
 
-    def calc_pval(self, cutcounts_file, fdrs_path: str, write_mean_and_var=False):
+    def calc_pval(self, cutcounts_file, pvals_path: str, write_mean_and_var=False):
         self.logger.info('Calculating per-bp p-values')
-        pvals_path = fdrs_path.replace('.fdrs', '.pvals')
         params_outpath = pvals_path.replace('.pvals', '.pvals.params')
         delete_path(pvals_path)
         delete_path(params_outpath)
@@ -187,6 +186,8 @@ class GenomeProcessor:
             params_outpath,
             write_mean_and_var
         )
+    
+    def calc_fdr(self, pvals_path, fdrs_path):
         self.logger.info('Calculating per-bp FDRs')
         log10_pval = pd.read_parquet(
             pvals_path,
@@ -607,6 +608,9 @@ class ChromosomeProcessor:
         with tempfile.TemporaryDirectory(dir=self.gp.tmp_dir) as temp_dir:
             temp_path = os.path.join(temp_dir, f'{self.chrom_name}.temp.parquet')
             to_parquet_high_compression(data_df, temp_path)
+            res_path = os.path.join(path, f'chrom={self.chrom_name}')
+            if os.path.exists(res_path):
+                shutil.rmtree(res_path)
             shutil.move(os.path.join(temp_path, f'chrom={self.chrom_name}'), path)
         
     
