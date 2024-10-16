@@ -114,4 +114,3 @@ def delete_path(path):
             shutil.rmtree(path)
         else:
             os.remove(path)
-    
