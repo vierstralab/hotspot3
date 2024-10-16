@@ -452,7 +452,6 @@ class ChromosomeProcessor:
         neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
 
         p_global, r_global = p_and_r_from_mean_and_var(m0, v0)
-        r_global = m0 ** 2 / (v0 - m0)
         rmsea = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
         epsilon = calc_epsilon(r_global, p_global, tr=outliers_tr)
         params_df = pd.DataFrame({

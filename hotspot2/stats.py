@@ -12,7 +12,7 @@ from scipy.special import logsumexp
 def p_and_r_from_mean_and_var(mean, var):
     r = mean**2 / (var - mean) # mean
     p = 1 - mean / var # (var - mean) / var
-    return r, p
+    return p, r
 
 
 def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
