@@ -63,7 +63,7 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
         raise NotImplementedError("Only 1D arrays are supported.")
 
     m = log_pvals.shape[0]
-    order = np.argsort(log_pvals)
+    order = np.argsort(log_pvals) # can save argsort as uint32
     
     log_pvals = log_pvals[order]
 

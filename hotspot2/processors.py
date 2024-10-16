@@ -534,8 +534,11 @@ class ChromosomeProcessor:
 
 
     def read_hotspots_tabix(self, hotspots):
-        with TabixExtractor(hotspots) as hotspots_loader:
-            df = hotspots_loader[self.genomic_interval]
+        try:
+            with TabixExtractor(hotspots) as hotspots_loader:
+                df = hotspots_loader[self.genomic_interval]
+        except ValueError:
+            raise NoContigPresentError
         return df
 
     def fit_background_negbin_model(self, agg_cutcounts, mappable_bases, high_signal_mask, in_window=True):
