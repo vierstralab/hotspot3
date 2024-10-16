@@ -514,6 +514,7 @@ class ChromosomeProcessor:
         hotspot_ends = hotspots_coordinates['end'].values
 
         normalized_density = signal_df['normalized_density'].values
+        self.gp.logger.debug(f"Finding peaks in hotspots for {self.chrom_name}")
 
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
             signal_df['smoothed'].values,
