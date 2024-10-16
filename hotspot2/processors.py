@@ -383,7 +383,7 @@ class ChromosomeProcessor:
         outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr:.1f} for {self.chrom_name}')
         if outliers_tr == 0:
-            self.gp.logger.warning(f"No cutcounts found for {self.chrom_name}. Skipping.")
+            self.gp.logger.warning(f"No background signal for {self.chrom_name}. Skipping...")
             raise NoContigPresentError
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
