@@ -115,6 +115,22 @@ class GenomeProcessor:
         for name, value in state.items():
             setattr(self, name, value)
         self.set_logger()
+    
+    # Helper functions
+    def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
+        data = []
+        results = sorted(results, key=lambda x: x.identificator)
+        categories = [x.identificator for x in results]
+        for res in results:
+            df = res.data_df
+            df['chrom'] = pd.Categorical(
+                [res.identificator] * df.shape[0],
+                categories=categories,
+            )
+            data.append(df)
+            
+        data = pd.concat(data, ignore_index=True)
+        return ProcessorOutputData('all', data)
 
     def construct_parallel_args(self, *args):
         res_args = []
@@ -172,6 +188,28 @@ class GenomeProcessor:
         self.logger.debug(f'Results of {func.__name__} emitted.')
         return results
 
+    # Processing functions
+    def write_cutcounts(self, bam_path, outpath) -> None:
+        self.logger.info('Extracting cutcounts from bam file')
+        run_bam2_bed(bam_path, outpath)
+
+    def modwt_smooth_signal(self, cutcounts_path, save_path):
+        self.logger.info('Smoothing signal using MODWT')
+        total_cutcounts = sum(
+            self.parallel_by_chromosome(
+                ChromosomeProcessor.total_cutcounts,
+                cutcounts_path
+            )
+        )
+        self.logger.debug('Total cutcounts = %d', total_cutcounts)
+        
+        delete_path(save_path)
+        self.parallel_by_chromosome(
+            ChromosomeProcessor.modwt_smooth_density,
+            cutcounts_path,
+            total_cutcounts,
+            save_path
+        )
 
     def calc_pval(self, cutcounts_file, pvals_path: str, write_mean_and_var=False):
         self.logger.info('Calculating per-bp p-values')
@@ -221,7 +259,6 @@ class GenomeProcessor:
         )
         return fdrs_path
 
-    
     def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
         """
         Call hotspots from path to parquet file containing log10(FDR) values.
@@ -249,43 +286,6 @@ class GenomeProcessor:
             self.logger.debug(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
         return hotspots
 
-
-    def modwt_smooth_signal(self, cutcounts_path, save_path):
-        self.logger.info('Smoothing signal using MODWT')
-        total_cutcounts = sum(
-            self.parallel_by_chromosome(
-                ChromosomeProcessor.total_cutcounts,
-                cutcounts_path
-            )
-        )
-        self.logger.debug('Total cutcounts = %d', total_cutcounts)
-        
-        delete_path(save_path)
-        self.parallel_by_chromosome(
-            ChromosomeProcessor.modwt_smooth_density,
-            cutcounts_path,
-            total_cutcounts,
-            save_path
-        )
-
-    def write_cutcounts(self, bam_path, outpath) -> None:
-        self.logger.info('Extracting cutcounts from bam file')
-        run_bam2_bed(bam_path, outpath)
-
-    def extract_density(self, smoothed_signal) -> ProcessorOutputData:
-        data_df = []
-        for chrom_processor in self.chromosome_processors:
-            df = read_parquet_for_chrom(smoothed_signal, chrom_processor.chrom_name, columns=['chrom', 'normalized_density']).iloc[::self.density_step]
-            if df.empty:
-                continue
-            df['start'] = np.arange(len(df)) * self.density_step
-            data_df.append(df)
-        data_df = pd.concat(data_df, ignore_index=True)
-        data_df['end'] = data_df['start'] + self.density_step
-        data_df['id'] = 'id'
-        return ProcessorOutputData('all', data_df)
-
-
     def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
         """
         Call variable width peaks from smoothed signal and hotspots.
@@ -305,21 +305,15 @@ class GenomeProcessor:
         )
         return self.merge_and_add_chromosome(peaks_data)
 
-    def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
-        data = []
-        results = sorted(results, key=lambda x: x.identificator)
-        categories = [x.identificator for x in results]
-        for res in results:
-            df = res.data_df
-            df['chrom'] = pd.Categorical(
-                [res.identificator] * df.shape[0],
-                categories=categories,
-            )
-            data.append(df)
-            
-        data = pd.concat(data, ignore_index=True)
-        return ProcessorOutputData('all', data)
-
+    def extract_density(self, smoothed_signal) -> ProcessorOutputData:
+        density_data = self.parallel_by_chromosome(
+            ChromosomeProcessor.extract_density,
+            smoothed_signal
+        )
+        density_data = self.merge_and_add_chromosome(density_data)
+        density_data.data_df['end'] = density_data.data_df['start'] + self.density_step
+        density_data.data_df['id'] = 'id'
+        return density_data
 
 
 class ChromosomeProcessor:
@@ -625,3 +619,16 @@ class ChromosomeProcessor:
     def total_cutcounts(self, cutcounts):
         self.gp.logger.debug(f"Calculating total cutcounts for {self.chrom_name}")
         return self.extract_cutcounts(cutcounts).sum()
+
+
+    @ensure_contig_exists
+    def extract_density(self, smoothed_signal) -> ProcessorOutputData:
+        data_df = read_parquet_for_chrom(
+            smoothed_signal,
+            self.chrom_name,
+            columns=['chrom', 'normalized_density']
+        ).iloc[::self.gp.density_step]
+        if data_df.empty:
+            raise NoContigPresentError
+        data_df['start'] = np.arange(len(data_df)) * self.gp.density_step
+        return ProcessorOutputData(self.chrom_name, data_df)
