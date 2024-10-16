@@ -167,6 +167,7 @@ class GenomeProcessor:
                 except Exception as e:
                     self.set_logger()
                     self.logger.critical("Exception, gracefully shutting down executor...")
+                    exit(143)
                     raise e
 
         self.set_logger() # Restore logger after parallel execution
