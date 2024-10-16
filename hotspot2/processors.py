@@ -569,19 +569,21 @@ class ChromosomeProcessor:
         else:
             bg_sum_mappable = np.sum(mappable_bases[~high_signal_mask].compressed())
             agg_cutcounts = agg_cutcounts[~high_signal_mask]
-            bg_sum = np.sum(agg_cutcounts)
-            bg_sum_sq = np.sum(agg_cutcounts ** 2)
+            bg_sum = ma.sum(agg_cutcounts)
+            print(bg_sum, ma.sum(agg_cutcounts.astype(np.float64)))
+            bg_sum_sq = ma.sum(agg_cutcounts ** 2)
+            print(bg_sum_sq, ma.sum((agg_cutcounts ** 2).astype(np.float64)))
 
         del agg_cutcounts, high_signal_mask, mappable_bases
         gc.collect()
 
-        sliding_mean = (bg_sum / bg_sum_mappable).astype(np.float32)
+        mean = (bg_sum / bg_sum_mappable).astype(np.float32)
         del bg_sum
         gc.collect()
 
-        sliding_variance = ((bg_sum_sq - bg_sum_mappable * (sliding_mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
+        variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
 
-        return sliding_mean, sliding_variance
+        return mean, variance
         
     
     def smooth_counts(self, signal: np.ndarray, window: int, dtype=None, position_skip_mask: np.ndarray=None):
