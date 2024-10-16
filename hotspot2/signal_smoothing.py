@@ -72,7 +72,7 @@ def modwt_smooth(x, filters, level):
     return imodwt(w, filters, level)
 
 
-def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask=None) -> ma.MaskedArray:
+def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask: np.ndarray=None) -> ma.MaskedArray:
     if not isinstance(masked_array, ma.MaskedArray):
         masked_array = ma.masked_invalid(masked_array)
 

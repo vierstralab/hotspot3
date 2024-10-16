@@ -181,6 +181,7 @@ class GenomeProcessor:
                 except Exception as e:
                     self.set_logger()
                     self.logger.critical("Exception, gracefully shutting down executor...")
+                    print(e)
                     exit(143)
                     raise e
 
