@@ -298,7 +298,7 @@ class GenomeProcessor:
         )
         return fdrs_path
 
-    def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05, min_width=50) -> ProcessorOutputData:
+    def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05) -> ProcessorOutputData:
         """
         Call hotspots from path to parquet file containing log10(FDR) values.
 
@@ -314,7 +314,6 @@ class GenomeProcessor:
             ChromosomeProcessor.call_hotspots,
             fdr_path,
             fdr_tr,
-            min_width
         )
         hotspots = self.merge_and_add_chromosome(hotspots)
         hotspots.data_df['id'] = prefix
