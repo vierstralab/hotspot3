@@ -343,11 +343,12 @@ class GenomeProcessor:
             fdrs_path,
             fdr_tr
         )
+        peaks_data = self.merge_and_add_chromosome(peaks_data)
         if len(peaks_data.data_df) == 0:
             self.logger.critical(f"No peaks called at FDR={fdr_tr}. Most likely something went wrong!")
         else:
             self.logger.debug(f"There are {len(peaks_data.data_df)} peaks called at FDR={fdr_tr}")
-        return self.merge_and_add_chromosome(peaks_data)
+        return peaks_data
 
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
         density_data = self.parallel_by_chromosome(
@@ -566,7 +567,7 @@ class ChromosomeProcessor:
         starts, ends = find_stretches(signif_fdrs)
 
         normalized_density = signal_df['normalized_density'].values
-        self.gp.logger.debug(f"Finding peaks for {self.chrom_name}")
+        self.gp.logger.debug(f"Calling peaks for {self.chrom_name}")
 
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
             signal_df['smoothed'].values,
