@@ -16,7 +16,7 @@ setup(
         'hotspot3': ['scripts/extract_cutcounts.sh'],  # Include the shell script inside the package
     },
     install_requires=[
-        "numpy",
+        "numpy == 1.26.0",
         "scipy",
         "pandas",
     ],
