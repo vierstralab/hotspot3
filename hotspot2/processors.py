@@ -544,7 +544,7 @@ class ChromosomeProcessor:
         return df
 
     def fit_background_negbin_model(self, agg_cutcounts, mappable_bases, high_signal_mask, in_window=True):
-        agg_cutcounts = np.asarray(agg_cutcounts, dtype=np.float32)
+        agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
         if in_window:
             bg_sum_mappable = self.smooth_counts(
                 mappable_bases,
