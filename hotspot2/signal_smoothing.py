@@ -22,10 +22,12 @@ def convolve_s(g_t, v_j, j):
     for i, g in enumerate(g_t):
         g_ker[i * 2**(j - 1)] = g
 
-    return convolve1d_fast(v_j,
-                        np.flip(g_ker),
-                        mode='wrap',
-                        origin=(len(g_ker) - 1) // 2)
+    return convolve1d_fast(
+        v_j,
+        np.flip(g_ker),
+        mode='wrap',
+        origin=(len(g_ker) - 1) // 2
+    )
 
 
 def imodwt(v_j, filters, level):
