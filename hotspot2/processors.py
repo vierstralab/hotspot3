@@ -570,21 +570,28 @@ class ChromosomeProcessor:
             bg_sum_mappable = np.sum(mappable_bases[~high_signal_mask].compressed())
             agg_cutcounts = agg_cutcounts[~high_signal_mask]
             bg_sum = ma.sum(agg_cutcounts)
-            print(bg_sum, ma.sum(agg_cutcounts.astype(np.float64)))
+            bg_sum2 = ma.sum(agg_cutcounts.astype(np.float64))
+            print(bg_sum, bg_sum2)
             bg_sum_sq = ma.sum(agg_cutcounts ** 2)
-            print(bg_sum_sq, ma.sum((agg_cutcounts ** 2).astype(np.float64)))
+            bg_sum_sq2 = ma.sum(agg_cutcounts.astype(np.float64) ** 2)
+            print(bg_sum_sq, bg_sum_sq2)
 
         del agg_cutcounts, high_signal_mask, mappable_bases
         gc.collect()
 
         mean = (bg_sum / bg_sum_mappable).astype(np.float32)
+        
         del bg_sum
         gc.collect()
 
         variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
 
+
         if not in_window:
+            mean2 = (bg_sum2 / bg_sum_mappable)
+            variance2 = ((bg_sum_sq2 - bg_sum_mappable * (mean2 ** 2)) / (bg_sum_mappable - 1))
             print(mean, variance)
+            print(mean2, variance2)
         return mean, variance
         
     
