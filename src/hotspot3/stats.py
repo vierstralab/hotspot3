@@ -79,42 +79,6 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
     return np.clip(log_pvals, a_min=None, a_max=0)
 
 
-# Find hotspots
-
-
-
-def hotspots_from_log10_fdr_vectorized(signif_tr, min_width, smoothing=151):
-    """
-    Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
-
-    Parameters:
-        - fdr_path: Path to the partitioned parquet file(s) containing the log10(FDR) values.
-        - threshold: FDR threshold for merging regions.
-        - min_width: Minimum width for a region to be called a hotspot.
-
-    Returns:
-        - pd.DataFrame: DataFrame containing the hotspots in bed format.
-    """
-    
-    region_starts, region_ends = find_stretches(signif_tr)
-    
-    valid_widths = (region_ends - region_starts) >= min_width
-    region_starts = region_starts[valid_widths]
-    region_ends = region_ends[valid_widths]
-
-    max_log10_fdrs = np.empty(region_ends.shape)
-    for i in range(len(region_starts)):
-        start = region_starts[i]
-        end = region_ends[i]
-        max_log10_fdrs[i] = np.max(log10_fdr_array[start:end])
-
-    return pd.DataFrame({
-        'start': region_starts,
-        'end': region_ends,
-        'max_neglog10_fdr': max_log10_fdrs
-    })
-
-
 # Find peaks
 def filter_peaks_summits_within_regions(peaks_coordinates: np.ndarray, starts, ends):
     """
