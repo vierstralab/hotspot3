@@ -180,8 +180,8 @@ class GenomeProcessor:
                             results.append(result)
                 except Exception as e:
                     self.set_logger()
-                    self.logger.critical("Exception, gracefully shutting down executor...")
-                    print(e)
+                    self.logger.critical(f"Exception occured, gracefully shutting down executor...")
+                    self.logger.critical(e)
                     exit(143)
                     raise e
 
