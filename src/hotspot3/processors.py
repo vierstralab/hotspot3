@@ -533,6 +533,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
         smoothed_signif = nan_moving_sum(signif_fdrs, window=self.gp.window, dtype=np.int16)
+        smoothed_signif = smoothed_signif.filled(0)
         region_starts, region_ends = find_stretches(smoothed_signif > 0)
 
         max_log10_fdrs = np.empty(region_ends.shape)
@@ -540,6 +541,8 @@ class ChromosomeProcessor:
             start = region_starts[i]
             end = region_ends[i]
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
+        
+        self.gp.logger.debug(f"{len(region_starts)} hotspots called for {self.chrom_name}")
 
         data = pd.DataFrame({
             'start': region_starts,
@@ -580,6 +583,7 @@ class ChromosomeProcessor:
             np.max(normalized_density[start:end])
             for start, end in zip(peaks_df['start'], peaks_df['end'])
         ]
+        self.gp.logger.debug(f"{len(peaks_df)} peaks called for {self.chrom_name}")
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
