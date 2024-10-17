@@ -2,9 +2,12 @@ import psutil
 import time
 import subprocess
 import sys
-from main import parse_arguments
 import os
 import threading
+
+from .main import parse_arguments
+
+
 """
 This script is used to call main.py with memory tracking.
 Inefficient to use this script in a pipeline, didn't optimize too much.

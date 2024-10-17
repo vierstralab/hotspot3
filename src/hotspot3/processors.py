@@ -14,11 +14,11 @@ import dataclasses
 import subprocess
 from pathlib import Path
 
-from signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
+from .signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
 
-from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
+from .stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
 
-from utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
+from .utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
 
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
