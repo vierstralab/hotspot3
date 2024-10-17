@@ -57,7 +57,8 @@ def main() -> None:
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
         peaks = genome_processor.call_variable_width_peaks(
             smoothed_signal_path,
-            hotspots_path=hotspots_path,
+            fdrs_path=precomp_fdrs,
+            fdr_tr=fdr
         ).data_df
         peaks['id'] = sample_id
         peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]

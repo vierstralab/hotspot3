@@ -14,9 +14,9 @@ import dataclasses
 import subprocess
 from pathlib import Path
 
-from .signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
+from .signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum, find_stretches
 
-from .stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
+from .stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var
 
 from .utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
 
@@ -324,13 +324,14 @@ class GenomeProcessor:
             self.logger.debug(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
         return hotspots
 
-    def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
+    def call_variable_width_peaks(self, smoothed_signal_path, fdrs_path, fdr_tr) -> ProcessorOutputData:
         """
         Call variable width peaks from smoothed signal and hotspots.
 
         Parameters:
-            - smoothed_signal: ProcessorOutputData containing the smoothed signal. (Output of GenomeProcessor.modwt_smooth_signal)
-            - hotspots_path: Path to the tabix hotspots file.
+            - smoothed_signal_path: Path to the parquet file containing the smoothed signal.
+            - fdrs_path: Path to the parquet file containing the log10(FDR) values.
+            - fdr_tr: FDR threshold for calling peaks.
         
         Returns:
             - peaks_data: ProcessorOutputData containing the peaks in bed format
@@ -339,7 +340,8 @@ class GenomeProcessor:
         peaks_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks,
             smoothed_signal_path,
-            hotspots_path
+            fdrs_path,
+            fdr_tr
         )
         return self.merge_and_add_chromosome(peaks_data)
 
@@ -523,21 +525,28 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
-        with ChromParquetExtractor(fdr_path, columns=['log10_fdr']) as fdr_loader:
-            log10_fdr_array = fdr_loader[self.genomic_interval]['log10_fdr'].to_numpy()
-        if log10_fdr_array.size == 0:
-            raise NoContigPresentError
+        log10_fdrs = self.read_fdr_path(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
-        data = hotspots_from_log10_fdr_vectorized(
-            log10_fdr_array,
-            fdr_threshold=fdr_threshold,
-            min_width=self.gp.min_hotspot_width
-        )
+        signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
+        smoothed_signif = nan_moving_sum(signif_fdrs, window=self.gp.window, dtype=np.int16)
+        region_starts, region_ends = find_stretches(smoothed_signif > 0)
 
+        max_log10_fdrs = np.empty(region_ends.shape)
+        for i in range(len(region_starts)):
+            start = region_starts[i]
+            end = region_ends[i]
+            max_log10_fdrs[i] = np.max(log10_fdrs[start:end])
+
+        data = pd.DataFrame({
+            'start': region_starts,
+            'end': region_ends,
+            'max_neglog10_fdr': max_log10_fdrs
+        })
         return ProcessorOutputData(self.chrom_name, data)
+    
 
     @ensure_contig_exists
-    def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
+    def call_variable_width_peaks(self, smoothed_signal_path, fdr_path, fdr_threshold) -> ProcessorOutputData:
         with ChromParquetExtractor(
             smoothed_signal_path,
             columns=['smoothed', 'normalized_density']
@@ -545,18 +554,17 @@ class ChromosomeProcessor:
             signal_df = smoothed_signal_loader[self.genomic_interval]
         if signal_df.empty:
             raise NoContigPresentError
-
-        hotspots_coordinates = self.read_hotspots_tabix(hotspots_path)
-        hotspot_starts = hotspots_coordinates['start'].values
-        hotspot_ends = hotspots_coordinates['end'].values
+        
+        signif_fdrs = self.read_fdr_path(fdr_path)  >= -np.log10(fdr_threshold)
+        starts, ends = find_stretches(signif_fdrs)
 
         normalized_density = signal_df['normalized_density'].values
         self.gp.logger.debug(f"Finding peaks in hotspots for {self.chrom_name}")
 
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
             signal_df['smoothed'].values,
-            hotspot_starts,
-            hotspot_ends
+            starts,
+            ends
         )
         peaks_df = pd.DataFrame(
             peaks_in_hotspots_trimmed,
@@ -566,18 +574,19 @@ class ChromosomeProcessor:
         
         peaks_df['max_density'] = [
             np.max(normalized_density[start:end])
-            for start, end in zip(peaks_df['start'], peaks_df['end'])]
+            for start, end in zip(peaks_df['start'], peaks_df['end'])
+        ]
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
 
-    def read_hotspots_tabix(self, hotspots):
-        try:
-            with TabixExtractor(hotspots) as hotspots_loader:
-                df = hotspots_loader[self.genomic_interval]
-        except ValueError:
+    def read_fdr_path(self, fdr_path):
+        with ChromParquetExtractor(fdr_path, columns=['log10_fdr']) as fdr_loader:
+            log10_fdrs = fdr_loader[self.genomic_interval]['log10_fdr'].to_numpy()
+        if log10_fdrs.size == 0:
             raise NoContigPresentError
-        return df
+        return log10_fdrs
+
 
     def fit_background_negbin_model(self, agg_cutcounts, mappable_bases, high_signal_mask, in_window=True):
         agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)

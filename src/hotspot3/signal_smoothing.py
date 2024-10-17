@@ -75,6 +75,15 @@ def modwt_smooth(x, filters, level):
 
 
 def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask: np.ndarray=None) -> ma.MaskedArray:
+    """
+    Calculate moving sum of an array. Masks invalid values.
+
+    Args:
+        - masked_array: np.ndarray or ma.MaskedArray
+        - window: int - window size for moving sum
+        - dtype: dtype of the output array
+        - position_skip_mask: np.ndarray - mask for positions to skip
+    """
     if not isinstance(masked_array, ma.MaskedArray):
         masked_array = ma.masked_invalid(masked_array)
 
@@ -105,3 +114,20 @@ def calc_rmsea(obs, unique_cutcounts, r, p, tr):
 
 def calc_epsilon(r, p, tr):
     return st.nbinom(r, 1 - p).pmf(tr) / (1 - p)
+
+
+def find_stretches(arr: np.ndarray):
+    """
+    Find stretches of True values in a boolean array.
+
+    Parameters:
+        - arr: np.ndarray 1D boolean array.
+
+    Returns:
+        - start: np.ndarray of start positions of stretches
+        - end: end positions of stretches
+    """
+    boundaries = np.diff(arr.astype(np.int8), prepend=0, append=0)
+    start = np.where(boundaries == 1)[0]
+    end = np.where(boundaries == -1)[0]
+    return start, end

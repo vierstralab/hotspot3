@@ -80,20 +80,10 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
 
 
 # Find hotspots
-def find_stretches(arr: np.ndarray):
-    """
-    Find stretches of True values in a boolean array.
-    Returns:
-        - start: start positions of stretches
-        - end: end positions of stretches
-    """
-    boundaries = np.diff(arr.astype(np.int8), prepend=0, append=0)
-    start = np.where(boundaries == 1)[0]
-    end = np.where(boundaries == -1)[0]
-    return start, end
 
 
-def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width):
+
+def hotspots_from_log10_fdr_vectorized(signif_tr, min_width, smoothing=151):
     """
     Merge adjacent base pairs in a NumPy array where log10(FDR) is below the threshold.
 
@@ -105,9 +95,8 @@ def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width
     Returns:
         - pd.DataFrame: DataFrame containing the hotspots in bed format.
     """
-    below_threshold = log10_fdr_array >= -np.log10(fdr_threshold)
-
-    region_starts, region_ends = find_stretches(below_threshold)
+    
+    region_starts, region_ends = find_stretches(signif_tr)
     
     valid_widths = (region_ends - region_starts) >= min_width
     region_starts = region_starts[valid_widths]
@@ -127,22 +116,25 @@ def hotspots_from_log10_fdr_vectorized(log10_fdr_array, fdr_threshold, min_width
 
 
 # Find peaks
-def filter_peaks_summits_within_hotspots(peaks_coordinates, hotspot_starts, hotspot_ends):
+def filter_peaks_summits_within_regions(peaks_coordinates: np.ndarray, starts, ends):
     """
-    Filter peaks that are in hotspots.
-    Returns:
-        - valid_hotspot_starts: starts of hotspots that contain peaks
-        - valid_hotspot_ends: ends of hotspots that contain peaks
-        - valid_mask: mask of peaks that are in hotspots
-    """
-    summits = peaks_coordinates[:, 1]
-    closest_left_index = np.searchsorted(hotspot_starts, summits, side='right') - 1
-    valid_mask = (closest_left_index >= 0) & (summits < hotspot_ends[closest_left_index])
+    Filter peaks which summits are within the regions defined by starts and ends.
 
-    valid_hotspot_starts = hotspot_starts[closest_left_index[valid_mask]]
-    valid_hotspot_ends = hotspot_ends[closest_left_index[valid_mask]]
+    Parameters:
+        - peaks_coordinates: np.array of shape (n_peaks, 3) with peak starts, summits and ends
+        - starts: 1D array of regions' starts
+        - ends: 1D array of regions' ends
+
+    Returns:
+        - filtered_peaks_mask: 1D boolean array of peaks that are within the regions
+    """
+    starts = np.asarray(starts)
+    ends = np.asarray(ends)
+    summits = peaks_coordinates[:, 1]
+    closest_left_index = np.searchsorted(starts, summits, side='right') - 1
+    filtered_peaks_mask = (closest_left_index >= 0) & (summits < ends[closest_left_index])
     
-    return valid_hotspot_starts, valid_hotspot_ends, valid_mask
+    return filtered_peaks_mask
 
 
 def find_closest_min_peaks(signal):
@@ -195,29 +187,30 @@ def trim_at_threshold(signal, peaks_coordinates):
     return peaks_in_hotspots_trimmed, threshold_heights
 
 
-def find_varwidth_peaks(signal: np.ndarray, hotspot_starts, hotspot_ends, min_width=20):
+def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None, min_width=20):
     """
     Find variable width peaks within hotspots.
 
     Parameters:
         - signal: 1D array of smoothed signal values.
-        - hotspot_starts: 1D array of hotspot start positions.
-        - hotspot_ends: 1D array of hotspot end positions.
+        - starts: 1D array of start positions of significant stretches.
+        - ends: 1D array of end positions of significant stretches.
         - min_width: Minimum width of peaks.
     
     Returns:
         - peaks_in_hotspots_trimmed: 2D array of start, summit, and end positions for each peak.
         - threshold_heights: 1D array of threshold heights for each peak.
     """
+    if starts is None:
+        assert ends is None
+        starts = np.zeros(1)
+        ends = np.zeros(1)
     peaks_coordinates = find_closest_min_peaks(signal)
-    _, _, in_hs_mask = filter_peaks_summits_within_hotspots(
-        peaks_coordinates,
-        hotspot_starts,
-        hotspot_ends,
-    )
-    peaks_in_hotspots = peaks_coordinates[in_hs_mask, :]
+    in_sign_stretch = filter_peaks_summits_within_regions(peaks_coordinates, starts, ends)
+    
+    peaks_in_regions = peaks_coordinates[in_sign_stretch, :]
 
-    peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_hotspots)
+    peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_regions)
     
     width_mask = (peaks_in_hotspots_trimmed[:, 2] - peaks_in_hotspots_trimmed[:, 0]) >= min_width
     return peaks_in_hotspots_trimmed[width_mask], threshold_heights[width_mask]
