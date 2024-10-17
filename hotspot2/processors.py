@@ -583,6 +583,8 @@ class ChromosomeProcessor:
 
         variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
 
+        if not in_window:
+            print(mean, variance)
         return mean, variance
         
     
