@@ -567,14 +567,15 @@ class ChromosomeProcessor:
             )
             self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
-            bg_sum_mappable = ma.sum(mappable_bases[~high_signal_mask].astype(np.float32))
-            agg_cutcounts = agg_cutcounts[~high_signal_mask]
-            bg_sum = ma.sum(agg_cutcounts)
-            bg_sum2 = ma.sum(agg_cutcounts.astype(np.float64))
+            bg_sum_mappable = ma.sum(mappable_bases[~high_signal_mask])
+            agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
+            bg_sum = np.sum(agg_cutcounts)
+            bg_sum2 = np.sum(agg_cutcounts.astype(np.float64))
             print(bg_sum, bg_sum2)
-            bg_sum_sq = ma.sum(agg_cutcounts ** 2)
-            bg_sum_sq2 = ma.sum(agg_cutcounts.astype(np.float64) ** 2)
+            bg_sum_sq = np.sum(agg_cutcounts ** 2)
+            bg_sum_sq2 = np.sum(agg_cutcounts.astype(np.float64) ** 2)
             print(bg_sum_sq, bg_sum_sq2)
+            print(np.mean(agg_cutcounts), np.var(agg_cutcounts))
 
         del agg_cutcounts, high_signal_mask, mappable_bases
         gc.collect()
@@ -585,7 +586,6 @@ class ChromosomeProcessor:
         gc.collect()
 
         variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
-
 
         if not in_window:
             mean2 = (bg_sum2 / bg_sum_mappable)
