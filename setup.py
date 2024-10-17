@@ -23,6 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "hotspot3=hotspot3.main:main",
+            "hotspot3-track-mem=hotspot3.track_memory:main",
         ],
     },
     python_requires=">=3.7",
