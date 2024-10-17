@@ -1,7 +1,8 @@
 import logging
 import argparse
 from processors import GenomeProcessor, root_logger, set_logger_config
-from utils import read_chrom_sizes, df_to_tabix
+from utils import read_chrom_sizes
+from genome_tools.helpers import df_to_tabix
 
 
 def main() -> None:
@@ -16,6 +17,7 @@ def main() -> None:
         save_debug=args.debug,
         bg_window=args.background_window,
         window=args.window,
+        min_hotspot_width=args.min_hotspot_width,
         #chromosomes=['chr3']
     )
     precomp_fdrs = args.fdrs_parquet
@@ -122,6 +124,8 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed). Used in fit of background model", default=None)
     parser.add_argument("--window", help="Window size for smoothing cutcounts", type=int, default=151)
     parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
+
+    parser.add_argument("--min_hotspot_width", help="Minimum width for a region to be called a hotspot", type=int, default=50)
     
     # Arguments to skip previous steps if provided
     parser.add_argument("--bam", help="Path to input bam/cram file", default=None)

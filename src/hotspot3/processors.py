@@ -18,10 +18,10 @@ from signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_
 
 from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
 
-from utils import read_parquet_for_chrom, normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
+from utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
 
 from genome_tools.genomic_interval import GenomicInterval
-from genome_tools.data.extractors import TabixExtractor
+from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 
 
 root_logger = logging.getLogger(__name__)
@@ -82,6 +82,8 @@ class GenomeProcessor:
         - min_mappable_bg: Minimum number of mappable bases for a window to be considered in background.
 
         - density_step: Step size for extracting density.
+        - min_hotspot_width: Minimum width for a region to be called a hotspot.
+    
         - signal_tr: Quantile threshold for outlier detection for background distribution fit.
         - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
@@ -98,6 +100,7 @@ class GenomeProcessor:
             window=151, min_mappable=76,
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
+            min_hotspot_width=50,
             signal_tr=0.975,
             fdr_method='bh',
             cpus=1,
@@ -122,6 +125,7 @@ class GenomeProcessor:
         self.min_mappable_bg = min_mappable_bg
 
         self.density_step = density_step
+        self.min_hotspot_width = min_hotspot_width
 
         self.cpus = min(cpus, max(1, mp.cpu_count()))
         self.signal_tr = signal_tr
@@ -457,7 +461,7 @@ class ChromosomeProcessor:
         gc.collect()
         infs = np.isinf(neglog_pvals)
         n_infs = np.sum(infs) 
-        if n_infs > 0:
+        if n_infs > 0: # TODO recalc using higher precision
             outdir = pvals_outpath.replace('.pvals.parquet', '')
             fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
             self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
@@ -496,21 +500,6 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         self.to_parquet(neglog_pvals, pvals_outpath)
         self.to_parquet(params_df, params_outpath)
-
-
-    @ensure_contig_exists
-    def call_hotspots(self, fdr_path, fdr_threshold=0.05, min_width=50) -> ProcessorOutputData:
-        log10_fdr_array = read_parquet_for_chrom(fdr_path, self.chrom_name, columns=['log10_fdr'])['log10_fdr'].to_numpy()
-        if log10_fdr_array.size == 0:
-            raise NoContigPresentError
-        self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
-        data = hotspots_from_log10_fdr_vectorized(
-            log10_fdr_array,
-            fdr_threshold=fdr_threshold,
-            min_width=min_width
-        )
-
-        return ProcessorOutputData(self.chrom_name, data)
     
 
     @ensure_contig_exists
@@ -533,14 +522,28 @@ class ChromosomeProcessor:
         self.to_parquet(data, save_path)
         return ProcessorOutputData(self.chrom_name, save_path)
 
+    @ensure_contig_exists
+    def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
+        with ChromParquetExtractor(fdr_path, columns=['log10_fdr']) as fdr_loader:
+            log10_fdr_array = fdr_loader[self.genomic_interval]['log10_fdr'].to_numpy()
+        if log10_fdr_array.size == 0:
+            raise NoContigPresentError
+        self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
+        data = hotspots_from_log10_fdr_vectorized(
+            log10_fdr_array,
+            fdr_threshold=fdr_threshold,
+            min_width=self.gp.min_hotspot_width
+        )
+
+        return ProcessorOutputData(self.chrom_name, data)
 
     @ensure_contig_exists
     def call_variable_width_peaks(self, smoothed_signal_path, hotspots_path) -> ProcessorOutputData:
-        signal_df = read_parquet_for_chrom(
+        with ChromParquetExtractor(
             smoothed_signal_path,
-            self.chrom_name,
             columns=['smoothed', 'normalized_density']
-        )
+        ) as smoothed_signal_loader:
+            signal_df = smoothed_signal_loader[self.genomic_interval]
         if signal_df.empty:
             raise NoContigPresentError
 
@@ -664,11 +667,12 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
-        data_df = read_parquet_for_chrom(
+        with ChromParquetExtractor(
             smoothed_signal,
             self.chrom_name,
             columns=['chrom', 'normalized_density']
-        ).iloc[::self.gp.density_step]
+        ) as smoothed_signal_loader:
+            data_df = smoothed_signal_loader[self.genomic_interval].iloc[::self.gp.density_step]
         if data_df.empty:
             raise NoContigPresentError
         data_df['start'] = np.arange(len(data_df)) * self.gp.density_step
