@@ -581,12 +581,9 @@ class ChromosomeProcessor:
         gc.collect()
 
         variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
+        del bg_sum_sq
+        gc.collect()
 
-        if not in_window:
-            mean2 = (bg_sum2 / bg_sum_mappable)
-            variance2 = ((bg_sum_sq2 - bg_sum_mappable * (mean2 ** 2)) / (bg_sum_mappable - 1))
-            print(mean, variance)
-            print(mean2, variance2)
         return mean, variance
         
     
