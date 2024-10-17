@@ -2,7 +2,7 @@ import psutil
 import time
 import subprocess
 import sys
-from main import parse_arguments
+from cli import parse_arguments
 import os
 import threading
 """

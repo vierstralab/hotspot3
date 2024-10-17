@@ -2,34 +2,68 @@ import logging
 import numpy as np
 import numpy.ma as ma
 from concurrent.futures import ProcessPoolExecutor
-from genome_tools.genomic_interval import GenomicInterval
-from genome_tools.data.extractors import TabixExtractor
 import multiprocessing as mp
 import pandas as pd
-import sys
 import gc
-from signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
-from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
-from utils import ProcessorOutputData, NoContigPresentError, ensure_contig_exists, read_parquet_for_chrom, normalize_density, run_bam2_bed, is_iterable, to_parquet_high_compression, delete_path
-import sys
 from typing import Iterable
 import tempfile
 import shutil
 import os
+import functools
+import dataclasses
+import subprocess
+from pathlib import Path
+
+from signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum
+
+from stats import calc_neglog10fdr, negbin_neglog10pvalue, hotspots_from_log10_fdr_vectorized, find_varwidth_peaks, p_and_r_from_mean_and_var
+
+from utils import read_parquet_for_chrom, normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
+
+from genome_tools.genomic_interval import GenomicInterval
+from genome_tools.data.extractors import TabixExtractor
+
 
 root_logger = logging.getLogger(__name__)
-
 counts_dtype = np.int32
 
 
-def set_logger_config(logger: logging.Logger, level: int):
-    logger.setLevel(level)
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setLevel(level)
-        formatter = logging.Formatter('%(asctime)s  %(levelname)s  %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+class NoContigPresentError(Exception):
+    ...
+
+
+@dataclasses.dataclass
+class ProcessorOutputData:
+    """
+    Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
+    """
+    identificator: str
+    data_df: pd.DataFrame
+
+
+def ensure_contig_exists(func):
+    """
+    Decorator for functions that require a contig to be present in the input data.
+
+    Returns None if the contig is not present.
+    Otherwise, returns the result of the function.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except NoContigPresentError:
+            return None
+    return wrapper
+
+
+def run_bam2_bed(bam_path, tabix_bed_path):
+    """
+    
+    """
+    script_dir = Path(__file__).resolve().parent.parent
+    script = script_dir / 'extract_cutcounts.sh'
+    subprocess.run(['bash', script.as_posix(), bam_path, tabix_bed_path], check=True)
 
 
 class GenomeProcessor:

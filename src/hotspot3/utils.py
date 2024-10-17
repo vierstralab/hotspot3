@@ -1,25 +1,11 @@
 import pandas as pd
-import dataclasses
 import pysam
 import io
-import functools
-import subprocess
 import os
 import numpy as np
 import shutil
-
-
-class NoContigPresentError(Exception):
-    ...
-
-
-@dataclasses.dataclass
-class ProcessorOutputData:
-    """
-    Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
-    """
-    identificator: str
-    data_df: pd.DataFrame
+import logging
+import sys
 
 
 def is_iterable(obj):
@@ -32,6 +18,21 @@ def is_iterable(obj):
         return False
     
 
+def set_logger_config(logger: logging.Logger, level: int):
+    logger.setLevel(level)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(level)
+        formatter = logging.Formatter('%(asctime)s  %(levelname)s  %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    
+
+def normalize_density(density, total_cutcounts):
+    return (density / total_cutcounts * 1_000_000).astype(np.float32)
+
+
+# I/O functions
 def read_chrom_sizes(chrom_sizes):
     if chrom_sizes is None:
         raise NotImplementedError("hg38 chromosome sizes are not embedded yet. Please provide a chromosome sizes file.")
@@ -57,7 +58,7 @@ def df_to_tabix(df: pd.DataFrame, tabix_path):
     Renames 'chrom' column to '#chr' if exists.
 
     Parameters:
-        - df: DataFrame to convert - bed format. First columns (chr start end).
+        - df: DataFrame to convert to bed format. First columns are expected to be bed-like (chr start end).
         - tabix_path: Path to the tabix-indexed file.
 
     Returns:
@@ -68,31 +69,6 @@ def df_to_tabix(df: pd.DataFrame, tabix_path):
             df.rename(columns={'chrom': '#chr'}).to_csv(text_out, sep='\t', index=False)
 
     pysam.tabix_index(tabix_path, preset='bed', force=True)
-
-
-def ensure_contig_exists(func):
-    """
-    Decorator for functions that require a contig to be present in the input data.
-
-    Returns None if the contig is not present.
-    Otherwise, returns the result of the function.
-    """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except NoContigPresentError:
-            return None
-    return wrapper
-
-def normalize_density(density, total_cutcounts):
-    return (density / total_cutcounts * 1_000_000).astype(np.float32)
-
-
-def run_bam2_bed(bam_path, tabix_bed_path):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    script = os.path.join(script_dir, 'extract_cutcounts.sh')
-    subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
 
 
 def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):

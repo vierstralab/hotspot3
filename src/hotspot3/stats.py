@@ -10,7 +10,7 @@ from scipy.special import logsumexp
 
 # Calculate p-values and FDR
 def p_and_r_from_mean_and_var(mean, var):
-    r = mean**2 / (var - mean) # mean
+    r = mean ** 2 / (var - mean) # mean
     p = 1 - mean / var # (var - mean) / var
     return p, r
 

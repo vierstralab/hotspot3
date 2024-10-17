@@ -1,0 +1,29 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="hotspot3",
+    version="0.1.0",
+    description="Peak calling in DNase-seq data",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    author="Serj Abramov & Alexandr Boytsov",
+    author_email="sabramov@altius.org",
+    url="https://github.com/vierstralab/hotspot3",
+    packages=find_packages(),
+    include_package_data=True,
+    package_dir={'': 'src'},
+    package_data={
+        'hotspot3': ['scripts/extract_cutcounts.sh'],  # Include the shell script inside the package
+    },
+    install_requires=[
+        "numpy",
+        "scipy",
+        "pandas",
+    ],
+    entry_points={
+        "console_scripts": [
+            "hotspot3=hotspot3.cli:main",
+        ],
+    },
+    python_requires=">=3.7",
+)
