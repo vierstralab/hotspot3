@@ -343,6 +343,10 @@ class GenomeProcessor:
             fdrs_path,
             fdr_tr
         )
+        if len(peaks_data.data_df) == 0:
+            self.logger.critical(f"No peaks called at FDR={fdr_tr}. Most likely something went wrong!")
+        else:
+            self.logger.debug(f"There are {len(peaks_data.data_df)} peaks called at FDR={fdr_tr}")
         return self.merge_and_add_chromosome(peaks_data)
 
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
