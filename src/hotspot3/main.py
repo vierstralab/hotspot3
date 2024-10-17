@@ -2,8 +2,8 @@ import logging
 import argparse
 from genome_tools.helpers import df_to_tabix
 
-from .processors import GenomeProcessor, root_logger, set_logger_config
-from .utils import read_chrom_sizes
+from hotspot3.processors import GenomeProcessor, root_logger, set_logger_config
+from hotspot3.utils import read_chrom_sizes
 
 
 def main() -> None:

@@ -14,11 +14,11 @@ import dataclasses
 import subprocess
 from pathlib import Path
 
-from .signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum, find_stretches
+from hotspot3.signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum, find_stretches
 
-from .stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var
+from hotspot3.stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var
 
-from .utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
 
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
@@ -535,7 +535,7 @@ class ChromosomeProcessor:
         for i in range(len(region_starts)):
             start = region_starts[i]
             end = region_ends[i]
-            max_log10_fdrs[i] = np.max(log10_fdrs[start:end])
+            max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
 
         data = pd.DataFrame({
             'start': region_starts,

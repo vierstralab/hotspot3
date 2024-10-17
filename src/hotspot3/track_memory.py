@@ -5,7 +5,7 @@ import sys
 import os
 import threading
 
-from .main import parse_arguments
+from hotspot3.main import parse_arguments
 
 
 """

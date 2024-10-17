@@ -3,7 +3,6 @@ from scipy.signal import find_peaks
 import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
-import pandas as pd
 import gc
 from scipy.special import logsumexp
 
