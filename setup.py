@@ -22,7 +22,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "hotspot3=hotspot3.cli:main",
+            "hotspot3=hotspot3.main:main",
         ],
     },
     python_requires=">=3.7",

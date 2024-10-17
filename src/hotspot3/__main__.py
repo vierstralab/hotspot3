@@ -1,4 +1,4 @@
-from cli import main
+from main import main as start_main
 
 if __name__ == '__main__':
-    main()
+    start_main()
