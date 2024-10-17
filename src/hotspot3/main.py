@@ -83,7 +83,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
         - per-bp smoothed signal: {sample_id}.smoothed_signal.parquet (large, ~10GB)
         - per-bp raw p-values: {sample_id}.pvals.parquet (large, ~1.5GB)
         - parameters used for background per-chromosome fits: {sample_id}.pvals.params.parquet (~1.5MB)
-        - per-bp FDR estimates: {sample_id}.fdrs.parquet (~400MB)
+        - per-bp FDR estimates: {sample_id}.fdrs.parquet (~600MB)
     
     Note:
         Multiple FDR thresholds can be provided as a space-separated list.
