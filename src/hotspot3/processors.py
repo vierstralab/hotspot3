@@ -559,7 +559,7 @@ class ChromosomeProcessor:
         starts, ends = find_stretches(signif_fdrs)
 
         normalized_density = signal_df['normalized_density'].values
-        self.gp.logger.debug(f"Finding peaks in hotspots for {self.chrom_name}")
+        self.gp.logger.debug(f"Finding peaks for {self.chrom_name}")
 
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
             signal_df['smoothed'].values,
