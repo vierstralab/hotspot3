@@ -567,7 +567,7 @@ class ChromosomeProcessor:
             )
             self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
-            bg_sum_mappable = np.sum(mappable_bases[~high_signal_mask].compressed())
+            bg_sum_mappable = ma.sum(mappable_bases[~high_signal_mask].astype(np.float32))
             agg_cutcounts = agg_cutcounts[~high_signal_mask]
             bg_sum = ma.sum(agg_cutcounts)
             bg_sum2 = ma.sum(agg_cutcounts.astype(np.float64))
