@@ -58,10 +58,10 @@ def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
 def df_to_bigwig(df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
     with pyBigWig.open(outpath, 'w') as bw:
         bw.addHeader(list(chrom_sizes.items()))
-        chroms = df['chrom'].values
-        starts = df['start'].values
-        ends = df['end'].values
-        values = df[col].values
+        chroms = df['chrom'].to_list()
+        starts = df['start'].to_list()
+        ends = df['end'].to_list()
+        values = df[col].to_list()
         bw.addEntries(chroms, starts, ends=ends, values=values)
 
 
