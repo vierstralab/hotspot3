@@ -1,7 +1,7 @@
 import logging
 import argparse
 from genome_tools.helpers import df_to_tabix
-
+import numpy as np
 from hotspot3.processors import GenomeProcessor, root_logger, set_logger_config
 from hotspot3.utils import read_chrom_sizes
 
@@ -33,7 +33,9 @@ def main() -> None:
 
         if smoothed_signal_path is None:
             smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-            genome_processor.modwt_smooth_signal(cutcounts_path, smoothed_signal_path)
+            total_cutcounts = genome_processor.total_cutcounts(cutcounts_path)
+            np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
+            genome_processor.modwt_smooth_signal(cutcounts_path, total_cutcounts=total_cutcounts, save_path=smoothed_signal_path)
 
         if precomp_fdrs is None:
             precomp_pvals = f"{outdir_pref}.pvals.parquet"

@@ -229,17 +229,20 @@ class GenomeProcessor:
     def write_cutcounts(self, bam_path, outpath) -> None:
         self.logger.info('Extracting cutcounts from bam file')
         run_bam2_bed(bam_path, outpath)
-
-    def modwt_smooth_signal(self, cutcounts_path, save_path):
-        self.logger.info('Smoothing signal using MODWT')
+    
+    def total_cutcounts(self, cutcounts_path) -> int:
         total_cutcounts = sum(
             self.parallel_by_chromosome(
                 ChromosomeProcessor.total_cutcounts,
                 cutcounts_path
             )
         )
-        self.logger.debug('Total cutcounts = %d', total_cutcounts)
-        
+        self.logger.info('Total cutcounts = %d', total_cutcounts)
+        return total_cutcounts
+
+    def modwt_smooth_signal(self, cutcounts_path, total_cutcounts, save_path):
+        self.logger.info('Smoothing signal using MODWT')
+    
         delete_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.modwt_smooth_density,
