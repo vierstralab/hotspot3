@@ -150,7 +150,7 @@ def trim_at_threshold(signal, peaks_coordinates):
     return peaks_in_hotspots_trimmed, threshold_heights
 
 
-def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None, min_width=20):
+def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None):
     """
     Find variable width peaks within hotspots.
 
@@ -158,7 +158,6 @@ def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None, min_width=20
         - signal: 1D array of smoothed signal values.
         - starts: 1D array of start positions of significant stretches.
         - ends: 1D array of end positions of significant stretches.
-        - min_width: Minimum width of peaks.
     
     Returns:
         - peaks_in_hotspots_trimmed: 2D array of start, summit, and end positions for each peak.
@@ -175,5 +174,4 @@ def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None, min_width=20
 
     peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_regions)
     
-    width_mask = (peaks_in_hotspots_trimmed[:, 2] - peaks_in_hotspots_trimmed[:, 0]) >= min_width
-    return peaks_in_hotspots_trimmed[width_mask], threshold_heights[width_mask]
+    return peaks_in_hotspots_trimmed, threshold_heights

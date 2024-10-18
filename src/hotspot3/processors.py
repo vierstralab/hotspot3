@@ -100,7 +100,6 @@ class GenomeProcessor:
             window=151, min_mappable=76,
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
-            min_hotspot_width=50,
             signal_tr=0.975,
             fdr_method='bh',
             cpus=1,
@@ -125,7 +124,6 @@ class GenomeProcessor:
         self.min_mappable_bg = min_mappable_bg
 
         self.density_step = density_step
-        self.min_hotspot_width = min_hotspot_width
 
         self.cpus = min(cpus, max(1, mp.cpu_count()))
         self.signal_tr = signal_tr
@@ -321,7 +319,7 @@ class GenomeProcessor:
         if len(hotspots.data_df) == 0:
             self.logger.critical(f"No hotspots called at FDR={fdr_tr}. Most likely something went wrong!")
         else:
-            self.logger.debug(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
+            self.logger.info(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
         return hotspots
 
     def call_variable_width_peaks(self, smoothed_signal_path, fdrs_path, fdr_tr) -> ProcessorOutputData:
@@ -347,7 +345,7 @@ class GenomeProcessor:
         if len(peaks_data.data_df) == 0:
             self.logger.critical(f"No peaks called at FDR={fdr_tr}. Most likely something went wrong!")
         else:
-            self.logger.debug(f"There are {len(peaks_data.data_df)} peaks called at FDR={fdr_tr}")
+            self.logger.info(f"There are {len(peaks_data.data_df)} peaks called at FDR={fdr_tr}")
         return peaks_data
 
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
