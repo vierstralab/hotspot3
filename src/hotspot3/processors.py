@@ -13,6 +13,7 @@ import functools
 import dataclasses
 import subprocess
 from pathlib import Path
+import importlib.resources as pkg_resources
 
 from hotspot3.signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum, find_stretches
 
@@ -61,9 +62,8 @@ def run_bam2_bed(bam_path, tabix_bed_path):
     """
     
     """
-    script_dir = Path(__file__).resolve().parent.parent
-    script = script_dir / 'extract_cutcounts.sh'
-    subprocess.run(['bash', script.as_posix(), bam_path, tabix_bed_path], check=True)
+    with pkg_resources.path('hotspot3', 'scripts/extract_cutcounts.sh') as script:
+        subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
 
 
 class GenomeProcessor:
