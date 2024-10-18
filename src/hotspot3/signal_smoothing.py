@@ -13,11 +13,11 @@ def convolve1d_fast(arr, ker, mode='wrap', origin=0):
 
 
 def convolve_s(g_t, v_j, j):
-    '''
-    (j-1)th level synthesis from w_j, w_j
-    see function circular_convolve_d
-    '''
-    g_ker = np.zeros(len(g_t) * 2**(j - 1))
+    """
+    (j-1)th level synthesis from w_j
+    """
+    dtype = v_j.dtype
+    g_ker = np.zeros(len(g_t) * 2**(j - 1), dtype=dtype)
 
     for i, g in enumerate(g_t):
         g_ker[i * 2**(j - 1)] = g
@@ -30,11 +30,15 @@ def convolve_s(g_t, v_j, j):
     )
 
 
-def imodwt(v_j, filters, level):
-    ''' inverse modwt '''
+def init_g_t(filters):
     wavelet = pywt.Wavelet(filters)
     g = wavelet.dec_lo
-    g_t = np.array(g) / np.sqrt(2)
+    return np.array(g, dtype=np.float32) / np.sqrt(2)
+
+
+def imodwt(v_j, filters, level):
+    ''' inverse modwt '''
+    g_t = init_g_t(filters)
     for jp in range(level):
         j = level - jp - 1
         v_j = convolve_s(g_t, v_j, j + 1)
@@ -48,7 +52,8 @@ def convolve_d(h_t, v_j_1, j):
     v_j_1: v_{j-1}, the (j-1)th scale coefficients
     return: w_j (or v_j)
     '''
-    ker = np.zeros(len(h_t) * 2**(j - 1))
+    dtype = v_j_1.dtype
+    ker = np.zeros(len(h_t) * 2**(j - 1), dtype=dtype)
     for i, h in enumerate(h_t):
         ker[i * 2**(j - 1)] = h
 
@@ -60,10 +65,8 @@ def modwt(x, filters, level):
     filters: 'db1', 'db2', 'haar', ...
     return: see matlab
     '''
-    wavelet = pywt.Wavelet(filters)
-    g = wavelet.dec_lo
-    g_t = np.array(g) / np.sqrt(2)
-    v_j_1 = x.astype(np.float32)
+    g_t = init_g_t(filters)
+    v_j_1 = x
     for j in range(level):
         v_j_1 = convolve_d(g_t, v_j_1, j + 1)
     return v_j_1

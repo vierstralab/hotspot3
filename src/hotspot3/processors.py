@@ -516,7 +516,7 @@ class ChromosomeProcessor:
         Run MODWT smoothing on cutcounts.
         """
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        agg_counts = self.smooth_counts(cutcounts, self.gp.window).filled(0)
+        agg_counts = self.smooth_counts(cutcounts, self.gp.window).filled(0).astype(np.float32)
         filters = 'haar'
         level = self.gp.modwt_level
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
