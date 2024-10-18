@@ -358,8 +358,7 @@ class GenomeProcessor:
         )
         density_data = self.merge_and_add_chromosome(density_data).data_df
         density_data['end'] = density_data['start'] + self.density_step
-        density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
-        df_to_bigwig(density_data, density_path, self.chrom_sizes)
+        df_to_bigwig(density_data, density_path, self.chrom_sizes, col='normalized_density')
         
 
 
