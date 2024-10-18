@@ -62,7 +62,7 @@ def run_bam2_bed(bam_path, tabix_bed_path):
     """
     
     """
-    with pkg_resources.path('hotspot3', 'scripts/extract_cutcounts.sh') as script:
+    with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
         subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
 
 
