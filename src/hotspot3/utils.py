@@ -4,6 +4,7 @@ import numpy as np
 import shutil
 import logging
 import sys
+import pyBigWig
 
 
 def is_iterable(obj):
@@ -52,6 +53,13 @@ def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
         partition_cols=['chrom'],
         **kwargs
     )
+
+
+def df_to_bigwig(df: pd.DataFrame, outpath, chrom_sizes: dict):
+    with pyBigWig.open(outpath, 'w') as bw:
+        bw.addHeader(list(chrom_sizes.items()))
+        for chrom, start, end, value in df.itertuples(index=False):
+            bw.addEntries(chrom, start, ends=end, values=value)
 
 
 def delete_path(path):

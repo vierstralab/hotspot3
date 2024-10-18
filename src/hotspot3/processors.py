@@ -19,7 +19,7 @@ from hotspot3.signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, na
 
 from hotspot3.stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var
 
-from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config, df_to_bigwig
 
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
@@ -351,15 +351,16 @@ class GenomeProcessor:
             self.logger.info(f"There are {len(peaks_data.data_df)} peaks called at FDR={fdr_tr}")
         return peaks_data
 
-    def extract_density(self, smoothed_signal) -> ProcessorOutputData:
+    def extract_density(self, smoothed_signal, density_path):
         density_data = self.parallel_by_chromosome(
             ChromosomeProcessor.extract_density,
             smoothed_signal
         )
-        density_data = self.merge_and_add_chromosome(density_data)
-        density_data.data_df['end'] = density_data.data_df['start'] + self.density_step
-        density_data.data_df['id'] = 'id'
-        return density_data
+        density_data = self.merge_and_add_chromosome(density_data).data_df
+        density_data['end'] = density_data['start'] + self.density_step
+        density_data = density_data[['chrom', 'start', 'end', 'normalized_density']]
+        df_to_bigwig(density_data, density_path, self.chrom_sizes)
+        
 
 
 class ChromosomeProcessor:
@@ -693,4 +694,5 @@ class ChromosomeProcessor:
         if data_df.empty:
             raise NoContigPresentError
         data_df['start'] = np.arange(len(data_df)) * self.gp.density_step
+        data_df.query('normalized_density > 0', inplace=True)
         return ProcessorOutputData(self.chrom_name, data_df)
