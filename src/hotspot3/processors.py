@@ -684,7 +684,6 @@ class ChromosomeProcessor:
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
         with ChromParquetExtractor(
             smoothed_signal,
-            self.chrom_name,
             columns=['chrom', 'normalized_density']
         ) as smoothed_signal_loader:
             data_df = smoothed_signal_loader[self.genomic_interval].iloc[::self.gp.density_step]
