@@ -104,7 +104,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     if signal_parquet was deleted (will take more time smoothing the signal).
     
     Optional if --save_density is provided:
-        - tabix indexed normalized density of cutcounts: {sample_id}.density.bed.gz
+        - normalized density of cutcounts in bigwig format: {sample_id}.normalized_density.bw
     """
     )
     
