@@ -29,8 +29,22 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
 
     result = np.empty(resulting_mask.shape, dtype=np.float16)
     result[resulting_mask] = np.nan
-    result[~resulting_mask] = -st.nbinom.logsf(x - 1, r, 1 - p) / np.log(10)
+    result[~resulting_mask] = calc_neglog10pvalue(x, r, p, dtype=np.float32)
+
+    low_precision = np.isinf(result)
+    for precision in [np.float64, np.float128]:
+        if np.any(low_precision):
+            new_pvals = calc_neglog10pvalue(x[low_precision], r[low_precision], p[low_precision], dtype=precision)
+            low_precision[low_precision] = np.isinf(new_pvals)
+    
     return result
+
+
+def calc_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=np.float32) -> np.ndarray:
+    x = np.asarray(x, dtype=dtype)
+    r = np.asarray(r, dtype=dtype)
+    p = np.asarray(p, dtype=dtype)
+    return -st.nbinom.logsf(x - 1, r, 1 - p) / np.log(10)
 
 
 def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
