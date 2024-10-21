@@ -466,11 +466,16 @@ class ChromosomeProcessor:
         # Fit global model
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
-        global_mean, global_variance = self.fit_global_background_negbin_model(
-            agg_cutcounts,
-            total_mappable_bg,
-            high_signal_mask,
-        )
+        try:
+            global_mean, global_variance = self.fit_global_background_negbin_model(
+                agg_cutcounts,
+                total_mappable_bg,
+                high_signal_mask,
+            )
+        except NoContigPresentError:
+            self.gp.logger.warning(f"Not enough background signal for global fit of {self.chrom_name}. Skipping...")
+            raise
+    
         global_p, global_r = p_and_r_from_mean_and_var(global_mean, global_variance)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
