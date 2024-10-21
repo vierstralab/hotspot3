@@ -28,7 +28,6 @@ root_logger = logging.getLogger(__name__)
 counts_dtype = np.int32
 
 
-
 @dataclasses.dataclass
 class ProcessorOutputData:
     """
@@ -438,8 +437,8 @@ class ChromosomeProcessor:
 
         outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
-        if outliers_tr == 0:
-            self.gp.logger.warning(f"No background signal for {self.chrom_name}. Skipping...")
+        if outliers_tr < 5: # TODO: move to genome processor as a parameter
+            self.gp.logger.warning(f"Too little background signal for {self.chrom_name}. Skipping...")
             raise NoContigPresentError
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
