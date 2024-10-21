@@ -506,7 +506,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         neglog_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
-        del r0, p0
+        del r0, p0, agg_cutcounts
         gc.collect()
 
         neglog_pvals = {'log10_pval': self.fix_inf_pvals(neglog_pvals)}
