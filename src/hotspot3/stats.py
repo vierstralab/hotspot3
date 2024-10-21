@@ -5,6 +5,7 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc
 from hotspot3.signal_smoothing import nan_moving_sum
+from scipy.special import hyp2f1, betaln
 
 
 # Calculate p-values and FDR
@@ -39,7 +40,13 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -
     x = np.asarray(x, dtype=dtype)
     r = np.asarray(r, dtype=dtype)
     p = np.asarray(p, dtype=dtype)
-    return st.nbinom.logsf(x - 1, r, 1 - p)
+    result = x * np.log(p)
+    result += r * np.log(1 - p)
+    result += np.log(hyp2f1(x + r, 1, x + 1, p))
+    result -= np.log(x)
+    result -= betaln(x, r)
+    return result
+
 
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
