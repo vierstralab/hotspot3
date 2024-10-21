@@ -1,7 +1,6 @@
 import numpy as np
 import numpy.ma as ma
 from scipy.signal import convolve
-import scipy.stats as st
 import pywt
 
 

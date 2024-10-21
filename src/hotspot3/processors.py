@@ -12,7 +12,6 @@ import os
 import functools
 import dataclasses
 import subprocess
-from pathlib import Path
 import importlib.resources as pkg_resources
 
 from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretches
@@ -63,7 +62,8 @@ def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
     
     """
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
-        subprocess.run(['bash', script, bam_path, tabix_bed_path], check=True)
+        chroms = ','.join(chromosomes) if chromosomes else ""
+        subprocess.run(['bash', script, bam_path, tabix_bed_path, chroms], check=True)
 
 
 class GenomeProcessor:
@@ -228,7 +228,7 @@ class GenomeProcessor:
     # Processing functions
     def write_cutcounts(self, bam_path, outpath) -> None:
         self.logger.info('Extracting cutcounts from bam file')
-        run_bam2_bed(bam_path, outpath)
+        run_bam2_bed(bam_path, outpath, self.chrom_sizes.keys())
     
     def total_cutcounts(self, cutcounts_path) -> int:
         total_cutcounts = sum(
