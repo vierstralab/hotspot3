@@ -267,25 +267,28 @@ class GenomeProcessor:
     
     def calc_fdr(self, pvals_path, fdrs_path):
         self.logger.info('Calculating per-bp FDRs')
-        log10_pval = pd.read_parquet(
+        log_pval = pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
             columns=['chrom', 'log10_pval']
         ) 
         # file is always sorted within chromosomes
-        chrom_pos_mapping = log10_pval['chrom'].drop_duplicates()
+        chrom_pos_mapping = log_pval['chrom'].drop_duplicates()
         starts = chrom_pos_mapping.index
-        ends = [*starts[1:], log10_pval.shape[0]]
-        log10_pval = log10_pval['log10_pval'].values 
-        log10_pval *= -np.log(10).astype(log10_pval.dtype)
+        ends = [*starts[1:], log_pval.shape[0]]
+        log_pval = log_pval['log10_pval'].values
 
-        result = np.full_like(log10_pval, np.nan)
-        not_nan = ~np.isnan(log10_pval)
-        log10_pval = log10_pval[not_nan]
+        # Cast to natural log
+        log_pval *= -np.log(10).astype(log_pval.dtype)
 
-        result[not_nan] = logfdr_from_logpvals(log10_pval, method=self.fdr_method)
-        del log10_pval
+        result = np.full_like(log_pval, np.nan)
+        not_nan = ~np.isnan(log_pval)
+        log_pval = log_pval[not_nan]
+
+        result[not_nan] = logfdr_from_logpvals(log_pval, method=self.fdr_method)
+        del log_pval
         gc.collect()
+        # Cast to neglog10
         result /= -np.log(10).astype(result.dtype)
 
         result = [
