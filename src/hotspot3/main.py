@@ -18,7 +18,7 @@ def main() -> None:
         save_debug=args.debug,
         bg_window=args.background_window,
         window=args.window,
-        # chromosomes=['chr21']
+        chromosomes=args.chromosomes
     )
     precomp_fdrs = args.fdrs_parquet
     cutcounts_path = args.cutcounts
@@ -131,6 +131,8 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     parser.add_argument("--cutcounts", help="Path to pre-calculated cutcounts tabix file. Skip extracting cutcounts from bam file", default=None)
     parser.add_argument("--signal_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips modwt signal smoothing", default=None)
     parser.add_argument("--fdrs_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp FDRs. Skips p-value calculation", default=None)
+
+    parser.add_argument("--chromosomes", help="List of chromosomes to process. Used for debug", nargs='+', default=None)
 
     # Optional - save density
     parser.add_argument("--save_density", action='store_true', help="Save density of cutcounts", default=False)
