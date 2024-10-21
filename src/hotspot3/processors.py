@@ -486,7 +486,7 @@ class ChromosomeProcessor:
             high_signal_mask,
         )
 
-        # Require at least 10% of the mappable bases to be nonzero
+        # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
         valid_windows = self.smooth_counts(
             agg_cutcounts > 0, 
             window=self.gp.bg_window,
@@ -503,6 +503,7 @@ class ChromosomeProcessor:
             sliding_mean,
             sliding_variance,
         )
+        # For invalid windows, revert to global model
         sliding_p[~valid_windows] = global_p
         sliding_r[~valid_windows] = global_r
         del valid_windows
@@ -601,9 +602,8 @@ class ChromosomeProcessor:
         cutcounts = self.extract_cutcounts(cutcounts_path)
         agg_counts = self.smooth_counts(cutcounts, self.gp.window).filled(0).astype(np.float32)
         filters = 'haar'
-        level = self.gp.modwt_level
-        self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={level}) for {self.chrom_name}")
-        smoothed = modwt_smooth(agg_counts, filters, level=level)
+        self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.gp.modwt_level}) for {self.chrom_name}")
+        smoothed = modwt_smooth(agg_counts, filters, level=self.gp.modwt_level)
         data = pd.DataFrame({
             #'cutcounts': cutcounts, 
             'smoothed': smoothed,
@@ -611,7 +611,7 @@ class ChromosomeProcessor:
             # maybe use the same window as for pvals? then cutcounts is redundant
         })
         self.to_parquet(data, save_path)
-        return ProcessorOutputData(self.chrom_name, save_path)
+
 
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
