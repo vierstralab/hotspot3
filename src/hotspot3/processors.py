@@ -85,6 +85,7 @@ class GenomeProcessor:
         - min_hotspot_width: Minimum width for a region to be called a hotspot.
     
         - signal_tr: Quantile threshold for outlier detection for background distribution fit.
+        - min_bins_chrom_fit: Minimum number of aggegated cutcounts bins (< signal_tr) for a chromosome to be considered for fitting a background model.
         - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
 
@@ -101,6 +102,7 @@ class GenomeProcessor:
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
             signal_tr=0.975,
+            min_bins_chrom_fit=5,
             fdr_method='bh',
             cpus=1,
             chromosomes=None,
@@ -119,6 +121,7 @@ class GenomeProcessor:
         
         self.window = window
         self.min_mappable = min_mappable
+        self.min_bins_chrom_fit = min_bins_chrom_fit
 
         self.bg_window = bg_window
         self.min_mappable_bg = min_mappable_bg
@@ -438,9 +441,9 @@ class ChromosomeProcessor:
         outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
 
-        min_outlier_tr = 5
-        if outliers_tr < min_outlier_tr: # TODO: move to genome processor as a parameter
-            self.gp.logger.warning(f"Too little background signal for {self.chrom_name} (outlier threshold: {outliers_tr} < {min_outlier_tr}). Skipping...")
+
+        if outliers_tr < self.gp.min_bins_chrom_fit: # TODO: move to genome processor as a parameter
+            self.gp.logger.warning(f"Too little background signal for {self.chrom_name} (outlier threshold: {outliers_tr} < {self.gp.min_bins_chrom_fit}). Skipping...")
             raise NoContigPresentError
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
@@ -512,7 +515,7 @@ class ChromosomeProcessor:
             gc.collect()
         
         
-        self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
+        self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
         resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, r0.mask, p0.mask])
         # Strip masks to free some memory
         r0 = r0[~resulting_mask].compressed()
@@ -529,7 +532,7 @@ class ChromosomeProcessor:
         fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
         neglog_pvals = {'log10_pval': self.fix_inf_pvals(neglog_pvals, fname)}
 
-        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
+        self.gp.logger.debug(f"Saving p-values for {self.chrom_name}")
         if write_debug_stats:
             neglog_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
@@ -672,8 +675,6 @@ class ChromosomeProcessor:
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
             )
-
-            self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
             agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
             bg_sum = np.sum(agg_cutcounts)
