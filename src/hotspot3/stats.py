@@ -5,7 +5,6 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc
 from hotspot3.signal_smoothing import nan_moving_sum
-from scipy.special import hyp2f1, betaln
 
 
 # Calculate p-values and FDR
@@ -36,17 +35,20 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     return result
 
 
+
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
     x = np.asarray(x, dtype=dtype)
     r = np.asarray(r, dtype=dtype)
     p = np.asarray(p, dtype=dtype)
-    result = x * np.log(p)
-    result += r * np.log(1 - p)
-    result += np.log(hyp2f1(x + r, 1, x + 1, p))
-    result -= np.log(x)
-    result -= betaln(x, r)
-    return result
-
+    # x = np.asarray(x, dtype=dtype)
+    # r = np.asarray(r, dtype=dtype)
+    # p = np.asarray(p, dtype=dtype)
+    # result = x * np.log(p)
+    # result += r * np.log(1 - p)
+    # result += np.log(hyp2f1(x + r, 1, x + 1, p, dtype=dtype))
+    # result -= np.log(x)
+    # result -= betaln(x, r, dtype=dtype)
+    return st.nbinom.logsf(x - 1, r, 1 - p)
 
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
@@ -63,7 +65,7 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
         - log_fdr: 1D array of log-transformed FDR values. 
     """
     assert method in ['bh', 'by'], "Only 'bh' and 'by' methods are supported."
-    log_pvals = np.asarray(log_pvals, dtype=dtype) # no further input checking yet
+    log_pvals = np.asarray(log_pvals).astype(dtype=dtype) # no further input checking yet
     if log_pvals.ndim != 1:
         raise NotImplementedError("Only 1D arrays are supported.")
 
