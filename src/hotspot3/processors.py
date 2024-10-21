@@ -517,6 +517,8 @@ class ChromosomeProcessor:
         
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
         resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, r0.mask, p0.mask])
+        if ma.any(r0 <= 0) or ma.any(p0 <= 0) or ma.any(p0 >= 1):
+            print(ma.where(r0 <= 0), ma.where(p0 <= 0), ma.where(p0 >= 1))
         # Strip masks to free some memory
         r0 = r0[~resulting_mask].compressed()
         p0 = p0[~resulting_mask].compressed()
