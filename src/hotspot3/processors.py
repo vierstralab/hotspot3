@@ -102,7 +102,7 @@ class GenomeProcessor:
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
             signal_tr=0.975,
-            nonzero_window_fit = 0.1,
+            nonzero_windows_to_fit = 0.001,
             fdr_method='bh',
             cpus=1,
             chromosomes=None,
@@ -121,7 +121,7 @@ class GenomeProcessor:
         
         self.window = window
         self.min_mappable = min_mappable
-        self.nonzero_window_fit = nonzero_window_fit
+        self.nonzero_windows_to_fit = nonzero_windows_to_fit
 
         self.bg_window = bg_window
         self.min_mappable_bg = min_mappable_bg
@@ -492,7 +492,7 @@ class ChromosomeProcessor:
             window=self.gp.bg_window,
             dtype=np.float32, 
             position_skip_mask=high_signal_mask
-        ) / bg_sum_mappable > self.gp.nonzero_window_fit
+        ) / bg_sum_mappable > self.gp.nonzero_windows_to_fit
 
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
@@ -705,7 +705,7 @@ class ChromosomeProcessor:
     
     def fit_global_background_negbin_model(self, agg_cutcounts, total_mappable_bg, high_signal_mask):
         agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
-        has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.gp.nonzero_window_fit
+        has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.gp.nonzero_windows_to_fit
         if not has_enough_background:
             raise NoContigPresentError
         
