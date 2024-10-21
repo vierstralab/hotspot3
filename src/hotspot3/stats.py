@@ -20,7 +20,7 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     assert r.shape == p.shape, "r and p should have the same shape"
     # in masked arrays, mask is True for masked values
 
-    result = logpval_for_dtype(x, r, p, dtype=np.float32)
+    result = logpval_for_dtype(x, r, p, dtype=np.float32).astype(np.float16)
     low_precision = np.isinf(result)
     for precision in (np.float64, ): # np.float128 is not supported. Might need to implement logsf for it
         if np.any(low_precision):
@@ -32,7 +32,9 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
             )
             result[low_precision] = new_pvals
             low_precision[low_precision] = np.isinf(new_pvals)
-    return -result / np.log(10)
+    
+    result /= -np.log(10).astype(result.dtype)
+    return result
 
 
 def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
