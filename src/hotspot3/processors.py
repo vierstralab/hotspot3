@@ -13,7 +13,7 @@ import functools
 import dataclasses
 import subprocess
 import importlib.resources as pkg_resources
-
+from functools import reduce
 from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretches
 
 from hotspot3.stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
@@ -478,6 +478,7 @@ class ChromosomeProcessor:
             gc.collect()
 
         p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
+        agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
 
         if write_debug_stats:
             step = 20
@@ -505,7 +506,14 @@ class ChromosomeProcessor:
         
         
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
-        neglog_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
+        resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, r0.mask, p0.mask])
+        # Strip masks to free some memory
+        r0 = r0[~resulting_mask].compressed()
+        p0 = p0[~resulting_mask].compressed()
+        agg_cutcounts = agg_cutcounts[~resulting_mask].compressed()
+    
+        neglog_pvals = np.full(self.chrom_size, np.nan, dtype=np.float16)
+        neglog_pvals[~resulting_mask] = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
         del r0, p0, agg_cutcounts
         gc.collect()

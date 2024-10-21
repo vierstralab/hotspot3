@@ -16,24 +16,12 @@ def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray) -> Tuple[np.nda
     return p, r
 
 
-def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
-    x = ma.asarray(x)
-    r = ma.asarray(r)
-    p = ma.asarray(p)
+def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
     assert r.shape == p.shape, "r and p should have the same shape"
-    resulting_mask = x.mask.copy()
     # in masked arrays, mask is True for masked values
-    if len(r.shape) != 0:
-        resulting_mask = reduce(ma.mask_or, [resulting_mask, r.mask, p.mask])
-        r = r[~resulting_mask].compressed()
-        p = p[~resulting_mask].compressed()
-    x = x[~resulting_mask].compressed()
 
-    result = np.empty(resulting_mask.shape, dtype=np.float16)
-    result[resulting_mask] = np.nan
-    result[~resulting_mask] = logpval_for_dtype(x, r, p, dtype=np.float32)
-
-    low_precision = np.isinf(result[~resulting_mask])
+    result = logpval_for_dtype(x, r, p, dtype=np.float32)
+    low_precision = np.isinf(result)
     for precision in (np.float64, ): # np.float128 is not supported. Might need to implement logsf for it
         if np.any(low_precision):
             new_pvals = logpval_for_dtype(
@@ -42,8 +30,7 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
                 p[low_precision],
                 dtype=precision
             )
-            upd_indices = np.flatnonzero(~resulting_mask)[low_precision]
-            result[upd_indices] = new_pvals
+            result[low_precision] = new_pvals
             low_precision[low_precision] = np.isinf(new_pvals)
     return -result / np.log(10)
 
