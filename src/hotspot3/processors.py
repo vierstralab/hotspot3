@@ -478,8 +478,6 @@ class ChromosomeProcessor:
             gc.collect()
 
         p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
-        if np.any(p0 > np.finfo(np.float16).max) or np.any(r0 > np.finfo(np.float16).max):
-            print(self.chrom_name)
 
         if write_debug_stats:
             step = 20
