@@ -18,6 +18,7 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     assert r.shape == p.shape, "r and p should have the same shape"
     if np.any(r <= 0) or np.any(p <= 0) or np.any(p >= 1):
         print(np.where(r <= 0), np.where(p <= 0), np.where(p >= 1))
+        raise ValueError("r should be positive, p should be in (0, 1)")
 
     result = logpval_for_dtype(x, r, p, dtype=np.float32).astype(np.float16)
     low_precision = np.isinf(result)
@@ -43,7 +44,7 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -
     r = np.asarray(r, dtype=dtype)[mask]
     p = np.asarray(p, dtype=dtype)[mask]
     
-    result = np.ones(mask.shape, dtype=dtype)
+    result = np.zeros(mask.shape, dtype=dtype)
     result[mask] = (
         x * np.log(p) 
         + r * np.log(1 - p) 
