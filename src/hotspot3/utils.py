@@ -7,6 +7,10 @@ import sys
 import pyBigWig
 
 
+class NoContigPresentError(Exception):
+    ...
+
+
 def is_iterable(obj):
     if isinstance(obj, pd.DataFrame) or isinstance(obj, str):
         return False

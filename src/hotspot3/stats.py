@@ -1,4 +1,3 @@
-from functools import reduce
 from scipy.signal import find_peaks
 import numpy as np
 import numpy.ma as ma
@@ -6,8 +5,7 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc
 from hotspot3.signal_smoothing import nan_moving_sum
-from typing import Tuple
-
+from hotspot3.utils import NoContigPresentError
 
 # Calculate p-values and FDR
 def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
@@ -105,6 +103,8 @@ def filter_peaks_summits_within_regions(peaks_coordinates: np.ndarray, starts, e
     """
     starts = np.asarray(starts)
     ends = np.asarray(ends)
+    if peaks_coordinates.shape[0] == 0:
+        raise NoContigPresentError
     summits = peaks_coordinates[:, 1]
     closest_left_index = np.searchsorted(starts, summits, side='right') - 1
     filtered_peaks_mask = (closest_left_index >= 0) & (summits < ends[closest_left_index])

@@ -18,7 +18,7 @@ from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretch
 
 from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
 
-from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config, df_to_bigwig
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config, df_to_bigwig, NoContigPresentError
 
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
@@ -27,9 +27,6 @@ from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 root_logger = logging.getLogger(__name__)
 counts_dtype = np.int32
 
-
-class NoContigPresentError(Exception):
-    ...
 
 
 @dataclasses.dataclass
@@ -623,12 +620,15 @@ class ChromosomeProcessor:
 
         normalized_density = signal_df['normalized_density'].values
         self.gp.logger.debug(f"Calling peaks for {self.chrom_name}")
-
-        peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
-            signal_df['smoothed'].values,
-            starts,
-            ends
-        )
+        try:
+            peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
+                signal_df['smoothed'].values,
+                starts,
+                ends
+            )
+        except NoContigPresentError:
+            self.gp.logger.warning(f"No peaks found for {self.chrom_name}. Skipping...")
+            raise
         peaks_df = pd.DataFrame(
             peaks_in_hotspots_trimmed,
             columns=['start', 'summit', 'end']
