@@ -429,7 +429,7 @@ class ChromosomeProcessor:
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window)
+        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window, dtype=np.float32)
 
         del cutcounts
         gc.collect()
@@ -466,17 +466,16 @@ class ChromosomeProcessor:
         # Fit global model
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
-        m0, v0 = self.fit_background_negbin_model(
+        global_mean, global_variance = self.fit_global_background_negbin_model(
             agg_cutcounts,
             total_mappable_bg,
             high_signal_mask,
-            by_window=False
         )
-        global_p, global_r = p_and_r_from_mean_and_var(m0, v0)
+        global_p, global_r = p_and_r_from_mean_and_var(global_mean, global_variance)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
-        sliding_mean, sliding_variance = self.fit_background_negbin_model(
+        sliding_mean, sliding_variance = self.fit_windowed_background_negbin_model(
             agg_cutcounts,
             bg_sum_mappable,
             high_signal_mask,
@@ -503,7 +502,6 @@ class ChromosomeProcessor:
         sliding_p[~valid_windows] = global_p
         sliding_r[~valid_windows] = global_r
         del valid_windows
-        agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
         
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
 
@@ -581,8 +579,8 @@ class ChromosomeProcessor:
             'unique_cutcounts': unique_cutcounts,
             'count': n_obs,
             'outliers_tr': [outliers_tr] * len(unique_cutcounts),
-            'mean': [m0] * len(unique_cutcounts),
-            'variance': [v0] * len(unique_cutcounts),
+            'mean': [global_mean] * len(unique_cutcounts),
+            'variance': [global_variance] * len(unique_cutcounts),
             'rmsea': [rmsea_global] * len(unique_cutcounts),
             'epsilon': [epsilon_global] * len(unique_cutcounts),
             'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
@@ -682,39 +680,39 @@ class ChromosomeProcessor:
         return log10_fdrs
 
 
-    def fit_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask, by_window=True):
-        agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
-        if by_window:
+    def fit_windowed_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask):
+        bg_sum = self.smooth_counts(
+            agg_cutcounts,
+            self.gp.bg_window,
+            position_skip_mask=high_signal_mask
+        )
 
-            bg_sum = self.smooth_counts(
-                agg_cutcounts,
-                self.gp.bg_window,
-                position_skip_mask=high_signal_mask
-            )
+        mean = bg_sum / bg_sum_mappable
+        del bg_sum
+        gc.collect()
 
-            mean = bg_sum / bg_sum_mappable
-            del bg_sum
-            gc.collect()
-
-            bg_sum_sq = self.smooth_counts(
-                agg_cutcounts ** 2,
-                self.gp.bg_window,
-                position_skip_mask=high_signal_mask
-            )
-        else:
-            agg_cutcounts = agg_cutcounts[~high_signal_mask]
-            valid_windows = ma.sum(agg_cutcounts > 0) / bg_sum_mappable  > self.gp.nonzero_window_fit 
-            agg_cutcounts = ma.masked_where(~valid_windows, agg_cutcounts).compressed()
-            
-            bg_sum = np.sum(agg_cutcounts)
-            bg_sum_sq = np.sum(agg_cutcounts ** 2)
-            mean = bg_sum / bg_sum_mappable
-
+        bg_sum_sq = self.smooth_counts(
+            agg_cutcounts ** 2,
+            self.gp.bg_window,
+            position_skip_mask=high_signal_mask
+        )
 
         variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1))
 
         return mean, variance
+    
+    def fit_global_background_negbin_model(self, agg_cutcounts, total_mappable_bg, high_signal_mask):
+        agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
+        has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.gp.nonzero_window_fit
+        if not has_enough_background:
+            raise NoContigPresentError
         
+        bg_sum = np.sum(agg_cutcounts)
+        bg_sum_sq = np.sum(agg_cutcounts ** 2)
+        # TODO: A little repetetive maybe fix later
+        mean = bg_sum / total_mappable_bg
+        variance = (bg_sum_sq - total_mappable_bg * (mean ** 2)) / (total_mappable_bg - 1)
+        return mean, variance
     
     def smooth_counts(self, signal: np.ndarray, window: int, dtype=None, position_skip_mask: np.ndarray=None):
         """
