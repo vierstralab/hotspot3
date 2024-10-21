@@ -41,8 +41,11 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -
     x = np.asarray(x, dtype=dtype)
     r = np.asarray(r, dtype=dtype)
     p = np.asarray(p, dtype=dtype)
-    result = x * np.log(p) + r * np.log(1 - p) \
-        + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=dtype)) - np.log(x) - betaln(x, r, dtype=dtype)
+    result = x * np.log(p) 
+    result += r * np.log(1 - p)
+    result += np.log(hyp2f1(x + r, 1, x + 1, p, dtype=dtype))
+    result -= np.log(x) 
+    result -= betaln(x, r, dtype=dtype)
     return result
 
 
