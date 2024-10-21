@@ -102,7 +102,7 @@ class GenomeProcessor:
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
             signal_tr=0.975,
-            nonzero_windows_to_fit = 0.001,
+            nonzero_windows_to_fit = 0.01,
             fdr_method='bh',
             cpus=1,
             chromosomes=None,
