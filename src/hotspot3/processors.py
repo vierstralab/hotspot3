@@ -63,17 +63,11 @@ def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
     """
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
         chroms = ','.join(chromosomes) if chromosomes else ""
-        try:
-            subprocess.run(
-                ['bash', script, bam_path, tabix_bed_path, chroms],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-        except subprocess.CalledProcessError as e:
-            print("Subprocess failed with error:\n", e.stderr)
-            raise 
+        subprocess.run(
+            ['bash', script, bam_path, tabix_bed_path, chroms],
+            check=True,
+            text=True
+        )
 
 
 class GenomeProcessor:
@@ -421,8 +415,8 @@ class ChromosomeProcessor:
 
 
     @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_mean_and_var=False) -> ProcessorOutputData:
-        write_mean_and_var = write_mean_and_var or self.gp.save_debug
+    def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
+        write_debug_stats = write_debug_stats or self.gp.save_debug
         mappable_bases = self.extract_mappable_bases()
         cutcounts = self.extract_cutcounts(cutcounts_file)
 
@@ -443,6 +437,11 @@ class ChromosomeProcessor:
             raise NoContigPresentError
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
+        
+        unique_cutcounts, n_obs = np.unique(
+            agg_cutcounts[~high_signal_mask].compressed(),
+            return_counts=True
+        )
         self.gp.logger.debug(f'Fit model for {self.chrom_name}')
 
         bg_sum_mappable = self.smooth_counts(
@@ -473,17 +472,13 @@ class ChromosomeProcessor:
             high_signal_mask
         )
 
-        unique_cutcounts, n_obs = np.unique(
-            agg_cutcounts[~high_signal_mask].compressed(),
-            return_counts=True
-        )
-        if not write_mean_and_var:
+        if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
 
         p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
 
-        if write_mean_and_var:
+        if write_debug_stats:
             step = 20
             rmsea = calc_rmsea_all_windows(
                 r0, p0, outliers_tr,
@@ -503,33 +498,21 @@ class ChromosomeProcessor:
             ) / bg_sum_mappable
             del bg_sum_mappable
             gc.collect()
-
-        if not write_mean_and_var:
+        else:
             del sliding_mean, sliding_variance
             gc.collect()
+        
         
         self.gp.logger.debug(f'Calculate p-value for {self.chrom_name}')
         neglog_pvals = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
 
         del r0, p0
         gc.collect()
-        infs = np.isinf(neglog_pvals)
-        n_infs = np.sum(infs) 
-        if n_infs > 0:
-            outdir = pvals_outpath.replace('.pvals.parquet', '')
-            fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
-            self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
-            np.savetxt(fname, np.where(infs)[0], fmt='%d')
-            
-            neglog_pvals[infs] = 300
-        del infs
-        gc.collect()
 
-        neglog_pvals = {'log10_pval': neglog_pvals}
-
+        neglog_pvals = {'log10_pval': self.fix_inf_pvals(neglog_pvals)}
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-        if write_mean_and_var:
+        if write_debug_stats:
             neglog_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
@@ -669,12 +652,12 @@ class ChromosomeProcessor:
             bg_sum = np.sum(agg_cutcounts)
             bg_sum_sq = np.sum(agg_cutcounts ** 2)
 
-        mean = (bg_sum / bg_sum_mappable).astype(np.float32)
+        mean = (bg_sum / bg_sum_mappable).astype(np.float16)
         
         del bg_sum
         gc.collect()
 
-        variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float32)
+        variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float16)
         del bg_sum_sq
         gc.collect()
 
@@ -734,3 +717,15 @@ class ChromosomeProcessor:
         data_df['start'] = np.arange(len(data_df)) * self.gp.density_step
         data_df.query('normalized_density > 0', inplace=True)
         return ProcessorOutputData(self.chrom_name, data_df)
+
+
+    def fix_inf_pvals(self, neglog_pvals, pvals_outpath):
+        infs = np.isinf(neglog_pvals)
+        n_infs = np.sum(infs) 
+        if n_infs > 0:
+            outdir = pvals_outpath.replace('.pvals.parquet', '')
+            fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
+            self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
+            np.savetxt(fname, np.where(infs)[0], fmt='%d')
+            neglog_pvals[infs] = 300
+        return neglog_pvals

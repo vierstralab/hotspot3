@@ -6,12 +6,13 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc
 from hotspot3.signal_smoothing import nan_moving_sum
+from typing import Tuple
 
 
 # Calculate p-values and FDR
-def p_and_r_from_mean_and_var(mean, var):
-    r = mean ** 2 / (var - mean) # mean
-    p = 1 - mean / var # (var - mean) / var
+def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    r = np.asarray(mean ** 2 / (var - mean), dtype=np.float16)
+    p = np.asarray(1 - mean / var, dtype=np.float16)
     return p, r
 
 
@@ -30,23 +31,21 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
 
     result = np.empty(resulting_mask.shape, dtype=np.float16)
     result[resulting_mask] = np.nan
-    result[~resulting_mask] = neglog10pval_for_dtype(x, r, p, dtype=np.float32)
+    result[~resulting_mask] = logpval_for_dtype(x, r, p)
 
     low_precision = np.isinf(result[~resulting_mask])
-    for precision in (np.float64,): # np.float128 is not supported. Might need to implement logsf for it
+    for precision in (np.float32, np.float64,): # np.float128 is not supported. Might need to implement logsf for it
         if np.any(low_precision):
-            new_pvals = neglog10pval_for_dtype(x[low_precision], r[low_precision], p[low_precision], dtype=precision)
+            new_pvals = logpval_for_dtype(
+                x[low_precision],
+                r[low_precision],
+                p[low_precision],
+                dtype=precision
+            )
             upd_indices = np.flatnonzero(~resulting_mask)[low_precision]
             result[upd_indices] = new_pvals
             low_precision[low_precision] = np.isinf(new_pvals)
-    return result
-
-
-def neglog10pval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=np.float32) -> np.ndarray:
-    x = np.asarray(x, dtype=dtype)
-    r = np.asarray(r, dtype=dtype)
-    p = np.asarray(p, dtype=dtype)
-    return -st.nbinom.logsf(x - 1, r, 1 - p) / np.log(10)
+    return -result / np.log(10)
 
 
 def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
@@ -57,6 +56,13 @@ def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
         -neglog10_pvals[not_nan] * np.log(10), method=fdr_method
     ) / np.log(10)
     return neglog10_fdr
+
+
+def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
+    x = np.asarray(x, dtype=dtype)
+    r = np.asarray(r, dtype=dtype)
+    p = np.asarray(p, dtype=dtype)
+    return st.nbinom.logsf(x - 1, r, 1 - p)
 
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):

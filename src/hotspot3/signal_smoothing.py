@@ -76,7 +76,7 @@ def modwt_smooth(x, filters, level):
     return imodwt(w, filters, level)
 
 
-def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask: np.ndarray=None) -> ma.MaskedArray:
+def nan_moving_sum(array, window, dtype=None, position_skip_mask: np.ndarray=None) -> ma.MaskedArray:
     """
     Calculate moving sum of an array. Masks invalid values.
 
@@ -86,23 +86,23 @@ def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask: np.ndar
         - dtype: dtype of the output array
         - position_skip_mask: np.ndarray - mask for positions to skip
     """
-    if not isinstance(masked_array, ma.MaskedArray):
-        masked_array = ma.masked_invalid(masked_array)
+    if not isinstance(array, ma.MaskedArray):
+        array = ma.masked_invalid(array)
 
     if dtype is None:
-        dtype = masked_array.dtype
+        dtype = array.dtype
     else:
-        if dtype != masked_array.dtype:
-            masked_array = masked_array.astype(dtype)
+        array = ma.asarray(array, dtype=dtype)
+    mask = array.mask
 
-    data = masked_array.filled(0)
+    array = array.filled(0)
     if position_skip_mask is not None:
-        assert position_skip_mask.shape == data.shape, "position_skip_mask should have the same shape as data"
-        data[position_skip_mask] = 0
+        assert position_skip_mask.shape == array.shape, "position_skip_mask should have the same shape as data"
+        array[position_skip_mask] = 0
 
     conv_arr = np.ones(window, dtype=dtype)
-    result = convolve(data, conv_arr, mode='same')
-    return ma.array(result, mask=masked_array.mask)
+    array = convolve(array, conv_arr, mode='same')
+    return ma.masked_where(mask, array)
 
 
 def find_stretches(arr: np.ndarray):
