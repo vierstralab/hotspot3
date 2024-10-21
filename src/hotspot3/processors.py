@@ -451,7 +451,6 @@ class ChromosomeProcessor:
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
         )
-        self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
 
         bg_sum_mappable = self.smooth_counts(
             mappable_bases,
@@ -466,6 +465,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
         # Fit global model
 
+        self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         m0, v0 = self.fit_background_negbin_model(
             agg_cutcounts,
             total_mappable_bg,
@@ -504,6 +504,8 @@ class ChromosomeProcessor:
         sliding_r[~valid_windows] = global_r
         del valid_windows
         agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
+        
+        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
 
         if write_debug_stats:
             step = 20
