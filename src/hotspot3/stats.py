@@ -9,8 +9,9 @@ from hotspot3.signal_smoothing import nan_moving_sum
 
 # Calculate p-values and FDR
 def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
-    r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
-    p = ma.asarray(1 - mean / var, dtype=np.float32)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
+        p = ma.asarray(1 - mean / var, dtype=np.float32)
     return p, r
 
 

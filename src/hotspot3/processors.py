@@ -85,7 +85,7 @@ class GenomeProcessor:
         - min_hotspot_width: Minimum width for a region to be called a hotspot.
     
         - signal_tr: Quantile threshold for outlier detection for background distribution fit.
-        - min_bins_chrom_fit: Minimum number of aggegated cutcounts bins (< signal_tr) for a chromosome to be considered for fitting a background model.
+        - nonzero_window_fit: Minimum fraction of nonzero values in a background window to fit the model.
         - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
 
@@ -102,7 +102,7 @@ class GenomeProcessor:
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
             signal_tr=0.975,
-            min_bins_chrom_fit=5,
+            nonzero_window_fit = 0.1,
             fdr_method='bh',
             cpus=1,
             chromosomes=None,
@@ -121,7 +121,7 @@ class GenomeProcessor:
         
         self.window = window
         self.min_mappable = min_mappable
-        self.min_bins_chrom_fit = min_bins_chrom_fit
+        self.nonzero_window_fit = nonzero_window_fit
 
         self.bg_window = bg_window
         self.min_mappable_bg = min_mappable_bg
@@ -441,9 +441,8 @@ class ChromosomeProcessor:
         outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
         self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
 
-
-        if outliers_tr < self.gp.min_bins_chrom_fit: # TODO: move to genome processor as a parameter
-            self.gp.logger.warning(f"Too little background signal for {self.chrom_name} (outlier threshold: {outliers_tr} < {self.gp.min_bins_chrom_fit}). Skipping...")
+        if outliers_tr == 0:
+            self.gp.logger.warning(f"No background signal for {self.chrom_name} (outlier threshold: {outliers_tr} == 0). Skipping...")
             raise NoContigPresentError
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
@@ -461,12 +460,11 @@ class ChromosomeProcessor:
             dtype=np.int32
         )
         bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
-        self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
-
         total_mappable_bg = ma.sum(mappable_bases[~high_signal_mask])
-
         del mappable_bases
         gc.collect()
+        self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
+        # Fit global model
 
         m0, v0 = self.fit_background_negbin_model(
             agg_cutcounts,
@@ -474,8 +472,10 @@ class ChromosomeProcessor:
             high_signal_mask,
             by_window=False
         )
+        global_p, global_r = p_and_r_from_mean_and_var(m0, v0)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
+        # Fit sliding window model
         sliding_mean, sliding_variance = self.fit_background_negbin_model(
             agg_cutcounts,
             bg_sum_mappable,
@@ -483,17 +483,32 @@ class ChromosomeProcessor:
             by_window=True
         )
 
+        # Require at least 10% of the mappable bases to be nonzero
+        valid_windows = self.smooth_counts(
+            agg_cutcounts > 0, 
+            window=self.gp.bg_window,
+            dtype=np.float32, 
+            position_skip_mask=high_signal_mask
+        ) / bg_sum_mappable > self.gp.nonzero_window_fit
+
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
-
-        p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
+        
+        # Calculate final model parameters
+        sliding_p, sliding_r = p_and_r_from_mean_and_var(
+            sliding_mean,
+            sliding_variance,
+        )
+        sliding_p[~valid_windows] = global_p
+        sliding_r[~valid_windows] = global_r
+        del valid_windows
         agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
 
         if write_debug_stats:
             step = 20
             rmsea = calc_rmsea_all_windows(
-                r0, p0, outliers_tr,
+                sliding_r, sliding_p, outliers_tr,
                 bg_sum_mappable,
                 agg_cutcounts,
                 self.gp.bg_window,
@@ -502,7 +517,7 @@ class ChromosomeProcessor:
                 step=step
             )
             
-            epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(r0, p0, outliers_tr, step=step)
+            epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(sliding_r, sliding_p, outliers_tr, step=step)
             epsilon_obs = nan_moving_sum(
                 agg_cutcounts,
                 self.gp.bg_window,
@@ -516,18 +531,24 @@ class ChromosomeProcessor:
         
         
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
-        resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, r0.mask, p0.mask])
-        if ma.any(r0 <= 0) or ma.any(p0 <= 0) or ma.any(p0 >= 1):
-            print(ma.where(r0 <= 0), ma.where(p0 <= 0), ma.where(p0 >= 1))
+        resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, sliding_r.mask, sliding_p.mask])
+        invalid_fits = ma.where((sliding_r <= 0) | (sliding_p <= 0) | (sliding_p >= 1))[0]
+        if len(invalid_fits) > 0:
+            self.gp.logger.warning(f"Window estimated parameters (r0 or p0) contain invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
+            sliding_r[invalid_fits] = global_r
+            sliding_p[invalid_fits] = global_p
+        
+        del invalid_fits
+        gc.collect()
         # Strip masks to free some memory
-        r0 = r0[~resulting_mask].compressed()
-        p0 = p0[~resulting_mask].compressed()
+        sliding_r = sliding_r[~resulting_mask].compressed()
+        sliding_p = sliding_p[~resulting_mask].compressed()
         agg_cutcounts = agg_cutcounts[~resulting_mask].compressed()
     
         neglog_pvals = np.full(self.chrom_size, np.nan, dtype=np.float16)
-        neglog_pvals[~resulting_mask] = negbin_neglog10pvalue(agg_cutcounts, r0, p0)
+        neglog_pvals[~resulting_mask] = negbin_neglog10pvalue(agg_cutcounts, sliding_r, sliding_p)
 
-        del r0, p0, agg_cutcounts
+        del sliding_r, sliding_p, agg_cutcounts
         gc.collect()
 
         outdir = pvals_outpath.replace('.pvals.parquet', '')
@@ -552,9 +573,8 @@ class ChromosomeProcessor:
         del neglog_pvals
         gc.collect()
 
-        p_global, r_global = p_and_r_from_mean_and_var(m0, v0)
-        rmsea_global = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
-        epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(r_global, p_global, tr=outliers_tr)
+        rmsea_global = calc_rmsea(n_obs, unique_cutcounts, global_r, global_p, tr=outliers_tr)
+        epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
         params_df = pd.DataFrame({
             'unique_cutcounts': unique_cutcounts,
             'count': n_obs,
@@ -663,11 +683,13 @@ class ChromosomeProcessor:
     def fit_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask, by_window=True):
         agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
         if by_window:
+
             bg_sum = self.smooth_counts(
                 agg_cutcounts,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
             )
+
             mean = bg_sum / bg_sum_mappable
             del bg_sum
             gc.collect()
@@ -678,7 +700,10 @@ class ChromosomeProcessor:
                 position_skip_mask=high_signal_mask
             )
         else:
-            agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
+            agg_cutcounts = agg_cutcounts[~high_signal_mask]
+            valid_windows = ma.sum(agg_cutcounts > 0) / bg_sum_mappable  > self.gp.nonzero_window_fit 
+            agg_cutcounts = ma.masked_where(~valid_windows, agg_cutcounts).compressed()
+            
             bg_sum = np.sum(agg_cutcounts)
             bg_sum_sq = np.sum(agg_cutcounts ** 2)
             mean = bg_sum / bg_sum_mappable
