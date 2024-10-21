@@ -436,12 +436,13 @@ class ChromosomeProcessor:
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
         outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
+        self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
+
         min_outlier_tr = 5
         if outliers_tr < min_outlier_tr: # TODO: move to genome processor as a parameter
             self.gp.logger.warning(f"Too little background signal for {self.chrom_name} (outlier threshold: {outliers_tr} < {min_outlier_tr}). Skipping...")
             raise NoContigPresentError
 
-        self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
 
         unique_cutcounts, n_obs = np.unique(
