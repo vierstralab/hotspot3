@@ -10,9 +10,9 @@ from typing import Tuple
 
 
 # Calculate p-values and FDR
-def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    r = np.asarray(mean ** 2 / (var - mean), dtype=np.float32)
-    p = np.asarray(1 - mean / var, dtype=np.float32)
+def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
+    r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
+    p = ma.asarray(1 - mean / var, dtype=np.float32)
     return p, r
 
 
