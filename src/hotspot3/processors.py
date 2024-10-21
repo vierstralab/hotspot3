@@ -471,7 +471,7 @@ class ChromosomeProcessor:
             high_signal_mask,
             by_window=False
         )
-        self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
+        self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         sliding_mean, sliding_variance = self.fit_background_negbin_model(
             agg_cutcounts,
