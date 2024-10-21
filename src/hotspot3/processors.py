@@ -595,12 +595,12 @@ class ChromosomeProcessor:
     
 
     @ensure_contig_exists
-    def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path) -> ProcessorOutputData:
+    def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path):
         """
         Run MODWT smoothing on cutcounts.
         """
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        agg_counts = self.smooth_counts(cutcounts, self.gp.window).filled(0).astype(np.float32)
+        agg_counts = self.smooth_counts(cutcounts, self.gp.window, dtype=np.float32).filled(0)
         filters = 'haar'
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.gp.modwt_level}) for {self.chrom_name}")
         smoothed = modwt_smooth(agg_counts, filters, level=self.gp.modwt_level)
