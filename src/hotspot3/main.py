@@ -18,7 +18,7 @@ def main() -> None:
         save_debug=args.debug,
         bg_window=args.background_window,
         window=args.window,
-        #chromosomes=['chr3']
+        # chromosomes=['chr21']
     )
     precomp_fdrs = args.fdrs_parquet
     cutcounts_path = args.cutcounts

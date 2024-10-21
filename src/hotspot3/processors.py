@@ -15,9 +15,9 @@ import subprocess
 from pathlib import Path
 import importlib.resources as pkg_resources
 
-from hotspot3.signal_smoothing import calc_epsilon, calc_rmsea, modwt_smooth, nan_moving_sum, find_stretches
+from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretches
 
-from hotspot3.stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var
+from hotspot3.stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
 
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config, df_to_bigwig
 
@@ -58,7 +58,7 @@ def ensure_contig_exists(func):
     return wrapper
 
 
-def run_bam2_bed(bam_path, tabix_bed_path):
+def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
     """
     
     """
@@ -218,7 +218,7 @@ class GenomeProcessor:
                     self.set_logger()
                     self.logger.critical(f"Exception occured, gracefully shutting down executor...")
                     self.logger.critical(e)
-                    exit(143)
+                    #exit(143)
                     raise e
 
         self.set_logger() # Restore logger after parallel execution
@@ -426,8 +426,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
-        outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr)
-        self.gp.logger.debug(f'Found outlier threshold={outliers_tr:.1f} for {self.chrom_name}')
+        outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
+        self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
         if outliers_tr == 0:
             self.gp.logger.warning(f"No background signal for {self.chrom_name}. Skipping...")
             raise NoContigPresentError
@@ -435,9 +435,23 @@ class ChromosomeProcessor:
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
         self.gp.logger.debug(f'Fit model for {self.chrom_name}')
 
+        bg_sum_mappable = self.smooth_counts(
+            mappable_bases,
+            self.gp.bg_window,
+            position_skip_mask=high_signal_mask,
+            dtype=np.int32
+        )
+        bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
+        self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
+
+        total_mappable_bg = ma.sum(mappable_bases[~high_signal_mask])
+
+        del mappable_bases
+        gc.collect()
+
         m0, v0 = self.fit_background_negbin_model(
             agg_cutcounts,
-            mappable_bases,
+            total_mappable_bg,
             high_signal_mask,
             in_window=False
         )
@@ -445,7 +459,7 @@ class ChromosomeProcessor:
 
         sliding_mean, sliding_variance = self.fit_background_negbin_model(
             agg_cutcounts,
-            mappable_bases,
+            bg_sum_mappable,
             high_signal_mask
         )
 
@@ -453,10 +467,32 @@ class ChromosomeProcessor:
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
         )
-        del mappable_bases, high_signal_mask
-        gc.collect()
+        if not write_mean_and_var:
+            del bg_sum_mappable, high_signal_mask
+            gc.collect()
 
         p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
+
+        if write_mean_and_var:
+            step = 20
+            rmsea = calc_rmsea_all_windows(
+                r0, p0, outliers_tr,
+                bg_sum_mappable,
+                agg_cutcounts,
+                self.gp.bg_window,
+                position_skip_mask=high_signal_mask,
+                dtype=np.float32,
+                step=step
+            )
+            
+            epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(r0, p0, outliers_tr, step=step)
+            epsilon_obs = nan_moving_sum(
+                agg_cutcounts,
+                self.gp.bg_window,
+                position_skip_mask=~high_signal_mask,
+            ) / bg_sum_mappable
+            del bg_sum_mappable
+            gc.collect()
 
         if not write_mean_and_var:
             del sliding_mean, sliding_variance
@@ -469,7 +505,7 @@ class ChromosomeProcessor:
         gc.collect()
         infs = np.isinf(neglog_pvals)
         n_infs = np.sum(infs) 
-        if n_infs > 0: # TODO recalc using higher precision
+        if n_infs > 0:
             outdir = pvals_outpath.replace('.pvals.parquet', '')
             fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
             self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
@@ -486,24 +522,29 @@ class ChromosomeProcessor:
         if write_mean_and_var:
             neglog_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
-                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float32),
+                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
+                'rmsea': rmsea.filled(np.nan).astype(np.float16),
+                'epsilon': epsilon.filled(np.nan).astype(np.float16),
+                'epsilon_mu': epsilon_mu.filled(np.nan).astype(np.float16),
+                'epsilon_obs': epsilon_obs.filled(np.nan).astype(np.float16),
             })
-            del sliding_mean, sliding_variance
+            del sliding_mean, sliding_variance, rmsea, epsilon, epsilon_mu, epsilon_obs
             gc.collect()
 
         neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
 
         p_global, r_global = p_and_r_from_mean_and_var(m0, v0)
-        rmsea = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
-        epsilon = calc_epsilon(r_global, p_global, tr=outliers_tr)
+        rmsea_global = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
+        epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(r_global, p_global, tr=outliers_tr)
         params_df = pd.DataFrame({
             'unique_cutcounts': unique_cutcounts,
             'count': n_obs,
             'outliers_tr': [outliers_tr] * len(unique_cutcounts),
             'mean': [m0] * len(unique_cutcounts),
             'variance': [v0] * len(unique_cutcounts),
-            'rmsea': [rmsea] * len(unique_cutcounts),
-            'epsilon': [epsilon] * len(unique_cutcounts)
+            'rmsea': [rmsea_global] * len(unique_cutcounts),
+            'epsilon': [epsilon_global] * len(unique_cutcounts),
+            'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
         })
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         self.to_parquet(neglog_pvals, pvals_outpath)
@@ -599,18 +640,9 @@ class ChromosomeProcessor:
         return log10_fdrs
 
 
-    def fit_background_negbin_model(self, agg_cutcounts, mappable_bases, high_signal_mask, in_window=True):
+    def fit_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask, in_window=True):
         agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
         if in_window:
-            bg_sum_mappable = self.smooth_counts(
-                mappable_bases,
-                self.gp.bg_window,
-                position_skip_mask=high_signal_mask,
-                dtype=np.int32
-            )
-            bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
-            self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
-            
             bg_sum = self.smooth_counts(
                 agg_cutcounts,
                 self.gp.bg_window,
@@ -623,13 +655,9 @@ class ChromosomeProcessor:
             )
             self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
-            bg_sum_mappable = ma.sum(mappable_bases[~high_signal_mask])
             agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
             bg_sum = np.sum(agg_cutcounts)
             bg_sum_sq = np.sum(agg_cutcounts ** 2)
-
-        del agg_cutcounts, high_signal_mask, mappable_bases
-        gc.collect()
 
         mean = (bg_sum / bg_sum_mappable).astype(np.float32)
         

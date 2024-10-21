@@ -4,7 +4,8 @@ import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
 import gc
-from scipy.special import logsumexp
+from scipy.special import logsumexp, gammaln, betainc
+from hotspot3.signal_smoothing import nan_moving_sum
 
 
 # Calculate p-values and FDR
@@ -29,18 +30,19 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
 
     result = np.empty(resulting_mask.shape, dtype=np.float16)
     result[resulting_mask] = np.nan
-    result[~resulting_mask] = calc_neglog10pvalue(x, r, p, dtype=np.float32)
+    result[~resulting_mask] = neglog10pval_for_dtype(x, r, p, dtype=np.float32)
 
-    low_precision = np.isinf(result)
-    for precision in [np.float64, np.float128]:
+    low_precision = np.isinf(result[~resulting_mask])
+    for precision in (np.float64,): # np.float128 is not supported. Might need to implement logsf for it
         if np.any(low_precision):
-            new_pvals = calc_neglog10pvalue(x[low_precision], r[low_precision], p[low_precision], dtype=precision)
+            new_pvals = neglog10pval_for_dtype(x[low_precision], r[low_precision], p[low_precision], dtype=precision)
+            upd_indices = np.flatnonzero(~resulting_mask)[low_precision]
+            result[upd_indices] = new_pvals
             low_precision[low_precision] = np.isinf(new_pvals)
-    
     return result
 
 
-def calc_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=np.float32) -> np.ndarray:
+def neglog10pval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=np.float32) -> np.ndarray:
     x = np.asarray(x, dtype=dtype)
     r = np.asarray(r, dtype=dtype)
     p = np.asarray(p, dtype=dtype)
@@ -189,3 +191,135 @@ def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None):
     peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_regions)
     
     return peaks_in_hotspots_trimmed, threshold_heights
+
+
+def calc_rmsea(obs, unique_cutcounts, r, p, tr):
+    N = sum(obs)
+    exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
+    # chisq = sum((obs - exp) ** 2 / exp)
+    G_sq = 2 * sum(obs * np.log(obs / exp))
+    df = len(obs) - 2
+    return np.sqrt((G_sq / df - 1) / (N - 1))
+
+
+def cast_to_original_shape(data, original_shape, original_mask, step):
+    res = np.full(original_shape, np.nan, dtype=data.dtype)
+    res[::step] = data
+    return ma.masked_where(original_mask, res)
+
+
+def calc_epsilon_and_epsilon_mu(r, p, tr, step=None): # Can rewrite for code clarity
+    r = ma.masked_invalid(r)
+    p = ma.masked_invalid(p)
+    original_shape = r.shape
+    original_mask = r.mask
+
+    if step is not None:
+        r = r[::step]
+        p = p[::step]
+
+    valid_mask = ~r.mask & ~p.mask
+
+    eps = ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
+    eps[valid_mask] = betainc(tr, r[valid_mask], p[valid_mask])
+
+    eps_mu = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
+    eps_mu[valid_mask] = eps[valid_mask] * ((tr * (1 - p[valid_mask]) / p[valid_mask] + 1) / r[valid_mask] - 1)
+
+    if len(original_shape) == 0:
+        return eps.compressed()[0], eps_mu.compressed()[0]
+    return (
+        cast_to_original_shape(eps, original_shape, original_mask, step),
+        cast_to_original_shape(eps_mu, original_shape, original_mask, step)
+    )
+
+
+
+def fast_nb_pmf(k, r, pmf_coef, pmf_const):
+    return np.exp(gammaln(k + r) - gammaln(k + 1) + k * pmf_coef + pmf_const)
+
+
+def calc_pmf_coefs(r, p, tr):
+    r = np.ma.masked_invalid(r)
+    p = np.ma.masked_invalid(p)
+    
+    valid_mask = ~r.mask & ~p.mask
+    
+    pmf_coef = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
+    pmf_const = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
+    
+    pmf_coef[valid_mask] = np.log(p[valid_mask])
+    pmf_const[valid_mask] = (
+        np.log(1 - p[valid_mask]) * r[valid_mask]
+        - gammaln(r[valid_mask])
+        - np.log1p(-betainc(tr, r[valid_mask], p[valid_mask]))
+    )
+    
+    return pmf_coef, pmf_const
+
+
+def calc_g_sq_for_k(
+        k, r,
+        pmf_coef, pmf_const,
+        agg_cov_masked,
+        bg_sum_mappable,
+        bg_window,
+        position_skip_mask,
+        dtype,
+        step,
+):
+    # same as: exp = st.nbinom.pmf(k, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * bg_sum_mappable
+    exp = fast_nb_pmf(k, r, pmf_coef, pmf_const) * bg_sum_mappable
+
+    obs = nan_moving_sum(
+        agg_cov_masked == k,
+        bg_window,
+        position_skip_mask=position_skip_mask,
+        dtype=dtype,
+    ) * step
+    ratio = obs / exp
+    ratio[ratio == 0] = 1
+    return obs * np.ma.log(ratio) * 2
+
+
+def calc_rmsea_all_windows(
+        r, p, tr,
+        bg_sum_mappable,
+        agg_cov_masked,
+        bg_window,
+        position_skip_mask,
+        dtype,
+        step=20,
+    ):
+    """
+    Calculate RMSEA for all sliding windows with given stride.
+    Stride is required to be a divisor of the window size.
+    """
+    assert (bg_window - 1) % step == 0, "Stride should be a divisor of the window size."
+    initial_shape = r.shape
+    initial_mask = r.mask
+    agg_cov_masked = agg_cov_masked[::step]
+    position_skip_mask = position_skip_mask[::step]
+    bg_sum_mappable = bg_sum_mappable[::step]
+    r = r[::step]
+    p = p[::step]
+    bg_window = (bg_window - 1) // step + 1
+
+    pmf_coef, pmf_const = calc_pmf_coefs(r, p, tr)
+    G_sq = np.ma.masked_where(r.mask, np.zeros_like(r))
+    for k in range(tr):
+        G_sq += calc_g_sq_for_k(
+            k, r,
+            pmf_coef, pmf_const,
+            agg_cov_masked,
+            bg_sum_mappable,
+            bg_window,
+            position_skip_mask,
+            dtype,
+            step,
+        )
+
+    G_sq = np.ma.masked_where(~np.isfinite(G_sq), G_sq)
+    rmsea_stride = np.sqrt(np.clip(G_sq / (tr - 2) - 1, 0, None) / (bg_sum_mappable - 1))
+
+    return cast_to_original_shape(rmsea_stride, initial_shape, initial_mask, step)

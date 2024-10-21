@@ -106,19 +106,6 @@ def nan_moving_sum(masked_array, window, dtype=None, position_skip_mask: np.ndar
     return ma.array(result, mask=masked_array.mask)
 
 
-def calc_rmsea(obs, unique_cutcounts, r, p, tr):
-    N = sum(obs)
-    exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
-    # chisq = sum((obs - exp) ** 2 / exp)
-    G_sq = 2 * sum(obs * np.log(obs / exp))
-    df = len(obs) - 2
-    return np.sqrt((G_sq / df - 1) / (N - 1))
-
-
-def calc_epsilon(r, p, tr):
-    return st.nbinom(r, 1 - p).pmf(tr) / (1 - p)
-
-
 def find_stretches(arr: np.ndarray):
     """
     Find stretches of True values in a boolean array.
