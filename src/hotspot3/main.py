@@ -30,6 +30,12 @@ def main() -> None:
         if cutcounts_path is None:
             cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
             genome_processor.write_cutcounts(args.bam, cutcounts_path)
+        
+        if smoothed_signal_path is None:
+            smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
+            total_cutcounts = genome_processor.total_cutcounts(cutcounts_path)
+            np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
+            genome_processor.modwt_smooth_signal(cutcounts_path, total_cutcounts=total_cutcounts, save_path=smoothed_signal_path)
 
         if precomp_fdrs is None:
             precomp_pvals = f"{outdir_pref}.pvals.parquet"
@@ -37,12 +43,6 @@ def main() -> None:
     
             precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
             genome_processor.calc_fdr(precomp_pvals, precomp_fdrs)
-        
-        if smoothed_signal_path is None:
-            smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-            total_cutcounts = genome_processor.total_cutcounts(cutcounts_path)
-            np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
-            genome_processor.modwt_smooth_signal(cutcounts_path, total_cutcounts=total_cutcounts, save_path=smoothed_signal_path)
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
