@@ -605,10 +605,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.gp.modwt_level}) for {self.chrom_name}")
         smoothed = modwt_smooth(agg_counts, filters, level=self.gp.modwt_level)
         data = pd.DataFrame({
-            #'cutcounts': cutcounts, 
             'smoothed': smoothed,
             'normalized_density': normalize_density(agg_counts, total_cutcounts) 
-            # maybe use the same window as for pvals? then cutcounts is redundant
         })
         self.to_parquet(data, save_path)
 
