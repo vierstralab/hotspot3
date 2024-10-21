@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -o pipefail
 
-if [ $# -ne 2 ]; then
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
   echo "Usage: $0 <input.bam> <output.bed.gz> [chromosomes]"
   exit 1
 fi
@@ -35,8 +35,8 @@ eval "$INPUT_CMD" \
     }' \
   | sort-bed - \
   | uniq -c \
-  | "$AWK_EXE" -v OFS='\t' '{ print $2,$3,$4,"id",$1 }' \
-  | { echo -e "#chr\tstart\tend\tid\tcount"; cat; } \
+  | "$AWK_EXE" -v OFS='\t' '{ print $2,$3,$4,$1 }' \
+  | { echo -e "#chr\tstart\tend\tcount"; cat; } \
   | bgzip > "$2"
 
 tabix -p bed "$2"

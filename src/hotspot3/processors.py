@@ -59,11 +59,21 @@ def ensure_contig_exists(func):
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
     """
-    
+    Run bam2bed conversion script.
     """
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
         chroms = ','.join(chromosomes) if chromosomes else ""
-        subprocess.run(['bash', script, bam_path, tabix_bed_path, chroms], check=True)
+        try:
+            subprocess.run(
+                ['bash', script, bam_path, tabix_bed_path, chroms],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            print("Subprocess failed with error:\n", e.stderr)
+            raise 
 
 
 class GenomeProcessor:
