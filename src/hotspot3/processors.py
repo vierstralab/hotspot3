@@ -484,7 +484,6 @@ class ChromosomeProcessor:
             agg_cutcounts,
             bg_sum_mappable,
             high_signal_mask,
-            by_window=True
         )
 
         # Require at least 10% of the mappable bases to be nonzero
