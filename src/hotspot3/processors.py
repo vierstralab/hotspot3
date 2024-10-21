@@ -437,7 +437,7 @@ class ChromosomeProcessor:
             raise NoContigPresentError
 
         high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
-        
+
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
@@ -641,25 +641,25 @@ class ChromosomeProcessor:
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
             )
+            mean = bg_sum / bg_sum_mappable
+            del bg_sum
+            gc.collect()
+
             bg_sum_sq = self.smooth_counts(
                 agg_cutcounts ** 2,
                 self.gp.bg_window,
                 position_skip_mask=high_signal_mask
             )
+
             self.gp.logger.debug(f"Background cutcounts calculated for {self.chrom_name}")
         else:
             agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
             bg_sum = np.sum(agg_cutcounts)
             bg_sum_sq = np.sum(agg_cutcounts ** 2)
+            mean = bg_sum / bg_sum_mappable
 
-        mean = (bg_sum / bg_sum_mappable).astype(np.float16)
-        
-        del bg_sum
-        gc.collect()
 
-        variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)).astype(np.float16)
-        del bg_sum_sq
-        gc.collect()
+        variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1))
 
         return mean, variance
         
