@@ -510,7 +510,9 @@ class ChromosomeProcessor:
         del r0, p0, agg_cutcounts
         gc.collect()
 
-        neglog_pvals = {'log10_pval': self.fix_inf_pvals(neglog_pvals)}
+        outdir = pvals_outpath.replace('.pvals.parquet', '')
+        fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
+        neglog_pvals = {'log10_pval': self.fix_inf_pvals(neglog_pvals, fname)}
 
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
         if write_debug_stats:
@@ -722,12 +724,10 @@ class ChromosomeProcessor:
         return ProcessorOutputData(self.chrom_name, data_df)
 
 
-    def fix_inf_pvals(self, neglog_pvals, pvals_outpath):
+    def fix_inf_pvals(self, neglog_pvals, fname):
         infs = np.isinf(neglog_pvals)
         n_infs = np.sum(infs) 
         if n_infs > 0:
-            outdir = pvals_outpath.replace('.pvals.parquet', '')
-            fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
             self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
             np.savetxt(fname, np.where(infs)[0], fmt='%d')
             neglog_pvals[infs] = 300
