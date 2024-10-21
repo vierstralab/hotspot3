@@ -31,10 +31,10 @@ def negbin_neglog10pvalue(x: ma.MaskedArray, r, p) -> np.ndarray:
 
     result = np.empty(resulting_mask.shape, dtype=np.float16)
     result[resulting_mask] = np.nan
-    result[~resulting_mask] = logpval_for_dtype(x, r, p)
+    result[~resulting_mask] = logpval_for_dtype(x, r, p, dtype=np.float32)
 
     low_precision = np.isinf(result[~resulting_mask])
-    for precision in (np.float32, np.float64,): # np.float128 is not supported. Might need to implement logsf for it
+    for precision in (np.float64, ): # np.float128 is not supported. Might need to implement logsf for it
         if np.any(low_precision):
             new_pvals = logpval_for_dtype(
                 x[low_precision],
