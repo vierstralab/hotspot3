@@ -105,7 +105,11 @@ def filter_peaks_summits_within_regions(peaks_coordinates: np.ndarray, starts, e
     ends = np.asarray(ends)
     if peaks_coordinates.shape[0] == 0:
         raise NoContigPresentError
-    summits = peaks_coordinates[:, 1]
+    try:
+        summits = peaks_coordinates[:, 1]
+    except IndexError:
+        print(peaks_coordinates.shape)
+        raise
     closest_left_index = np.searchsorted(starts, summits, side='right') - 1
     filtered_peaks_mask = (closest_left_index >= 0) & (summits < ends[closest_left_index])
     

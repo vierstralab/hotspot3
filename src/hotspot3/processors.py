@@ -615,7 +615,7 @@ class ChromosomeProcessor:
         if signal_df.empty:
             raise NoContigPresentError
         
-        signif_fdrs = self.read_fdr_path(fdr_path)  >= -np.log10(fdr_threshold)
+        signif_fdrs = self.read_fdr_path(fdr_path) >= -np.log10(fdr_threshold)
         starts, ends = find_stretches(signif_fdrs)
 
         normalized_density = signal_df['normalized_density'].values
