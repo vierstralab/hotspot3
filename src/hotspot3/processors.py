@@ -449,7 +449,7 @@ class ChromosomeProcessor:
             agg_cutcounts[~high_signal_mask].compressed(),
             return_counts=True
         )
-        self.gp.logger.debug(f'Fit model for {self.chrom_name}')
+        self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
 
         bg_sum_mappable = self.smooth_counts(
             mappable_bases,
