@@ -5,7 +5,7 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc
 from hotspot3.signal_smoothing import nan_moving_sum
-from hotspot3.utils import NoContigPresentError
+
 
 # Calculate p-values and FDR
 def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
@@ -35,17 +35,6 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     return result
 
 
-def calc_neglog10fdr(neglog10_pvals, fdr_method='bh'):
-
-    neglog10_pvals = neglog10_pvals[not_nan]
-    neglog10_pvals *= -np.log(10).astype(neglog10_pvals.dtype)
-    result[not_nan] = logfdr_from_logpvals(
-        neglog10_pvals, method=fdr_method
-    )
-    result /= -np.log(10).astype(result.dtype)
-    return result
-
-
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
     x = np.asarray(x, dtype=dtype)
     r = np.asarray(r, dtype=dtype)
@@ -67,7 +56,7 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
         - log_fdr: 1D array of log-transformed FDR values. 
     """
     assert method in ['bh', 'by'], "Only 'bh' and 'by' methods are supported."
-    log_pvals = np.asarray(log_pvals).astype(dtype=dtype) # no further input checking yet
+    log_pvals = np.asarray(log_pvals, dtype=dtype) # no further input checking yet
     if log_pvals.ndim != 1:
         raise NotImplementedError("Only 1D arrays are supported.")
 
@@ -106,7 +95,6 @@ def filter_peaks_summits_within_regions(peaks_coordinates: np.ndarray, starts, e
     summits = peaks_coordinates[:, 1]
 
     closest_left_index = np.searchsorted(starts, summits, side='right') - 1
-    print(closest_left_index, summits, starts)
     filtered_peaks_mask = (closest_left_index >= 0) & (summits < ends[closest_left_index])
     
     return filtered_peaks_mask

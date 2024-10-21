@@ -617,18 +617,17 @@ class ChromosomeProcessor:
         
         signif_fdrs = self.read_fdr_path(fdr_path) >= -np.log10(fdr_threshold)
         starts, ends = find_stretches(signif_fdrs)
+        if len(starts) == 0:
+            self.gp.logger.warning(f"No peaks found for {self.chrom_name}. Skipping...")
+            raise NoContigPresentError
 
         normalized_density = signal_df['normalized_density'].values
         self.gp.logger.debug(f"Calling peaks for {self.chrom_name}")
-        try:
-            peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
-                signal_df['smoothed'].values,
-                starts,
-                ends
-            )
-        except NoContigPresentError:
-            self.gp.logger.warning(f"No peaks found for {self.chrom_name}. Skipping...")
-            raise
+        peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
+            signal_df['smoothed'].values,
+            starts,
+            ends
+        )
         peaks_df = pd.DataFrame(
             peaks_in_hotspots_trimmed,
             columns=['start', 'summit', 'end']
