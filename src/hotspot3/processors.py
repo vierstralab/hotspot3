@@ -462,14 +462,15 @@ class ChromosomeProcessor:
             agg_cutcounts,
             total_mappable_bg,
             high_signal_mask,
-            in_window=False
+            by_window=False
         )
         self.gp.logger.debug(f"Total fit finished for {self.chrom_name}")
 
         sliding_mean, sliding_variance = self.fit_background_negbin_model(
             agg_cutcounts,
             bg_sum_mappable,
-            high_signal_mask
+            high_signal_mask,
+            by_window=True
         )
 
         if not write_debug_stats:
@@ -477,6 +478,8 @@ class ChromosomeProcessor:
             gc.collect()
 
         p0, r0 = p_and_r_from_mean_and_var(sliding_mean, sliding_variance)
+        if np.any(p0 > np.finfo(np.float16).max) or np.any(r0 > np.finfo(np.float16).max):
+            print(self.chrom_name)
 
         if write_debug_stats:
             step = 20
@@ -525,6 +528,9 @@ class ChromosomeProcessor:
             gc.collect()
 
         neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
+        self.to_parquet(neglog_pvals, pvals_outpath)
+        del neglog_pvals
+        gc.collect()
 
         p_global, r_global = p_and_r_from_mean_and_var(m0, v0)
         rmsea_global = calc_rmsea(n_obs, unique_cutcounts, r_global, p_global, tr=outliers_tr)
@@ -540,7 +546,6 @@ class ChromosomeProcessor:
             'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
         })
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
-        self.to_parquet(neglog_pvals, pvals_outpath)
         self.to_parquet(params_df, params_outpath)
     
 
@@ -633,9 +638,9 @@ class ChromosomeProcessor:
         return log10_fdrs
 
 
-    def fit_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask, in_window=True):
+    def fit_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask, by_window=True):
         agg_cutcounts = ma.asarray(agg_cutcounts, dtype=np.float32)
-        if in_window:
+        if by_window:
             bg_sum = self.smooth_counts(
                 agg_cutcounts,
                 self.gp.bg_window,
