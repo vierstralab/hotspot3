@@ -16,7 +16,7 @@ import importlib.resources as pkg_resources
 from functools import reduce
 from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretches
 
-from hotspot3.stats import calc_neglog10fdr, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
+from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
 
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config, df_to_bigwig
 
@@ -279,16 +279,22 @@ class GenomeProcessor:
         chrom_pos_mapping = log10_pval['chrom'].drop_duplicates()
         starts = chrom_pos_mapping.index
         ends = [*starts[1:], log10_pval.shape[0]]
-        log10_pval = log10_pval['log10_pval'].values
-       
-        log10_fdrs = calc_neglog10fdr(log10_pval, fdr_method=self.fdr_method)
+        log10_pval = log10_pval['log10_pval'].values 
+        log10_pval *= -np.log(10).astype(log10_pval.dtype)
+
+        result = np.full_like(log10_pval, np.nan)
+        not_nan = ~np.isnan(log10_pval)
+        log10_pval = log10_pval[not_nan]
+
+        result[not_nan] = logfdr_from_logpvals(log10_pval, method=self.fdr_method)
         del log10_pval
         gc.collect()
+        result /= -np.log(10).astype(result.dtype)
 
-        log10_fdrs = [
+        result = [
             ProcessorOutputData(
                 chrom, 
-                pd.DataFrame({'log10_fdr': log10_fdrs[start:end]})
+                pd.DataFrame({'log10_fdr': result[start:end]})
             )
             for chrom, start, end
             in zip(chrom_pos_mapping, starts, ends)
@@ -298,7 +304,7 @@ class GenomeProcessor:
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(
             ChromosomeProcessor.to_parquet,
-            log10_fdrs,
+            result,
             fdrs_path,
         )
         return fdrs_path
