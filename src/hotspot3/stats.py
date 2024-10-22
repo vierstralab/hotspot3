@@ -5,6 +5,7 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
 from hotspot3.signal_smoothing import nan_moving_sum
+import itertools
 
 
 # Calculate p-values and FDR
@@ -20,22 +21,22 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
 
     result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type='nbinom').astype(np.float16)
     low_precision = ~np.isfinite(result)
-    for precision in (np.float32, np.float64, ):
+    for precision, method in itertools.product(
+        (np.float32, np.float64), ('nbinom', 'beta', 'hyp2f')
+    ):
         if np.any(low_precision):
-            for method in ('nbinom', 'beta', 'hyp2f'):
-                if precision == np.float32 and method == 'nbinom':
-                    continue
-                new_pvals = logpval_for_dtype(
-                    x[low_precision],
-                    r[low_precision],
-                    p[low_precision],
-                    dtype=precision,
-                    calc_type=method
-                )
-                result[low_precision] = new_pvals
-                low_precision[low_precision] = ~np.isfinite(new_pvals)
-        else:
-            break
+            if precision == np.float32 and method == 'nbinom':
+                continue
+            new_pvals = logpval_for_dtype(
+                x[low_precision],
+                r[low_precision],
+                p[low_precision],
+                dtype=precision,
+                calc_type=method
+            )
+            result[low_precision] = new_pvals
+            low_precision[low_precision] = ~np.isfinite(new_pvals)
+        break
 
     n = low_precision.sum()
     if n > 0:
