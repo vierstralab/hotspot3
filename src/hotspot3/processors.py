@@ -540,7 +540,7 @@ class ChromosomeProcessor:
         resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, sliding_r.mask, sliding_p.mask])
         invalid_fits = ma.where((sliding_r <= 0) | (sliding_p <= 0) | (sliding_p >= 1))[0]
         if len(invalid_fits) > 0:
-            self.gp.logger.warning(f"Window estimated parameters (r0 or p0) contain invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
+            self.gp.logger.warning(f"Window estimated parameters (r or p) have {len(invalid_fits)} invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
             sliding_r[invalid_fits] = global_r
             sliding_p[invalid_fits] = global_p
         
