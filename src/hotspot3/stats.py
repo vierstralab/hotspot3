@@ -37,7 +37,9 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
         else:
             break
     else:
-        print(low_precision.sum(), "p-values are still inf or nan.")
+        n = low_precision.sum()
+        if n > 0:
+            print(n, "p-values are still inf or nan.")
     result /= -np.log(10).astype(result.dtype)
     return result
 
