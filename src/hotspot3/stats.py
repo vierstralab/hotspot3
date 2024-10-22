@@ -19,7 +19,7 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     assert r.shape == p.shape, "r and p should have the same shape"
 
     result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type='beta').astype(np.float16)
-    low_precision = np.isfinite(result)
+    low_precision = ~np.isfinite(result)
     for precision in (np.float32, np.float64, ):
         if np.any(low_precision):
             for method in ('beta', 'hyp2f'):
@@ -33,8 +33,9 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
                     calc_type=method
                 )
                 result[low_precision] = new_pvals
-                low_precision[low_precision] = np.isinf(new_pvals)
-    
+                low_precision[low_precision] = ~np.isfinite(new_pvals)
+        else:
+            break
     result /= -np.log(10).astype(result.dtype)
     return result
 
