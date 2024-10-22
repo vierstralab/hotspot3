@@ -487,12 +487,13 @@ class ChromosomeProcessor:
         )
 
         # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
-        valid_windows = self.smooth_counts(
+        window_has_enough_background = self.smooth_counts(
             agg_cutcounts > 0, 
             window=self.gp.bg_window,
             dtype=np.float32, 
             position_skip_mask=high_signal_mask
         ) / bg_sum_mappable > self.gp.nonzero_windows_to_fit
+        window_has_enough_background = window_has_enough_background.filled(False)
 
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
@@ -504,9 +505,9 @@ class ChromosomeProcessor:
             sliding_variance,
         )
         # For invalid windows, revert to global model
-        sliding_p[~valid_windows] = global_p
-        sliding_r[~valid_windows] = global_r
-        del valid_windows
+        sliding_p[~window_has_enough_background] = global_p
+        sliding_r[~window_has_enough_background] = global_r
+        del window_has_enough_background
         
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
 
@@ -699,7 +700,7 @@ class ChromosomeProcessor:
             position_skip_mask=high_signal_mask
         )
 
-        variance = ((bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1))
+        variance = (bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)
 
         return mean, variance
     
