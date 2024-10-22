@@ -18,40 +18,59 @@ def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
 def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
     assert r.shape == p.shape, "r and p should have the same shape"
 
-    result = logpval_for_dtype(x, r, p, dtype=np.float32).astype(np.float16)
-    low_precision = np.isinf(result)
-    for precision in (np.float64, ): # np.float128 is not supported. Might need to implement logsf for it
+    result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type='beta').astype(np.float16)
+    low_precision = np.isfinite(result)
+    for precision in (np.float32, np.float64, ):
         if np.any(low_precision):
-            new_pvals = logpval_for_dtype(
-                x[low_precision],
-                r[low_precision],
-                p[low_precision],
-                dtype=precision
-            )
-            result[low_precision] = new_pvals
-            low_precision[low_precision] = np.isinf(new_pvals)
+            for method in ('beta', 'hyp2f'):
+                if precision == np.float32 and method == 'beta':
+                    continue
+                new_pvals = logpval_for_dtype(
+                    x[low_precision],
+                    r[low_precision],
+                    p[low_precision],
+                    dtype=precision,
+                    calc_type=method
+                )
+                result[low_precision] = new_pvals
+                low_precision[low_precision] = np.isinf(new_pvals)
     
     result /= -np.log(10).astype(result.dtype)
     return result
 
 
-
-def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
+def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type='beta') -> np.ndarray:
+    """
+    Implementation of log(betainc) for low precision
+    """
     mask = x > 0
     x = np.asarray(x, dtype=dtype)[mask]
     r = np.asarray(r, dtype=dtype)[mask]
     p = np.asarray(p, dtype=dtype)[mask]
     
     result = np.zeros(mask.shape, dtype=dtype)
-    result[mask] = (
+    if calc_type == 'beta':
+        func = logpval_for_dtype_betainc
+    elif calc_type == 'hyp2f':
+        func = logpval_for_dtype_hyp2f
+    else:
+        raise ValueError("Unknown p-value calculation type.")
+    result[mask] = func(x, r, p, dtype=dtype)
+    return result
+
+
+def logpval_for_dtype_betainc(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
+    return np.log(betainc(x, r, p, dtype=dtype))
+
+
+def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
+    return np.log((
         x * np.log(p) 
         + r * np.log(1 - p) 
         + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=dtype))
         - np.log(x)
         - betaln(x, r, dtype=dtype)
-    )
-    return result
-
+    ))
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
     """
