@@ -60,25 +60,26 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     if calc_type == 'nbinom':
         p_vals = st.nbinom.logsf(x - 1, r, 1 - p)
     elif calc_type == 'beta':
-        p_vals = logpval_for_dtype_betainc(x, r, p, dtype=dtype)
+        p_vals = logpval_for_dtype_betainc(x, r, p)
     elif calc_type == 'hyp2f':
-        p_vals = logpval_for_dtype_hyp2f(x, r, p, dtype=dtype)
+        p_vals = logpval_for_dtype_hyp2f(x, r, p)
     else:
         raise ValueError(f"Unknown p-value calculation type: {calc_type}")
     result[mask] = p_vals
     return result
 
 
-def logpval_for_dtype_betainc(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
-    return np.log(betainc(x, r, p, dtype=dtype))
+def logpval_for_dtype_betainc(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
+    return np.log(betainc(x, r, p, dtype=r.dtype))
 
 
-def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
-    return (x * np.log(p) 
+def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
+    return (
+        x * np.log(p) 
         + r * np.log(1 - p) 
-        + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=dtype))
+        + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=r.dtype))
         - np.log(x)
-        - betaln(x, r, dtype=dtype)
+        - betaln(x, r, dtype=r.dtype)
     )
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
@@ -95,7 +96,7 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
         - log_fdr: 1D array of log-transformed FDR values. 
     """
     assert method in ['bh', 'by'], "Only 'bh' and 'by' methods are supported."
-    log_pvals = np.asarray(log_pvals).astype(dtype=dtype) # no further input checking yet
+    log_pvals = np.asarray(log_pvals, dtype=dtype) # no further input checking yet
     if log_pvals.ndim != 1:
         raise NotImplementedError("Only 1D arrays are supported.")
 
