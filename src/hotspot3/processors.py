@@ -101,7 +101,7 @@ class GenomeProcessor:
             window=151, min_mappable=76,
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
-            signal_tr=0.975,
+            signal_quantile=0.975,
             nonzero_windows_to_fit = 0.01,
             fdr_method='bh',
             cpus=1,
@@ -129,7 +129,7 @@ class GenomeProcessor:
         self.density_step = density_step
 
         self.cpus = min(cpus, max(1, mp.cpu_count()))
-        self.signal_tr = signal_tr
+        self.signal_tr = signal_quantile
         self.fdr_method = fdr_method
         self.modwt_level = modwt_level
 

@@ -18,7 +18,8 @@ def main() -> None:
         save_debug=args.debug,
         bg_window=args.background_window,
         window=args.window,
-        chromosomes=args.chromosomes
+        chromosomes=args.chromosomes,
+        signal_quantile=args.signal_quantile
     )
     precomp_fdrs = args.fdrs_parquet
     cutcounts_path = args.cutcounts
@@ -125,6 +126,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed). Used in fit of background model", default=None)
     parser.add_argument("--window", help="Window size for smoothing cutcounts", type=int, default=151)
     parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
+    parser.add_argument("--signal_quantile", help="Chromosome signal quantile. Positions with signal above the threshold considered to be 'potential peaks' and are not used to fit a background model", type=float, default=0.975)
     
     # Arguments to skip previous steps if provided
     parser.add_argument("--bam", help="Path to input bam/cram file", default=None)
