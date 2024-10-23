@@ -39,10 +39,6 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
             low_precision[low_precision] = ~np.isfinite(new_pvals)
         else:
             break
-
-    n = low_precision.sum()
-    if n > 0:
-        print(n, "p-values are still inf or nan.")
     result /= -np.log(10).astype(result.dtype)
     return result
 
@@ -52,7 +48,7 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     Implementation of log(pval) with high precision
     """
     mask = x > 0
-    x = np.asarray(x, dtype=dtype)[mask]
+    x = np.round(np.asarray(x, dtype=dtype)[mask])
     r = np.asarray(r, dtype=dtype)[mask]
     p = np.asarray(p, dtype=dtype)[mask]
     
