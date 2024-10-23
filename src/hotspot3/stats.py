@@ -37,8 +37,8 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
                 calc_type=method
             )
             corrected_infs = np.isfinite(new_pvals)
+            result[low_precision] = np.where(corrected_infs, new_pvals, result[low_precision])
             low_precision[low_precision] = ~corrected_infs
-            result[low_precision] = new_pvals[corrected_infs]
 
         else:
             break
