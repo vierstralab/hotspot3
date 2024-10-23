@@ -57,7 +57,6 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     p = np.asarray(p, dtype=dtype)[mask]
     
     result = np.zeros(mask.shape, dtype=dtype)
-    print(calc_type, calc_type == "nbinom")
     if calc_type == 'nbinom':
         p_vals = st.nbinom.logsf(x - 1, r, 1 - p)
     elif calc_type == 'beta':
