@@ -19,10 +19,11 @@ def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
 def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
     assert r.shape == p.shape, "r and p should have the same shape"
 
-    result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type='nbinom').astype(np.float16)
+    result = logpval_for_dtype(x, r, p, dtype=np.float32).astype(np.float16)
     low_precision = ~np.isfinite(result)
     for precision, method in itertools.product(
-        (np.float32, np.float64), ('nbinom', 'beta', 'hyp2f')
+        (np.float32, np.float64),
+        ('nbinom', 'beta', 'hyp2f')
     ):
         if precision == np.float32 and method == 'nbinom':
             continue
@@ -56,6 +57,7 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     p = np.asarray(p, dtype=dtype)[mask]
     
     result = np.zeros(mask.shape, dtype=dtype)
+    print(calc_type, calc_type == "nbinom")
     if calc_type == 'nbinom':
         p_vals = st.nbinom.logsf(x - 1, r, 1 - p)
     elif calc_type == 'beta':
