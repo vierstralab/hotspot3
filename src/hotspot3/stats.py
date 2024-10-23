@@ -58,12 +58,12 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     result = np.zeros(mask.shape, dtype=dtype)
     if calc_type == 'nbinom':
         p_vals = st.nbinom.logsf(x - 1, r, 1 - p)
-    if calc_type == 'beta':
+    elif calc_type == 'beta':
         p_vals = logpval_for_dtype_betainc(x, r, p, dtype=dtype)
     elif calc_type == 'hyp2f':
         p_vals = logpval_for_dtype_hyp2f(x, r, p, dtype=dtype)
     else:
-        raise ValueError(f"Unknown p-value calculation type. {calc_type}")
+        raise ValueError(f"Unknown p-value calculation type: {calc_type}")
     result[mask] = p_vals
     return result
 
