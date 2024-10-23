@@ -70,17 +70,19 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
 
 
 def logpval_for_dtype_betainc(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
-    return np.log(betainc(x, r, p, dtype=r.dtype))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return np.log(betainc(x, r, p, dtype=r.dtype))
 
 
 def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
-    return (
-        x * np.log(p) 
-        + r * np.log(1 - p) 
-        + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=r.dtype))
-        - np.log(x)
-        - betaln(x, r, dtype=r.dtype)
-    )
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return (
+            x * np.log(p) 
+            + r * np.log(1 - p) 
+            + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=r.dtype))
+            - np.log(x)
+            - betaln(x, r, dtype=r.dtype)
+        )
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
     """
