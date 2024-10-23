@@ -36,7 +36,8 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
             )
             result[low_precision] = new_pvals
             low_precision[low_precision] = ~np.isfinite(new_pvals)
-        break
+        else:
+            break
 
     n = low_precision.sum()
     if n > 0:
