@@ -74,13 +74,12 @@ def logpval_for_dtype_betainc(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype
 
 
 def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None) -> np.ndarray:
-    return np.log((
-        x * np.log(p) 
+    return (x * np.log(p) 
         + r * np.log(1 - p) 
         + np.log(hyp2f1(x + r, 1, x + 1, p, dtype=dtype))
         - np.log(x)
         - betaln(x, r, dtype=dtype)
-    ))
+    )
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
     """
