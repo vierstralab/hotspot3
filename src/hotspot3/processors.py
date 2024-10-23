@@ -553,8 +553,9 @@ class ChromosomeProcessor:
     
         neglog_pvals = np.full(self.chrom_size, np.nan, dtype=np.float16)
         neglog_pvals[~resulting_mask] = negbin_neglog10pvalue(agg_cutcounts, sliding_r, sliding_p)
-        if np.isnan(neglog_pvals).any():
+        if np.isnan(neglog_pvals[~resulting_mask]).any():
             self.gp.logger.warning(f"NaN p-values found for {self.chrom_name}. Debug me more")
+            np.savetxt(np.where(np.isnan(neglog_pvals[~resulting_mask]))[0], f'{self.chrom_name}_positions_with_nan_pvals.txt')
         del sliding_r, sliding_p, agg_cutcounts, resulting_mask
         gc.collect()
 
