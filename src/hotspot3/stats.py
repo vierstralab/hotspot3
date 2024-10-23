@@ -24,9 +24,9 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     for precision, method in itertools.product(
         (np.float32, np.float64), ('nbinom', 'beta', 'hyp2f')
     ):
+        if precision == np.float32 and method == 'nbinom':
+            continue
         if np.any(low_precision):
-            if precision == np.float32 and method == 'nbinom':
-                continue
             new_pvals = logpval_for_dtype(
                 x[low_precision],
                 r[low_precision],
