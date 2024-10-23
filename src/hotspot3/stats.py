@@ -48,7 +48,7 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
 
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type='nbinom') -> np.ndarray:
     """
-    Implementation of log(betainc) for low precision
+    Implementation of log(pval) with high precision
     """
     mask = x > 0
     x = np.asarray(x, dtype=dtype)[mask]
@@ -63,7 +63,7 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     elif calc_type == 'hyp2f':
         p_vals = logpval_for_dtype_hyp2f(x, r, p, dtype=dtype)
     else:
-        raise ValueError("Unknown p-value calculation type.")
+        raise ValueError(f"Unknown p-value calculation type. {calc_type}")
     result[mask] = p_vals
     return result
 
