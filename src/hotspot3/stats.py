@@ -19,13 +19,13 @@ def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
 def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
     assert r.shape == p.shape, "r and p should have the same shape"
 
-    result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type="nbinom").astype(np.float16)
+    result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type="betainc").astype(np.float16)
     low_precision = ~np.isfinite(result)
     for precision, method in itertools.product(
         (np.float32, np.float64),
-        ("nbinom", "beta", "hyp2f")
+        ("betainc", "hyp2f1", "nbinom")
     ):
-        if precision == np.float32 and method == "nbinom":
+        if precision == np.float32 and method == "betainc":
             continue
         if np.any(low_precision):
             new_pvals = logpval_for_dtype(
@@ -43,7 +43,7 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
     return result
 
 
-def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="nbinom") -> np.ndarray:
+def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="betainc") -> np.ndarray:
     """
     Implementation of log(pval) with high precision
     """
@@ -55,9 +55,9 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     result = np.zeros(mask.shape, dtype=dtype)
     if calc_type == 'nbinom':
         p_vals = st.nbinom.logsf(x - 1, r, 1 - p)
-    elif calc_type == 'beta':
+    elif calc_type == 'betainc':
         p_vals = logpval_for_dtype_betainc(x, r, p)
-    elif calc_type == 'hyp2f':
+    elif calc_type == 'hyp2f1':
         p_vals = logpval_for_dtype_hyp2f(x, r, p)
     else:
         raise ValueError(f"Unknown p-value calculation type: {calc_type}")
