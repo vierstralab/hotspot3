@@ -85,6 +85,8 @@ class GenomeProcessor:
         - min_hotspot_width: Minimum width for a region to be called a hotspot.
     
         - signal_tr: Quantile threshold for outlier detection for background distribution fit.
+        - adaptive_signal_tr: Use adaptive signal threshold. Signal_tr is ignored if True.
+
         - nonzero_window_fit: Minimum fraction of nonzero values in a background window to fit the model.
         - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
         - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
@@ -102,6 +104,7 @@ class GenomeProcessor:
             bg_window=50001, min_mappable_bg=10000,
             density_step=20, 
             signal_quantile=0.975,
+            adaptive_signal_tr=False,
             nonzero_windows_to_fit = 0.01,
             fdr_method='bh',
             cpus=1,
@@ -135,6 +138,7 @@ class GenomeProcessor:
         self.signal_tr = signal_quantile
         self.fdr_method = fdr_method
         self.modwt_level = modwt_level
+        self.adaptive_signal_tr = adaptive_signal_tr
 
         self.chromosome_processors = sorted(
             [ChromosomeProcessor(self, chrom_name) for chrom_name in self.chrom_sizes.keys()],
@@ -425,30 +429,38 @@ class ChromosomeProcessor:
         return cutcounts
 
 
-    @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
-        write_debug_stats = write_debug_stats or self.gp.save_debug
-        mappable_bases = self.extract_mappable_bases()
-        cutcounts = self.extract_cutcounts(cutcounts_file)
+    def infer_potential_peaks_mask(self, agg_cutcounts):
+        if not self.gp.adaptive_signal_tr:
+            outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
+        else:
+            # use first threshold with rmsea < 0.05 as signal threshold
+            raise NotImplementedError("Adaptive signal threshold is not implemented yet.")
 
-        self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window, dtype=np.float32)
-
-        del cutcounts
-        gc.collect()
-
-        agg_cutcounts = np.ma.masked_where(mappable_bases.mask, agg_cutcounts)
-        self.gp.logger.debug(
-            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
-
-        outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
-        self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
-
+        high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
         if outliers_tr == 0:
             self.gp.logger.warning(f"No background signal for {self.chrom_name} (outlier threshold: {outliers_tr} == 0). Skipping...")
             raise NoContigPresentError
 
-        high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
+        self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
+
+        return high_signal_mask, outliers_tr
+
+
+    @ensure_contig_exists
+    def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
+        write_debug_stats = write_debug_stats or self.gp.save_debug
+        self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
+        cutcounts = self.extract_cutcounts(cutcounts_file)
+        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window, dtype=np.float32)
+        del cutcounts
+        gc.collect()
+
+        mappable_bases = self.extract_mappable_bases()
+        agg_cutcounts = np.ma.masked_where(mappable_bases.mask, agg_cutcounts)
+        self.gp.logger.debug(
+            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
+
+        high_signal_mask, outliers_tr = self.infer_potential_peaks_mask(agg_cutcounts)
 
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
@@ -466,20 +478,16 @@ class ChromosomeProcessor:
         del mappable_bases
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
-        # Fit global model
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
-        try:
-            global_mean, global_variance = self.fit_global_background_negbin_model(
-                agg_cutcounts,
-                total_mappable_bg,
-                high_signal_mask,
-            )
-        except NoContigPresentError:
-            self.gp.logger.warning(f"Not enough background signal for global fit of {self.chrom_name}. Skipping...")
-            raise
-    
+        global_mean, global_variance = self.fit_global_background_negbin_model(
+            agg_cutcounts,
+            total_mappable_bg,
+            high_signal_mask,
+        )
+
         global_p, global_r = p_and_r_from_mean_and_var(global_mean, global_variance)
+        rmsea_global = calc_rmsea(n_obs, unique_cutcounts, global_r, global_p, tr=outliers_tr)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
@@ -496,7 +504,7 @@ class ChromosomeProcessor:
             dtype=np.float32, 
             position_skip_mask=high_signal_mask
         ) / bg_sum_mappable > self.gp.nonzero_windows_to_fit
-
+        window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
@@ -506,16 +514,14 @@ class ChromosomeProcessor:
             sliding_mean,
             sliding_variance,
         )
-        reverted_to_global = ma.sum(~window_has_enough_background)
-        window_has_enough_background = window_has_enough_background.filled(False)
+
+        reverted_to_global = np.sum(~window_has_enough_background)
+        
         if reverted_to_global > 0:
-            self.gp.logger.debug(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
+            self.gp.logger.warning(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
             sliding_p[~window_has_enough_background] = global_p
             sliding_r[~window_has_enough_background] = global_r
-        del window_has_enough_background
         
-        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
-
         if write_debug_stats:
             step = 20
             rmsea = calc_rmsea_all_windows(
@@ -528,7 +534,13 @@ class ChromosomeProcessor:
                 step=step
             )
             
-            epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(sliding_r, sliding_p, outliers_tr, step=step)
+            epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(
+                sliding_r,
+                sliding_p,
+                outliers_tr,
+                step=step
+            )
+
             epsilon_obs = nan_moving_sum(
                 agg_cutcounts,
                 self.gp.bg_window,
@@ -537,37 +549,29 @@ class ChromosomeProcessor:
             del bg_sum_mappable
             gc.collect()
         else:
-            del sliding_mean, sliding_variance
+            del sliding_mean, sliding_variance, window_has_enough_background
             gc.collect()
         
+        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")        
         
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
-        resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, sliding_r.mask, sliding_p.mask])
         invalid_fits = ma.where((sliding_r <= 0) | (sliding_p <= 0) | (sliding_p >= 1))[0]
-        if len(invalid_fits) > 0:
-            self.gp.logger.warning(f"Window estimated parameters (r or p) have {len(invalid_fits)} invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
+        n = len(invalid_fits)
+        if n > 0:
+            self.gp.logger.warning(f"Window estimated parameters (r or p) have {n} invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
             sliding_r[invalid_fits] = global_r
             sliding_p[invalid_fits] = global_p
         
         del invalid_fits
         gc.collect()
         # Strip masks to free some memory
+        resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, sliding_r.mask, sliding_p.mask])
         sliding_r = sliding_r[~resulting_mask].compressed()
         sliding_p = sliding_p[~resulting_mask].compressed()
         agg_cutcounts = agg_cutcounts[~resulting_mask].compressed()
     
         neglog_pvals = np.full(self.chrom_size, np.nan, dtype=np.float16)
         neglog_pvals[~resulting_mask] = negbin_neglog10pvalue(agg_cutcounts, sliding_r, sliding_p)
-        if np.isnan(neglog_pvals[~resulting_mask]).any():
-            ns = np.isnan(neglog_pvals[~resulting_mask])
-            r = ~(resulting_mask.copy())
-            r[~resulting_mask] = ns
-            np.savetxt(
-                f'{self.chrom_name}_positions_with_nan_pvals.txt', 
-                np.where(r)[0],
-                fmt='%d'
-            )
-            raise ValueError(f"{len(r)} NaN p-values found for {self.chrom_name}. Debug me more")
         del sliding_r, sliding_p, agg_cutcounts, resulting_mask
         gc.collect()
 
@@ -593,7 +597,6 @@ class ChromosomeProcessor:
         del neglog_pvals
         gc.collect()
 
-        rmsea_global = calc_rmsea(n_obs, unique_cutcounts, global_r, global_p, tr=outliers_tr)
         epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
         params_df = pd.DataFrame({
             'unique_cutcounts': unique_cutcounts,
@@ -722,6 +725,7 @@ class ChromosomeProcessor:
         agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
         has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.gp.nonzero_windows_to_fit
         if not has_enough_background:
+            self.gp.logger.warning(f"Not enough background signal for global fit of {self.chrom_name}. Skipping...")
             raise NoContigPresentError
         
         bg_sum = np.sum(agg_cutcounts)
