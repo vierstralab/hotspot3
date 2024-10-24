@@ -116,6 +116,8 @@ class GenomeProcessor:
         self.chrom_sizes = chrom_sizes
         if chromosomes is not None:
             self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
+        
+        self.logger.debug(f"Chromosomes to process: {self.chrom_sizes.keys()}")
         self.mappable_bases_file = mappable_bases_file
         self.tmp_dir = tmp_dir
         
@@ -504,9 +506,11 @@ class ChromosomeProcessor:
             sliding_mean,
             sliding_variance,
         )
-        # For invalid windows, revert to global model
-        sliding_p[~window_has_enough_background] = global_p
-        sliding_r[~window_has_enough_background] = global_r
+        reverted_to_global = np.sum(~window_has_enough_background)
+        if reverted_to_global > 0:
+            self.gp.logger.debug(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
+            sliding_p[~window_has_enough_background] = global_p
+            sliding_r[~window_has_enough_background] = global_r
         del window_has_enough_background
         
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")
