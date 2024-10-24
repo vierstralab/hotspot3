@@ -117,7 +117,8 @@ class GenomeProcessor:
         if chromosomes is not None:
             self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
         
-        self.logger.debug(f"Chromosomes to process: {self.chrom_sizes.keys()}")
+        chroms = [x for x in self.chrom_sizes.keys()]
+        self.logger.debug(f"Chromosomes to process: {chroms}")
         self.mappable_bases_file = mappable_bases_file
         self.tmp_dir = tmp_dir
         
