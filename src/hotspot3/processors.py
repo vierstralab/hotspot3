@@ -496,7 +496,6 @@ class ChromosomeProcessor:
             dtype=np.float32, 
             position_skip_mask=high_signal_mask
         ) / bg_sum_mappable > self.gp.nonzero_windows_to_fit
-        window_has_enough_background = window_has_enough_background.filled(False)
 
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
@@ -507,7 +506,8 @@ class ChromosomeProcessor:
             sliding_mean,
             sliding_variance,
         )
-        reverted_to_global = np.sum(~window_has_enough_background)
+        reverted_to_global = ma.sum(~window_has_enough_background)
+        window_has_enough_background = window_has_enough_background.filled(False)
         if reverted_to_global > 0:
             self.gp.logger.debug(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
             sliding_p[~window_has_enough_background] = global_p
