@@ -21,12 +21,9 @@ from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compr
 from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
 
 from hotspot3.logging import setup_logger
+from hotspot3.file_extractors import ChromosomeExtractor
 
-from genome_tools.genomic_interval import GenomicInterval
-from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
-
-
-counts_dtype = np.int32
+from genome_tools.data.extractors import ChromParquetExtractor
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -218,7 +215,7 @@ class GenomeProcessor:
         not_nan = ~np.isnan(log_pval)
         log_pval = log_pval[not_nan]
 
-        result[not_nan] = logfdr_from_logpvals(log_pval, method=self.fdr_method)
+        result[not_nan] = logfdr_from_logpvals(log_pval, method=self.config.fdr_method)
         del log_pval
         gc.collect()
         # Cast to neglog10
@@ -316,42 +313,7 @@ class ChromosomeProcessor:
         self.gp = genome_processor
         self.config = self.gp.config
         self.chrom_size = self.gp.chrom_sizes[chrom_name]
-        self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
-    
-    def extract_mappable_bases(self) -> ma.MaskedArray:
-        """
-        Extract mappable bases for the chromosome.
-        """
-        mappable_file = self.gp.mappable_bases_file
-        if mappable_file is None:
-            mappable = np.ones(self.chrom_size, dtype=bool)
-        else:
-            mappable = np.zeros(self.chrom_size, dtype=bool)
-            try:
-                with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
-                    for _, row in mappable_loader[self.genomic_interval].iterrows():
-                        if row['end'] > self.genomic_interval.end:
-                            raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end} for {self.chrom_name}")
-                        mappable[row['start']:row['end']] = True
-            except ValueError:
-                raise NoContigPresentError
-        
-        self.gp.logger.debug(f"Chromosome {self.chrom_name} mappable bases extracted. {np.sum(mappable)}/{self.chrom_size} are mappable")
-        return ma.masked_where(~mappable, mappable)
-
-    
-    def extract_cutcounts(self, cutcounts_file):
-        cutcounts = np.zeros(self.chrom_size, dtype=counts_dtype)
-        self.gp.logger.debug(f'Extracting cutcounts for chromosome {self.chrom_name}')
-        try:
-            with TabixExtractor(cutcounts_file) as cutcounts_loader:
-                data = cutcounts_loader[self.genomic_interval]
-                assert data.eval('end - start == 1').all(), "Cutcounts are expected to be at basepair resolution"
-                cutcounts[data['start']] = data['count'].to_numpy()
-        except ValueError:
-            raise NoContigPresentError
-
-        return cutcounts
+        self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size)
 
 
     def infer_potential_peaks_mask(self, agg_cutcounts):
@@ -375,12 +337,12 @@ class ChromosomeProcessor:
     def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
         write_debug_stats = write_debug_stats or self.config.save_debug
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        cutcounts = self.extract_cutcounts(cutcounts_file)
+        cutcounts = self.extractor.extract_cutcounts(cutcounts_file)
         agg_cutcounts = self.smooth_counts(cutcounts, self.config.window, dtype=np.float32)
         del cutcounts
         gc.collect()
 
-        mappable_bases = self.extract_mappable_bases()
+        mappable_bases = self.extractor.extract_mappable_bases(self.gp.mappable_bases_file)
         agg_cutcounts = np.ma.masked_where(mappable_bases.mask, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
@@ -545,7 +507,7 @@ class ChromosomeProcessor:
         """
         Run MODWT smoothing on cutcounts.
         """
-        cutcounts = self.extract_cutcounts(cutcounts_path)
+        cutcounts = self.extractor.extract_cutcounts(cutcounts_path)
         agg_counts = self.smooth_counts(cutcounts, self.config.window, dtype=np.float32).filled(0)
         filters = 'haar'
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.config.modwt_level}) for {self.chrom_name}")
@@ -559,7 +521,7 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
-        log10_fdrs = self.read_fdr_path(fdr_path)
+        log10_fdrs = self.extractor.extract_fdr_track(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
         smoothed_signif = nan_moving_sum(signif_fdrs, window=self.config.window, dtype=np.int16)
@@ -584,15 +546,12 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def call_variable_width_peaks(self, smoothed_signal_path, fdr_path, fdr_threshold) -> ProcessorOutputData:
-        with ChromParquetExtractor(
+        signal_df = self.extractor.extract_from_parquet(
             smoothed_signal_path,
             columns=['smoothed', 'normalized_density']
-        ) as smoothed_signal_loader:
-            signal_df = smoothed_signal_loader[self.genomic_interval]
-        if signal_df.empty:
-            raise NoContigPresentError
-        
-        signif_fdrs = self.read_fdr_path(fdr_path) >= -np.log10(fdr_threshold)
+        )
+
+        signif_fdrs = self.extractor.extract_fdr_track(fdr_path) >= -np.log10(fdr_threshold)
         starts, ends = find_stretches(signif_fdrs)
         if len(starts) == 0:
             self.gp.logger.warning(f"No peaks found for {self.chrom_name}. Skipping...")
@@ -618,14 +577,6 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{len(peaks_df)} peaks called for {self.chrom_name}")
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
-
-
-    def read_fdr_path(self, fdr_path):
-        with ChromParquetExtractor(fdr_path, columns=['log10_fdr']) as fdr_loader:
-            log10_fdrs = fdr_loader[self.genomic_interval]['log10_fdr'].to_numpy()
-        if log10_fdrs.size == 0:
-            raise NoContigPresentError
-        return log10_fdrs
 
 
     def fit_windowed_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask):
@@ -701,18 +652,16 @@ class ChromosomeProcessor:
     @ensure_contig_exists
     def total_cutcounts(self, cutcounts):
         self.gp.logger.debug(f"Calculating total cutcounts for {self.chrom_name}")
-        return self.extract_cutcounts(cutcounts).sum()
+        return self.extractor.extract_cutcounts(cutcounts).sum()
 
 
     @ensure_contig_exists
     def extract_density(self, smoothed_signal) -> ProcessorOutputData:
-        with ChromParquetExtractor(
-            smoothed_signal,
+        data_df = self.extractor.extract_from_parquet(
+            smoothed_signal, 
             columns=['chrom', 'normalized_density']
-        ) as smoothed_signal_loader:
-            data_df = smoothed_signal_loader[self.genomic_interval].iloc[::self.config.density_step]
-        if data_df.empty:
-            raise NoContigPresentError
+        )
+        
         data_df['start'] = np.arange(len(data_df)) * self.config.density_step
         data_df.query('normalized_density > 0', inplace=True)
         return ProcessorOutputData(self.chrom_name, data_df)
