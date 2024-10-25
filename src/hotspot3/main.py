@@ -14,7 +14,7 @@ def main() -> None:
     chrom_sizes = read_chrom_sizes(args.chrom_sizes)
     config = ProcessorConfig(
         window=args.window,
-        background_window=args.background_window,
+        bg_window=args.background_window,
         signal_quantile=args.signal_quantile,
         save_debug=args.debug,
         cpus=args.cpus,
