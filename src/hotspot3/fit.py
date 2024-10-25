@@ -10,7 +10,7 @@ class BackgroundFit:
 
     Contains methods to get negbin parameters from cutcounts and to calculate RMSEA
     """
-    def __init__(self, config: ProcessorConfig):
+    def __init__(self, config: ProcessorConfig=None):
         if config is None:
             config = ProcessorConfig()
         self.config = config
