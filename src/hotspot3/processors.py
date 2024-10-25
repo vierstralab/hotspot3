@@ -516,7 +516,7 @@ class ChromosomeProcessor:
         log10_fdrs = self.extractor.extract_fdr_track(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
-        smoothed_signif = nan_moving_sum(signif_fdrs, window=self.config.window, dtype=np.int16)
+        smoothed_signif = nan_moving_sum(signif_fdrs, window=self.config.window, dtype=np.float16)
         smoothed_signif = smoothed_signif.filled(0)
         region_starts, region_ends = find_stretches(smoothed_signif > 0)
 
