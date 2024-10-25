@@ -86,7 +86,8 @@ class GenomeProcessor:
             setattr(self, name, value)
         self.logger = self.set_logger()
 
-    def set_logger(self) -> logging.Logger:
+    @property
+    def logger(self) -> logging.Logger:
         if not hasattr(self, 'logger'):
             return setup_logger(level=self.config.logger_level)
         else:
