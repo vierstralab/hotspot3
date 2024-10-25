@@ -58,7 +58,6 @@ class GenomeProcessor:
         if config is None:
             config = ProcessorConfig()
         self.config = config
-        self.logger = self.set_logger()
         self.chrom_sizes = chrom_sizes
         if chromosomes is not None:
             self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
@@ -84,7 +83,6 @@ class GenomeProcessor:
     def __setstate__(self, state):
         for name, value in state.items():
             setattr(self, name, value)
-        self.logger = self.set_logger()
 
     @property
     def logger(self) -> logging.Logger:
@@ -155,13 +153,11 @@ class GenomeProcessor:
                         if result is not None:
                             results.append(result)
                 except Exception as e:
-                    self.set_logger()
                     self.logger.critical(f"Exception occured, gracefully shutting down executor...")
                     self.logger.critical(e)
                     #exit(143)
                     raise e
 
-        self.set_logger() # Restore logger after parallel execution
         self.logger.debug(f'Results of {func.__name__} emitted.')
         return results
 
