@@ -18,13 +18,13 @@ class BackgroundFit:
     @wrap_masked
     def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
-            p = np.asarray(1 - mean / var, dtype=np.float32)
+            p = np.array(1 - mean / var, dtype=np.float32)
         return p
     
     @wrap_masked
     def r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
-            r = np.asarray(mean ** 2 / (var - mean), dtype=np.float32)
+            r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, r, p, tr):
@@ -39,8 +39,8 @@ class BackgroundFit:
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, agg_cutcounts: ma.MaskedArray, tr: int) -> FitResults:
         mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
-        p = self.p_from_mean_and_var([mean], [var])
-        r = self.r_from_mean_and_var([mean], [var])
+        p = self.p_from_mean_and_var(mean, var)
+        r = self.r_from_mean_and_var(mean, var)
         unique, counts = np.unique(agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
         return FitResults(mean.squeeze(), var.squeeze(), p.squeeze(), r.squeeze(), rmsea.squeeze())
