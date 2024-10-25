@@ -517,7 +517,11 @@ class ChromosomeProcessor:
         log10_fdrs = self.extractor.extract_fdr_track(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
-        smoothed_signif = nan_moving_sum(signif_fdrs, window=self.config.window, dtype=np.float16)
+        smoothed_signif = nan_moving_sum(
+            signif_fdrs,
+            window=self.config.window,
+            dtype=np.float32
+        )
         smoothed_signif = smoothed_signif.filled(0)
         region_starts, region_ends = find_stretches(smoothed_signif > 0)
 
@@ -591,20 +595,6 @@ class ChromosomeProcessor:
 
         variance = (bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)
 
-        return mean, variance
-    
-    def fit_global_background_negbin_model(self, agg_cutcounts, total_mappable_bg, high_signal_mask):
-        agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
-        has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.config.nonzero_windows_to_fit
-        if not has_enough_background:
-            self.gp.logger.warning(f"Not enough background signal for global fit of {self.chrom_name}. Skipping...")
-            raise NoContigPresentError
-        
-        bg_sum = np.sum(agg_cutcounts)
-        bg_sum_sq = np.sum(agg_cutcounts ** 2)
-        # TODO: A little repetetive maybe fix later
-        mean = bg_sum / total_mappable_bg
-        variance = (bg_sum_sq - total_mappable_bg * (mean ** 2)) / (total_mappable_bg - 1)
         return mean, variance
     
     def smooth_counts(self, signal: np.ndarray, window: int, dtype=None, position_skip_mask: np.ndarray=None):

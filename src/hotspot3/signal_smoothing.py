@@ -103,6 +103,7 @@ def nan_moving_sum(array, window, dtype=None, position_skip_mask: np.ndarray=Non
 
     array = bn.move_sum(array, window)
     return ma.masked_where(mask, array)
+    
 
 
 def find_stretches(arr: np.ndarray):

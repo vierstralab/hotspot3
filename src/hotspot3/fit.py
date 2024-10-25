@@ -2,7 +2,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
-
+import bottleneck as bn
 
 class BackgroundFit:
     """
@@ -55,5 +55,25 @@ class GlobalBackgroundFit(BackgroundFit):
 
 
 class WindowBackgroundFit(BackgroundFit):
-    def fit():
-        ...
+    def fit(self, agg_cutcounts, tr) -> FitResults:
+        high_signal_mask = agg_cutcounts > tr
+        mask = agg_cutcounts.mask
+
+        mean, var = self.sliding_mean_and_variance(agg_cutcounts, high_signal_mask)
+
+        mean = bn.move_sum(array, window)
+
+        bg_sum_sq = self.smooth_counts(
+            agg_cutcounts ** 2,
+            self.config.bg_window,
+            position_skip_mask=high_signal_mask
+        )
+
+        variance = (bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)
+
+        return mean, variance
+
+    def sliding_mean_and_variance(self, array, window):
+        mean = bn.move_mean(array, window)
+        var = bn.move_var(array, window, ddof=1)
+        
