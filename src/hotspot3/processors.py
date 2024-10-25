@@ -343,8 +343,6 @@ class ChromosomeProcessor:
         total_bases_with_signal = w_fit.running_nansum(mappable_bases, self.config.bg_window)
         total_bases_with_signal = ma.masked_where(total_bases_with_signal < self.config.min_mappable, total_bases_with_signal)
 
-
-        
         cutcounts = self.extractor.extract_cutcounts(cutcounts_file)
         agg_cutcounts = w_fit.running_nansum(cutcounts, self.config.window)
         del cutcounts
@@ -374,7 +372,7 @@ class ChromosomeProcessor:
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
         low_signal = agg_cutcounts.copy()
-        low_signal = ma.masked_where(high_signal_mask, low_signal)
+        low_signal[high_signal_mask] = np.nan
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(low_signal.compressed(), outliers_tr)
@@ -390,7 +388,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"NB parameters are estimated for {sliding_p.count()}/{sliding_p.shape[0]} bases for {self.chrom_name}")
         
         if not write_debug_stats:
-            del bg_sum_mappable, high_signal_mask
+            del high_signal_mask
             gc.collect()
 
         if write_debug_stats:

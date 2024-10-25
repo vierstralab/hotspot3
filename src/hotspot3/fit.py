@@ -38,6 +38,7 @@ class BackgroundFit:
 
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, agg_cutcounts: ma.MaskedArray, tr: int) -> FitResults:
+        agg_cutcounts = ma.masked_invalid(agg_cutcounts).compressed()
         mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
