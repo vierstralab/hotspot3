@@ -6,6 +6,7 @@ import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
 from hotspot3.signal_smoothing import nan_moving_sum
 import itertools
+from hotspot3.utils import wrap_masked
 
 
 # Calculate p-values and FDR

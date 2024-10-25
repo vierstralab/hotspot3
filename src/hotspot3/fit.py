@@ -2,6 +2,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
+from hotspot3.utils import wrap_masked
 import bottleneck as bn
 
 
@@ -76,16 +77,8 @@ class WindowBackgroundFit(BackgroundFit):
     def running_nanmean(self, array, window):
         return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
     
-    # TODO create a wrapper to handle masked arrays
     def sliding_r(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
-        assert np.all(mean.mask == var.mask), 'Mean and variance masks do not match'
-        res_r = ma.masked_where(mean.mask, np.full(mean.shape, np.nan, dtype=np.float32))
-
-        res_r[~mean.mask] = self.r_from_mean_and_var(mean[~mean.mask], var[~mean.mask])
-        return res_r
+        return wrap_masked(self.r_from_mean_and_var, mean, var)
 
     def sliding_p(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
-        assert np.all(mean.mask == var.mask), 'Mean and variance masks do not match'
-        res_p = ma.masked_where(mean.mask, np.full(mean.shape, np.nan, dtype=np.float32))
-        res_p[~mean.mask] = self.p_from_mean_and_var(mean[~mean.mask], var[~mean.mask])
-        return res_p
+        return wrap_masked(self.p_from_mean_and_var, mean, var)

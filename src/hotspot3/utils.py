@@ -4,7 +4,7 @@ import numpy as np
 import shutil
 import pyBigWig
 import functools
-
+import numpy.ma as ma
 from hotspot3.models import NoContigPresentError
 
 
@@ -78,3 +78,26 @@ def delete_path(path):
             shutil.rmtree(path)
         else:
             os.remove(path)
+
+
+def wrap_masked(func, *args, **kwargs) -> ma.MaskedArray:
+    masked_arrays = [arg for arg in args if isinstance(arg, ma.MaskedArray)]
+    masked_arrays += [value for value in kwargs.values() if isinstance(value, ma.MaskedArray)]
+
+    if masked_arrays: # introduces overhead, maybe ignore this check
+        assert all(masked_arrays[0].shape == ma.shape for ma in masked_arrays), 'All masked arrays should have the same shape'
+        assert all(np.all(masked_arrays[0].mask == ma.mask) for ma in masked_arrays), 'All masked arrays should have the same mask'
+        mask = masked_arrays[0].mask
+    result = ma.masked_where(mask, np.full(mask.shape, np.nan, dtype=np.float32))
+    args = [compress_masked_arg(arg) for arg in args]
+    kwargs = {key: compress_masked_arg(value) for key, value in kwargs.items()}
+    result[~mask] = func(*args, **kwargs)
+    
+    return result
+
+
+def compress_masked_arg(arg):
+    if isinstance(arg, ma.MaskedArray):
+        return arg.compressed()
+    else:
+        return arg

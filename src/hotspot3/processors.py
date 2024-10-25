@@ -385,6 +385,8 @@ class ChromosomeProcessor:
             bg_sum_mappable,
             high_signal_mask,
         )
+        sliding_p = w_fit.sliding_p(sliding_mean, sliding_variance)
+        sliding_r = w_fit.sliding_r(sliding_mean, sliding_variance)
         
         # window_has_enough_background = w_fit.running_nanmean(
         #     (agg_cutcounts > 0).filled(np.nan),
