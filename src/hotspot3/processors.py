@@ -365,8 +365,8 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f"Calculating prop of mappable bases with signal higher than {outliers_tr} for {self.chrom_name}")
         w_fit = WindowBackgroundFit(self.config)
-        n_low_signal_bases = w_fit.running_nansum((low_signal > 0).astype(np.float32), self.config.bg_window)
-        total_bases = w_fit.running_nansum((agg_cutcounts > 0).astype(np.float32), self.config.bg_window)
+        n_low_signal_bases = w_fit.running_nansum(low_signal > 0, self.config.bg_window)
+        total_bases = w_fit.running_nansum(agg_cutcounts > 0, self.config.bg_window)
         frac_high_signal_bases = 1 - n_low_signal_bases / total_bases
 
         del mappable_bases
