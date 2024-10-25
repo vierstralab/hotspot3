@@ -22,7 +22,7 @@ from hotspot3.models import ProcessorOutputData, NoContigPresentError, Processor
 
 from hotspot3.logging import setup_logger
 from hotspot3.file_extractors import ChromosomeExtractor
-from hotspot3.fit import GlobalBackgroundFit
+from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -65,7 +65,7 @@ class GenomeProcessor:
         self.cpus = min(self.config.cpus, max(1, mp.cpu_count()))
 
         self.chromosome_processors = sorted(
-            [ChromosomeProcessor(self, chrom_name) for chrom_name in self.chrom_sizes.keys()],
+            [ChromosomeProcessor(self, chrom_name) for chrom_name in chroms],
             key=lambda x: x.chrom_size,
             reverse=True
         )
@@ -379,20 +379,26 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
+        w_fit = WindowBackgroundFit(self.config)
         sliding_mean, sliding_variance = self.fit_windowed_background_negbin_model(
             agg_cutcounts,
             bg_sum_mappable,
             high_signal_mask,
         )
+        
+        window_has_enough_background = w_fit.running_nanmean(
+            (agg_cutcounts > 0).filled(np.nan),
+            self.config.bg_window
+        )  > self.config.nonzero_windows_to_fit
 
         # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
-        window_has_enough_background = self.smooth_counts(
-            agg_cutcounts > 0, 
-            window=self.config.bg_window,
-            dtype=np.float32, 
-            position_skip_mask=high_signal_mask
-        ) / bg_sum_mappable > self.config.nonzero_windows_to_fit
-        window_has_enough_background = window_has_enough_background.filled(True)
+        # window_has_enough_background = self.smooth_counts(
+        #     agg_cutcounts > 0, 
+        #     window=self.config.bg_window,
+        #     dtype=np.float32, 
+        #     position_skip_mask=high_signal_mask
+        # ) / bg_sum_mappable
+        # window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
@@ -521,9 +527,8 @@ class ChromosomeProcessor:
             signif_fdrs,
             window=self.config.window,
             dtype=np.float32
-        )
-        smoothed_signif = smoothed_signif.filled(0)
-        region_starts, region_ends = find_stretches(smoothed_signif > 0)
+        ).filled(0) > 0
+        region_starts, region_ends = find_stretches(smoothed_signif)
 
         max_log10_fdrs = np.empty(region_ends.shape)
         for i in range(len(region_starts)):
