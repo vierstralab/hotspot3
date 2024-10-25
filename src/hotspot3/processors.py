@@ -374,7 +374,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts, outliers_tr)
-        global_mean, global_variance, global_p, global_r, rmsea_global = global_fit
+        global_p = global_fit.p
+        global_r = global_fit.r
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
@@ -397,7 +398,7 @@ class ChromosomeProcessor:
             gc.collect()
         
         # Calculate final model parameters
-        sliding_p, sliding_r = gf.p_and_r_from_mean_and_var(
+        sliding_p, sliding_r = g_fit.p_and_r_from_mean_and_var(
             sliding_mean,
             sliding_variance,
         )
@@ -484,9 +485,9 @@ class ChromosomeProcessor:
             'unique_cutcounts': unique_cutcounts,
             'count': n_obs,
             'outliers_tr': [outliers_tr] * len(unique_cutcounts),
-            'mean': [global_mean] * len(unique_cutcounts),
-            'variance': [global_variance] * len(unique_cutcounts),
-            'rmsea': [rmsea_global] * len(unique_cutcounts),
+            'mean': [global_fit.mean] * len(unique_cutcounts),
+            'variance': [global_fit.var] * len(unique_cutcounts),
+            'rmsea': [global_fit.rmsea] * len(unique_cutcounts),
             'epsilon': [epsilon_global] * len(unique_cutcounts),
             'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
         })
