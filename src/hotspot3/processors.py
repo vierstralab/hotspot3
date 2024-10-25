@@ -397,7 +397,7 @@ class ChromosomeProcessor:
             window=self.config.bg_window,
             dtype=np.float32, 
             position_skip_mask=high_signal_mask
-        ) / bg_sum_mappable
+        ) / bg_sum_mappable > self.config.nonzero_windows_to_fit
         window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
