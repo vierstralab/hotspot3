@@ -463,6 +463,14 @@ class ChromosomeProcessor:
         )
         bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
         total_mappable_bg = ma.sum(mappable_bases[~high_signal_mask])
+        bg_sum_mappable_high_signal = nan_moving_sum(
+                mappable_bases,
+                self.gp.bg_window,
+                position_skip_mask=~high_signal_mask,
+                dtype=np.float32
+            )
+        frac_high_signal_bases = bg_sum_mappable_high_signal / (bg_sum_mappable_high_signal + bg_sum_mappable)
+        del bg_sum_mappable_high_signal
         del mappable_bases
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
@@ -529,11 +537,6 @@ class ChromosomeProcessor:
             )
             
             epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(sliding_r, sliding_p, outliers_tr, step=step)
-            epsilon_obs = nan_moving_sum(
-                agg_cutcounts,
-                self.gp.bg_window,
-                position_skip_mask=~high_signal_mask,
-            ) / bg_sum_mappable
             del bg_sum_mappable
             gc.collect()
         else:
@@ -581,11 +584,11 @@ class ChromosomeProcessor:
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
                 'rmsea': rmsea.filled(np.nan).astype(np.float16),
-                'epsilon': epsilon.filled(np.nan).astype(np.float16),
+                'frac_high_signal_bases_exp': epsilon.filled(np.nan).astype(np.float16),
                 'epsilon_mu': epsilon_mu.filled(np.nan).astype(np.float16),
-                'epsilon_obs': epsilon_obs.filled(np.nan).astype(np.float16),
+                'frac_high_signal_bases_obs': frac_high_signal_bases.filled(np.nan).astype(np.float16),
             })
-            del sliding_mean, sliding_variance, rmsea, epsilon, epsilon_mu, epsilon_obs
+            del sliding_mean, sliding_variance, rmsea, epsilon, epsilon_mu, frac_high_signal_bases
             gc.collect()
 
         neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
