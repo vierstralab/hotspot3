@@ -22,7 +22,7 @@ from hotspot3.models import ProcessorOutputData, NoContigPresentError, Processor
 
 from hotspot3.logging import setup_logger
 from hotspot3.file_extractors import ChromosomeExtractor
-from hotspot3.src.hotspot3.fit import GlobalBackgroundFit
+from hotspot3.fit import GlobalBackgroundFit
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
