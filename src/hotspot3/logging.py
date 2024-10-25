@@ -3,9 +3,6 @@ import sys
 
 
 def setup_logger(name=None, level=None, outstream=None) -> logging.Logger:
-    if name is None:
-        name = __name__
-    
     if outstream is None:
         outstream = sys.stderr
 
