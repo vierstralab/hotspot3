@@ -36,20 +36,21 @@ class BackgroundFit:
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, agg_cutcounts: ma.MaskedArray, tr: int) -> FitResults:
         high_signal_mask = agg_cutcounts > tr
-        data = agg_cutcounts[~high_signal_mask]
+        data = agg_cutcounts[~high_signal_mask].compressed()
         mean, var = self.estimate_global_mean_and_var(data)
         p, r = self.p_and_r_from_mean_and_var(mean, var)
-        rmsea = self.calc_rmsea_for_tr(data, r, p, tr)
+        unique, counts = np.unique(data, return_counts=True)
+        rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
         return FitResults(mean, var, p, r, rmsea)
         
 
-    def estimate_global_mean_and_var(self, agg_cutcounts: ma.MaskedArray):
-        has_enough_background = ma.sum(agg_cutcounts > 0) / agg_cutcounts.count() > self.config.nonzero_windows_to_fit
+    def estimate_global_mean_and_var(self, agg_cutcounts:np.ndarray):
+        has_enough_background = np.count_nonzero(agg_cutcounts) / agg_cutcounts.size > self.config.nonzero_windows_to_fit
         if not has_enough_background:
             raise NoContigPresentError
         
-        mean = ma.mean(agg_cutcounts)
-        variance = ma.var(agg_cutcounts, ddof=1)
+        mean = np.mean(agg_cutcounts)
+        variance = np.var(agg_cutcounts, ddof=1)
         return mean, variance
 
 
