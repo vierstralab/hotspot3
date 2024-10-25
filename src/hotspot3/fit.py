@@ -70,3 +70,10 @@ class WindowBackgroundFit(BackgroundFit):
     
     def running_nanmean(self, array, window):
         return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
+    
+
+    def p_and_r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
+        with np.errstate(divide='ignore', invalid='ignore'):
+            r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
+            p = ma.asarray(1 - mean / var, dtype=np.float32)
+        return p, r
