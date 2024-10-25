@@ -86,10 +86,8 @@ class GenomeProcessor:
 
     @property
     def logger(self) -> logging.Logger:
-        if not hasattr(self, 'logger'):
-            return setup_logger(level=self.config.logger_level)
-        else:
-            return self.logger
+        return setup_logger(level=self.config.logger_level)
+
 
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
