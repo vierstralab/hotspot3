@@ -476,6 +476,7 @@ class ChromosomeProcessor:
             'epsilon': [epsilon_global] * len(unique_cutcounts),
             'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
         })
+        print(params_df)
         self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         self.to_parquet(params_df, params_outpath)
     
