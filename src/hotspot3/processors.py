@@ -397,7 +397,7 @@ class ChromosomeProcessor:
             step = 20
             rmsea = calc_rmsea_all_windows(
                 sliding_r, sliding_p, outliers_tr,
-                bg_sum_mappable,
+                low_sig_mappable_bases,
                 agg_cutcounts,
                 self.config.bg_window,
                 position_skip_mask=high_signal_mask,
@@ -412,7 +412,7 @@ class ChromosomeProcessor:
                 step=step
             )
 
-            del bg_sum_mappable
+            del low_sig_mappable_bases
             gc.collect()
         else:
             del sliding_mean, sliding_variance
