@@ -219,6 +219,10 @@ def cast_to_original_shape(data, original_shape, original_mask, step):
 
 
 def calc_epsilon_and_epsilon_mu(r, p, tr, step=None): # Can rewrite for code clarity
+    if len(r.shape) == 0:
+        eps = betainc(tr, r, p)
+        eps_mu = eps * ((tr * (1 - p) / p + 1) / r - 1)
+        return eps, eps_mu
     r = ma.masked_invalid(r)
     p = ma.masked_invalid(p)
     original_shape = r.shape
@@ -236,8 +240,6 @@ def calc_epsilon_and_epsilon_mu(r, p, tr, step=None): # Can rewrite for code cla
     eps_mu = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
     eps_mu[valid_mask] = eps[valid_mask] * ((tr * (1 - p[valid_mask]) / p[valid_mask] + 1) / r[valid_mask] - 1)
 
-    if len(original_shape) == 0:
-        return eps.compressed()[0], eps_mu.compressed()[0]
     return (
         cast_to_original_shape(eps, original_shape, original_mask, step),
         cast_to_original_shape(eps_mu, original_shape, original_mask, step)
