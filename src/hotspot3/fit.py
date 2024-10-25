@@ -59,7 +59,6 @@ class GlobalBackgroundFit(BackgroundFit):
 class WindowBackgroundFit(BackgroundFit):
     def fit(self, agg_cutcounts, tr) -> FitResults:
         high_signal_mask = agg_cutcounts > tr
-        mask = agg_cutcounts.mask
 
         data = agg_cutcounts.filled(np.nan)
         data[high_signal_mask] = np.nan
@@ -67,13 +66,16 @@ class WindowBackgroundFit(BackgroundFit):
         p, r = self.p_and_r_from_mean_and_var(mean, var)
         
 
-    def sliding_mean_and_variance(self, array): # FIXME bottleneck returns dtype float64
+    def sliding_mean_and_variance(self, array: ma.MaskedArray):
         window = self.config.bg_window
 
-        mean = self.running_nanmean(array, window)
-        var = bn.move_var(array, window, ddof=1, min_count=self.config.min_mappable_bg)
+        mean = wrap_masked(self.running_nanmean, array, window)
+        var = wrap_masked(self.sliding_nanvar, array, window)
         return mean, var
     
+    def sliding_nanvar(self, array, window):
+        return bn.move_var(array, window, ddof=1, min_count=self.config.min_mappable_bg).astype(np.float32)
+
     def running_nanmean(self, array, window):
         return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
     

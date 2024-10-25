@@ -380,13 +380,13 @@ class ChromosomeProcessor:
 
         # Fit sliding window model
         w_fit = WindowBackgroundFit(self.config)
-        sliding_mean, sliding_variance = self.fit_windowed_background_negbin_model(
-            agg_cutcounts,
-            bg_sum_mappable,
-            high_signal_mask,
-        )
+
+        array = agg_cutcounts.copy()
+        array[high_signal_mask] = np.nan
+        sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(array)
         sliding_p = w_fit.sliding_p(sliding_mean, sliding_variance)
         sliding_r = w_fit.sliding_r(sliding_mean, sliding_variance)
+        self.gp.logger.debug(sliding_p.count(), sliding_p.shape)
         
         # window_has_enough_background = w_fit.running_nanmean(
         #     (agg_cutcounts > 0).filled(np.nan),
@@ -404,10 +404,6 @@ class ChromosomeProcessor:
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
-        
-        # Calculate final model parameters
-        sliding_p = w_fit.sliding_p(sliding_mean, sliding_variance)
-        sliding_r = w_fit.sliding_r(sliding_mean, sliding_variance)
 
         # reverted_to_global = np.sum(~window_has_enough_background)
         
@@ -438,7 +434,7 @@ class ChromosomeProcessor:
             del bg_sum_mappable
             gc.collect()
         else:
-            del sliding_mean, sliding_variance, window_has_enough_background
+            del sliding_mean, sliding_variance
             gc.collect()
         
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")        
