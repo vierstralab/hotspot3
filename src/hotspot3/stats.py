@@ -9,13 +9,6 @@ import itertools
 
 
 # Calculate p-values and FDR
-def p_and_r_from_mean_and_var(mean: np.ndarray, var: np.ndarray):
-    with np.errstate(divide='ignore', invalid='ignore'):
-        r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
-        p = ma.asarray(1 - mean / var, dtype=np.float32)
-    return p, r
-
-
 def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
     assert r.shape == p.shape, "r and p should have the same shape"
 
@@ -216,15 +209,6 @@ def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None):
     peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_regions)
     
     return peaks_in_hotspots_trimmed, threshold_heights
-
-
-def calc_rmsea(obs, unique_cutcounts, r, p, tr):
-    N = sum(obs)
-    exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
-    # chisq = sum((obs - exp) ** 2 / exp)
-    G_sq = 2 * sum(obs * np.log(obs / exp))
-    df = len(obs) - 2
-    return np.sqrt((G_sq / df - 1) / (N - 1))
 
 
 def cast_to_original_shape(data, original_shape, original_mask, step):

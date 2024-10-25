@@ -1,6 +1,7 @@
 import dataclasses
 import pandas as pd
 import logging
+import numpy as np
 
 @dataclasses.dataclass
 class ProcessorConfig:
@@ -48,6 +49,15 @@ class ProcessorOutputData:
     """
     identificator: str
     data_df: pd.DataFrame
+
+
+@dataclasses.dataclass
+class FitResults:
+    mean: np.ndarray
+    var: np.ndarray
+    p: np.ndarray
+    r: np.ndarray
+    rmsea: np.ndarray
 
 
 class NoContigPresentError(Exception):

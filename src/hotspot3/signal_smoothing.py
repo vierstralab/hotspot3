@@ -2,6 +2,7 @@ import numpy as np
 import numpy.ma as ma
 from scipy.signal import convolve
 import pywt
+import bottleneck as bn
 
 
 def convolve1d_fast(arr, ker, mode='wrap', origin=0):
@@ -95,13 +96,12 @@ def nan_moving_sum(array, window, dtype=None, position_skip_mask: np.ndarray=Non
         array = ma.asarray(array, dtype=dtype)
     mask = array.mask
 
-    array = array.filled(0)
+    array = array.filled(np.nan)
     if position_skip_mask is not None:
         assert position_skip_mask.shape == array.shape, "position_skip_mask should have the same shape as data"
         array[position_skip_mask] = 0
 
-    conv_arr = np.ones(window, dtype=dtype)
-    array = convolve(array, conv_arr, mode='same')
+    array = bn.move_sum(array, window)
     return ma.masked_where(mask, array)
 
 

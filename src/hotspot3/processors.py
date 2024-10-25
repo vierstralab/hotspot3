@@ -14,7 +14,7 @@ import importlib.resources as pkg_resources
 from functools import reduce
 from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretches
 
-from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
+from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, find_varwidth_peaks, calc_rmsea_all_windows, calc_epsilon_and_epsilon_mu
 
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
 
@@ -22,8 +22,7 @@ from hotspot3.models import ProcessorOutputData, NoContigPresentError, Processor
 
 from hotspot3.logging import setup_logger
 from hotspot3.file_extractors import ChromosomeExtractor
-
-from genome_tools.data.extractors import ChromParquetExtractor
+from hotspot3.src.hotspot3.fit import GlobalBackgroundFit
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -297,11 +296,10 @@ class GenomeProcessor:
             smoothed_signal
         )
         density_data = self.merge_and_add_chromosome(density_data).data_df
-        density_data['end'] = density_data['start'] + self.density_step
+        density_data['end'] = density_data['start'] + self.config.density_step
         self.logger.debug(f"Converting density to bigwig")
         df_to_bigwig(density_data, density_path, self.chrom_sizes, col='normalized_density')
         
-
 
 class ChromosomeProcessor:
     """
@@ -361,7 +359,6 @@ class ChromosomeProcessor:
             dtype=np.int32
         )
         bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.config.min_mappable_bg)
-        total_mappable_bg = ma.sum(mappable_bases[~high_signal_mask])
         bg_sum_mappable_high_signal = nan_moving_sum(
                 mappable_bases,
                 self.config.bg_window,
@@ -369,20 +366,15 @@ class ChromosomeProcessor:
                 dtype=np.float32
             )
         frac_high_signal_bases = bg_sum_mappable_high_signal / (bg_sum_mappable_high_signal + bg_sum_mappable)
-        del bg_sum_mappable_high_signal
-        del mappable_bases
+
+        del bg_sum_mappable_high_signal, mappable_bases
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
-        global_mean, global_variance = self.fit_global_background_negbin_model(
-            agg_cutcounts,
-            total_mappable_bg,
-            high_signal_mask,
-        )
-
-        global_p, global_r = p_and_r_from_mean_and_var(global_mean, global_variance)
-        rmsea_global = calc_rmsea(n_obs, unique_cutcounts, global_r, global_p, tr=outliers_tr)
+        g_fit = GlobalBackgroundFit(self.config)
+        global_fit = g_fit.fit(agg_cutcounts, outliers_tr)
+        global_mean, global_variance, global_p, global_r, rmsea_global = global_fit
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
@@ -405,7 +397,7 @@ class ChromosomeProcessor:
             gc.collect()
         
         # Calculate final model parameters
-        sliding_p, sliding_r = p_and_r_from_mean_and_var(
+        sliding_p, sliding_r = gf.p_and_r_from_mean_and_var(
             sliding_mean,
             sliding_variance,
         )
