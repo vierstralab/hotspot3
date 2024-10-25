@@ -43,7 +43,7 @@ class GlobalBackgroundFit(BackgroundFit):
         r = self.r_from_mean_and_var(mean, var)
         unique, counts = np.unique(agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
-        return FitResults(mean, var, p, r, rmsea)
+        return FitResults(mean.squeeze(), var.squeeze(), p.squeeze(), r.squeeze(), rmsea.squeeze())
         
 
     def estimate_global_mean_and_var(self, agg_cutcounts:np.ndarray):
