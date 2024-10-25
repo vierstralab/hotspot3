@@ -39,8 +39,8 @@ class BackgroundFit:
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, agg_cutcounts: ma.MaskedArray, tr: int) -> FitResults:
         mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
-        p = self.p_from_mean_and_var(mean, var)
-        r = self.r_from_mean_and_var(mean, var)
+        p = self.p_from_mean_and_var([mean], [var])
+        r = self.r_from_mean_and_var([mean], [var])
         unique, counts = np.unique(agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
         return FitResults(mean.squeeze(), var.squeeze(), p.squeeze(), r.squeeze(), rmsea.squeeze())
