@@ -79,13 +79,13 @@ class WindowBackgroundFit(BackgroundFit):
     # TODO create a wrapper to handle masked arrays
     def sliding_r(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
         assert np.all(mean.mask == var.mask), 'Mean and variance masks do not match'
-        res_r = ma.masked_where(mean.mask, np.full(mean.shape, np.nan), dtype=np.float32)
+        res_r = ma.masked_where(mean.mask, np.full(mean.shape, np.nan, dtype=np.float32))
 
         res_r[~mean.mask] = self.r_from_mean_and_var(mean[~mean.mask], var[~mean.mask])
         return res_r
 
     def sliding_p(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
         assert np.all(mean.mask == var.mask), 'Mean and variance masks do not match'
-        res_p = ma.masked_where(mean.mask, np.full(mean.shape, np.nan), dtype=np.float32)
+        res_p = ma.masked_where(mean.mask, np.full(mean.shape, np.nan, dtype=np.float32))
         res_p[~mean.mask] = self.p_from_mean_and_var(mean[~mean.mask], var[~mean.mask])
         return res_p
