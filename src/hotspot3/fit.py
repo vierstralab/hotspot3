@@ -86,7 +86,7 @@ class WindowBackgroundFit(BackgroundFit):
     
     @wrap_masked
     def running_nansum(self, array, window):
-        print(array.dtype)
+        print(array)
         array = np.asarray(array, np.float32)
         return bn.move_sum(array, window, min_count=2).astype(np.float32)
     
