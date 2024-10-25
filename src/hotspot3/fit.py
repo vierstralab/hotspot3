@@ -18,9 +18,6 @@ class BackgroundFit:
     def fit(self) -> FitResults:
         raise NotImplementedError
 
-    def fit_windowed_model(self):
-        ...
-    
     def p_and_r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
             r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
@@ -37,7 +34,6 @@ class BackgroundFit:
 
 
 class GlobalBackgroundFit(BackgroundFit):
-
     def fit(self, agg_cutcounts: ma.MaskedArray, tr: int) -> FitResults:
         high_signal_mask = agg_cutcounts > tr
         data = agg_cutcounts[~high_signal_mask]
@@ -55,3 +51,8 @@ class GlobalBackgroundFit(BackgroundFit):
         mean = ma.mean(agg_cutcounts)
         variance = ma.var(agg_cutcounts, mean=mean, ddof=1)
         return mean, variance
+
+
+class WindowBackgroundFit(BackgroundFit):
+    def fit():
+        ...

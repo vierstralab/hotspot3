@@ -356,7 +356,7 @@ class ChromosomeProcessor:
             mappable_bases,
             self.config.bg_window,
             position_skip_mask=high_signal_mask,
-            dtype=np.int32
+            dtype=np.float32
         )
         bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.config.min_mappable_bg)
         bg_sum_mappable_high_signal = nan_moving_sum(
