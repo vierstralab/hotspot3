@@ -2,12 +2,11 @@ import pandas as pd
 import os
 import numpy as np
 import shutil
-import logging
-import sys
 import pyBigWig
 import functools
 
 from hotspot3.models import NoContigPresentError
+
 
 def ensure_contig_exists(func):
     """
@@ -23,7 +22,6 @@ def ensure_contig_exists(func):
         except NoContigPresentError:
             return None
     return wrapper
-
 
 
 def is_iterable(obj):

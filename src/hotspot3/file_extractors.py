@@ -52,7 +52,7 @@ class ChromosomeExtractor:
             columns=columns
         ) as smoothed_signal_loader:
             signal_df = smoothed_signal_loader[self.genomic_interval]
-        if signal_df.size:
+        if signal_df.empty:
             raise NoContigPresentError
         return signal_df
 
