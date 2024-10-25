@@ -338,7 +338,9 @@ class ChromosomeProcessor:
         
         w_fit = WindowBackgroundFit(self.config)
 
-        mappable_bases = self.extractor.extract_mappable_bases(self.gp.mappable_bases_file)
+        mappable_bases = self.extractor.extract_mappable_bases(
+            self.gp.mappable_bases_file
+        )
         
         total_bases_with_signal = w_fit.running_nansum(mappable_bases, self.config.bg_window)
         total_bases_with_signal = ma.masked_where(total_bases_with_signal < self.config.min_mappable, total_bases_with_signal)
