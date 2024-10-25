@@ -404,7 +404,7 @@ class ChromosomeProcessor:
             gc.collect()
         
         # Calculate final model parameters
-        sliding_p, sliding_r = g_fit.p_and_r_from_mean_and_var(
+        sliding_p, sliding_r = w_fit.p_and_r_from_mean_and_var(
             sliding_mean,
             sliding_variance,
         )
