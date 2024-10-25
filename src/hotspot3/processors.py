@@ -385,8 +385,8 @@ class ChromosomeProcessor:
         array = agg_cutcounts.copy()
         array[high_signal_mask] = np.nan
         sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(array)
-        sliding_p = w_fit.sliding_p(sliding_mean, sliding_variance)
-        sliding_r = w_fit.sliding_r(sliding_mean, sliding_variance)
+        sliding_p = w_fit.p_from_mean_and_var(sliding_mean, sliding_variance)
+        sliding_r = w_fit.r_from_mean_and_var(sliding_mean, sliding_variance)
         self.gp.logger.debug(f"{sliding_p.count()}/{sliding_p.shape[0]}")
         
         # window_has_enough_background = w_fit.running_nanmean(

@@ -80,21 +80,24 @@ def delete_path(path):
             os.remove(path)
 
 
-def wrap_masked(func, *args, **kwargs) -> ma.MaskedArray:
-    masked_arrays = [arg for arg in args if isinstance(arg, ma.MaskedArray)]
-    masked_arrays += [value for value in kwargs.values() if isinstance(value, ma.MaskedArray)]
+def wrap_masked(func) -> ma.MaskedArray:
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        masked_arrays = [arg for arg in args if isinstance(arg, ma.MaskedArray)]
+        masked_arrays += [value for value in kwargs.values() if isinstance(value, ma.MaskedArray)]
 
-    if len(masked_arrays) > 0: # introduces overhead, maybe ignore this check
-        assert all(masked_arrays[0].shape == ma.shape for ma in masked_arrays), 'All masked arrays should have the same shape'
-        assert all(np.all(masked_arrays[0].mask == ma.mask) for ma in masked_arrays), 'All masked arrays should have the same mask'
-        mask = masked_arrays[0].mask
-    else:
-        return func(*args, **kwargs)
-    args = [compress_masked_arg(arg) for arg in args]
-    kwargs = {key: compress_masked_arg(value) for key, value in kwargs.items()}
-    result = func(*args, **kwargs)
-    
-    return ma.masked_where(mask, result)
+        if len(masked_arrays) > 0: # introduces overhead, maybe ignore this check
+            assert all(masked_arrays[0].shape == ma.shape for ma in masked_arrays), 'All masked arrays should have the same shape'
+            assert all(np.all(masked_arrays[0].mask == ma.mask) for ma in masked_arrays), 'All masked arrays should have the same mask'
+            mask = masked_arrays[0].mask
+        else:
+            return func(*args, **kwargs)
+        args = [compress_masked_arg(arg) for arg in args]
+        kwargs = {key: compress_masked_arg(value) for key, value in kwargs.items()}
+        result = func(*args, **kwargs)
+        
+        return ma.masked_where(mask, result)
+    return wrapper
 
 
 def compress_masked_arg(arg):

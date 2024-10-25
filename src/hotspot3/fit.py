@@ -15,11 +15,13 @@ class BackgroundFit:
     def fit(self) -> FitResults:
         raise NotImplementedError
 
+    @wrap_masked
     def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
             p = np.asarray(1 - mean / var, dtype=np.float32)
         return p
     
+    @wrap_masked
     def r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
             r = np.asarray(mean ** 2 / (var - mean), dtype=np.float32)
@@ -63,26 +65,23 @@ class WindowBackgroundFit(BackgroundFit):
         data = agg_cutcounts.filled(np.nan)
         data[high_signal_mask] = np.nan
         mean, var = self.sliding_mean_and_variance(data)
-        p, r = self.p_and_r_from_mean_and_var(mean, var)
+        #p, r = self.p_and_r_from_mean_and_var(mean, var)
         
 
     def sliding_mean_and_variance(self, array: ma.MaskedArray):
         window = self.config.bg_window
 
-        mean = wrap_masked(self.running_nanmean, array, window)
-        var = wrap_masked(self.sliding_nanvar, array, window)
+        mean = self.running_nanmean(array, window)
+        var = self.sliding_nanvar(array, window)
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
         return mean, var
     
+    @wrap_masked
     def sliding_nanvar(self, array, window):
         return bn.move_var(array, window, ddof=1, min_count=self.config.min_mappable_bg).astype(np.float32)
 
+    @wrap_masked
     def running_nanmean(self, array, window):
         return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
     
-    def sliding_r(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
-        return wrap_masked(self.r_from_mean_and_var, mean, var)
-
-    def sliding_p(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
-        return wrap_masked(self.p_from_mean_and_var, mean, var)
