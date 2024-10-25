@@ -85,8 +85,8 @@ class WindowBackgroundFit(BackgroundFit):
         return bn.move_mean(array, window, min_count=10_000).astype(np.float32)
     
     @wrap_masked
-    def running_nansum(self, array, window):
-        print(array)
+    def running_nansum(self, array: np.array, window):
+        print(isinstance(array, ma.MaskedArray), isinstance(array, np.ndarray))
         array = np.asarray(array, np.float32)
         return bn.move_sum(array, window, min_count=2).astype(np.float32)
     
