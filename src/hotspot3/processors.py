@@ -386,19 +386,19 @@ class ChromosomeProcessor:
             high_signal_mask,
         )
         
-        window_has_enough_background = w_fit.running_nanmean(
-            (agg_cutcounts > 0).filled(np.nan),
-            self.config.bg_window
-        )  > self.config.nonzero_windows_to_fit
+        # window_has_enough_background = w_fit.running_nanmean(
+        #     (agg_cutcounts > 0).filled(np.nan),
+        #     self.config.bg_window
+        # )  > self.config.nonzero_windows_to_fit
 
         # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
-        # window_has_enough_background = self.smooth_counts(
-        #     agg_cutcounts > 0, 
-        #     window=self.config.bg_window,
-        #     dtype=np.float32, 
-        #     position_skip_mask=high_signal_mask
-        # ) / bg_sum_mappable
-        # window_has_enough_background = window_has_enough_background.filled(True)
+        window_has_enough_background = self.smooth_counts(
+            agg_cutcounts > 0, 
+            window=self.config.bg_window,
+            dtype=np.float32, 
+            position_skip_mask=high_signal_mask
+        ) / bg_sum_mappable
+        window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
