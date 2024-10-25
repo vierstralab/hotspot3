@@ -343,10 +343,7 @@ class ChromosomeProcessor:
         total_bases_with_signal = w_fit.running_nansum(mappable_bases, self.config.bg_window)
         total_bases_with_signal = ma.masked_where(total_bases_with_signal < self.config.min_mappable, total_bases_with_signal)
 
-        low_sig_mappable_bases = mappable_bases.copy()
-        low_sig_mappable_bases[high_signal_mask] = np.nan
-        low_sig_mappable_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
-        low_sig_mappable_bases = ma.masked_where(total_bases_with_signal.mask, low_sig_mappable_bases)
+
         
         cutcounts = self.extractor.extract_cutcounts(cutcounts_file)
         agg_cutcounts = w_fit.running_nansum(cutcounts, self.config.window)
@@ -357,6 +354,11 @@ class ChromosomeProcessor:
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
         high_signal_mask, outliers_tr = self.infer_potential_peaks_mask(agg_cutcounts)
+        
+        low_sig_mappable_bases = mappable_bases.copy()
+        low_sig_mappable_bases[high_signal_mask] = np.nan
+        low_sig_mappable_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
+        low_sig_mappable_bases = ma.masked_where(total_bases_with_signal.mask, low_sig_mappable_bases)
 
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
