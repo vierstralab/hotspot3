@@ -90,12 +90,11 @@ def wrap_masked(func, *args, **kwargs) -> ma.MaskedArray:
         mask = masked_arrays[0].mask
     else:
         return func(*args, **kwargs)
-    result = ma.masked_where(mask, np.full(mask.shape, np.nan, dtype=np.float32))
     args = [compress_masked_arg(arg) for arg in args]
     kwargs = {key: compress_masked_arg(value) for key, value in kwargs.items()}
     result = func(*args, **kwargs)
     
-    return result
+    return ma.masked_where(mask, result)
 
 
 def compress_masked_arg(arg):
