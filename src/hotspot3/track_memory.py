@@ -4,9 +4,9 @@ import subprocess
 import sys
 import os
 import threading
-
+import logging
 from hotspot3.main import parse_arguments
-
+from hotspot3.logging import setup_logger
 
 """
 This script is used to call main.py with memory tracking.
@@ -24,38 +24,36 @@ def format_memory(size_in_bytes):
 
 
 
-def track_memory(process, log_file, interval=2):
+def track_memory(process, logger: logging.Logger, interval=2):
     """Track memory usage of a subprocess and log it."""
     python_process = psutil.Process(process.pid)
-    with open(log_file, "w") as f:
-        f.write("timestamp\ttotal_memory_rss_bytes\ttotal_memory_rss_human\n")
+    logger.info("total_memory_rss_bytes\ttotal_memory_rss_human")
     
     while process.poll() is None:  # While the process is still running
-        with open(log_file, "a") as f:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            total_rss = python_process.memory_info().rss
-            for child in python_process.children(recursive=True):
-                if not child.is_running():
-                    continue
-                total_rss += child.memory_info().rss
+    
+        total_rss = python_process.memory_info().rss
+        for child in python_process.children(recursive=True):
+            if not child.is_running():
+                continue
+            total_rss += child.memory_info().rss
 
-            total_rss_human = format_memory(total_rss)
-            f.write(f"{timestamp}\t{total_rss}\t{total_rss_human}\n")
+        total_rss_human = format_memory(total_rss)
+        logger.info(f"{total_rss}\t{total_rss_human}")
         time.sleep(interval)
 
 
-def run_process_with_memory_tracking(cmd, log_file):
+def run_process_with_memory_tracking(cmd, logger: logging.Logger):
     """Run a subprocess and track its memory usage."""
     try:
         process = subprocess.Popen(cmd)  # Start the process
 
-        memory_thread = threading.Thread(target=track_memory, args=(process, log_file))
+        memory_thread = threading.Thread(target=track_memory, args=(process, logger))
         memory_thread.start()
         process.wait()
         memory_thread.join()
     except (psutil.NoSuchProcess, subprocess.SubprocessError, KeyboardInterrupt):
-        print("Process interrupted or failed. Terminating...")
-        exit(143)
+        logger.critical("Process interrupted or failed. Terminating...")
+        raise
     finally:
         if memory_thread.is_alive():
             memory_thread.join()
@@ -64,19 +62,19 @@ def run_process_with_memory_tracking(cmd, log_file):
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                print("Forcefully killing the subprocess...")
                 process.kill()
+                raise
+        
 
 
 def main():
-    args, _ = parse_arguments(" with memory tracking. Creates {args.id}.memory_usage.tsv in output folder.")
+    args, logger_level = parse_arguments(" with memory tracking. Creates {args.id}.memory_usage.tsv in output folder.")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cmd = ["python3", f"{script_dir}/main.py", *sys.argv[1:]]
 
     memory_log = f"{args.outdir}/{args.id}.memory_usage.tsv"
-    run_process_with_memory_tracking(cmd, memory_log)
-
-    print("Memory tracking finished.")
+    logger = setup_logger(level=logger_level, outstream=memory_log)
+    run_process_with_memory_tracking(cmd, logger)
 
 
 if __name__ == "__main__":

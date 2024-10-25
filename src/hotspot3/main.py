@@ -2,24 +2,30 @@ import logging
 import argparse
 from genome_tools.helpers import df_to_tabix
 import numpy as np
-from hotspot3.processors import GenomeProcessor, root_logger, set_logger_config
+from hotspot3.processors import GenomeProcessor
 from hotspot3.utils import read_chrom_sizes
+from hotspot3.models import ProcessorConfig
+from hotspot3.logging import setup_logger
 
 
 def main() -> None:
     args, logger_level = parse_arguments()
+    root_logger = setup_logger()
     chrom_sizes = read_chrom_sizes(args.chrom_sizes)
+    config = ProcessorConfig(
+        window=args.window,
+        background_window=args.background_window,
+        signal_quantile=args.signal_quantile,
+        save_debug=args.debug,
+        cpus=args.cpus,
+        logger_level=logger_level,
+    )
     genome_processor = GenomeProcessor(
         chrom_sizes=chrom_sizes,
         mappable_bases_file=args.mappable_bases,
         tmp_dir=args.tempdir,
-        cpus=args.cpus,
-        logger_level=logger_level,
-        save_debug=args.debug,
-        bg_window=args.background_window,
-        window=args.window,
         chromosomes=args.chromosomes,
-        signal_quantile=args.signal_quantile
+        config=config,
     )
     precomp_fdrs = args.fdrs_parquet
     cutcounts_path = args.cutcounts
@@ -143,7 +149,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
 
     args = parser.parse_args()
     logger_level = logging.DEBUG if args.debug else logging.INFO
-    set_logger_config(root_logger, logger_level)
+    root_logger = setup_logger(level=logger_level)
 
     
     if args.signal_parquet is not None and args.fdrs_parquet is not None:

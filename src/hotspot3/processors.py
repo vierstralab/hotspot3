@@ -9,8 +9,6 @@ from typing import Iterable
 import tempfile
 import shutil
 import os
-import functools
-import dataclasses
 import subprocess
 import importlib.resources as pkg_resources
 from functools import reduce
@@ -18,39 +16,17 @@ from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretch
 
 from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, find_varwidth_peaks, p_and_r_from_mean_and_var, calc_rmsea_all_windows, calc_rmsea, calc_epsilon_and_epsilon_mu
 
-from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, set_logger_config, df_to_bigwig, NoContigPresentError
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
+
+from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
+
+from hotspot3.logging import setup_logger
 
 from genome_tools.genomic_interval import GenomicInterval
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 
 
-root_logger = logging.getLogger(__name__)
 counts_dtype = np.int32
-
-
-@dataclasses.dataclass
-class ProcessorOutputData:
-    """
-    Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
-    """
-    identificator: str
-    data_df: pd.DataFrame
-
-
-def ensure_contig_exists(func):
-    """
-    Decorator for functions that require a contig to be present in the input data.
-
-    Returns None if the contig is not present.
-    Otherwise, returns the result of the function.
-    """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except NoContigPresentError:
-            return None
-    return wrapper
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -74,48 +50,15 @@ class GenomeProcessor:
         - chrom_sizes: Dictionary containing chromosome sizes.
         - mappable_bases_file: Path to the tabix-indexed file containing mappable bases or None.
         - tmp_dir: Temporary directory for intermediate files. Will use system default if None.
-
-        - window: Bandwidth for signal smoothing.
-        - min_mappable: Minimum number of mappable bases for a window to be tested.
-    
-        - bg_window: Window size for aggregating background cutcounts.
-        - min_mappable_bg: Minimum number of mappable bases for a window to be considered in background.
-
-        - density_step: Step size for extracting density.
-        - min_hotspot_width: Minimum width for a region to be called a hotspot.
-    
-        - signal_tr: Quantile threshold for outlier detection for background distribution fit.
-        - adaptive_signal_tr: Use adaptive signal threshold. Signal_tr is ignored if True.
-
-        - nonzero_window_fit: Minimum fraction of nonzero values in a background window to fit the model.
-        - fdr_method: Method for FDR calculation. 'bh and 'by' are supported. 'bh' (default) is tested.
-        - cpus: Number of CPUs to use. Won't use more than the number of chromosomes.
-
         - chromosomes: List of chromosomes to process or None. Used mostly for debugging. Will generate FDR corrections only for these chromosomes.
-        - save_debug: Save debug information.
-        - modwt_level: Level of MODWT decomposition. 7 is tested.
-        - logger_level: Logging level.
+
+        - config: ProcessorConfig object containing parameters.
     """
-    def __init__(
-            self, chrom_sizes,
-            mappable_bases_file=None,
-            tmp_dir=None,
-            window=151, min_mappable=76,
-            bg_window=50001, min_mappable_bg=10000,
-            density_step=20, 
-            signal_quantile=0.975,
-            adaptive_signal_tr=False,
-            nonzero_windows_to_fit = 0.01,
-            fdr_method='bh',
-            cpus=1,
-            chromosomes=None,
-            save_debug=False,
-            modwt_level=7,
-            logger_level=logging.INFO
-        ) -> None:
-        self.logger = root_logger
-        self.save_debug = save_debug
-        self.logger_level = logger_level
+    def __init__(self, chrom_sizes, config=None, mappable_bases_file=None, tmp_dir=None, chromosomes=None):
+        if config is None:
+            config = ProcessorConfig()
+        self.config = config
+        self.logger = self.set_logger()
         self.chrom_sizes = chrom_sizes
         if chromosomes is not None:
             self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
@@ -124,21 +67,7 @@ class GenomeProcessor:
         self.logger.debug(f"Chromosomes to process: {chroms}")
         self.mappable_bases_file = mappable_bases_file
         self.tmp_dir = tmp_dir
-        
-        self.window = window
-        self.min_mappable = min_mappable
-        self.nonzero_windows_to_fit = nonzero_windows_to_fit
-
-        self.bg_window = bg_window
-        self.min_mappable_bg = min_mappable_bg
-
-        self.density_step = density_step
-
-        self.cpus = min(cpus, max(1, mp.cpu_count()))
-        self.signal_tr = signal_quantile
-        self.fdr_method = fdr_method
-        self.modwt_level = modwt_level
-        self.adaptive_signal_tr = adaptive_signal_tr
+        self.cpus = min(self.config.cpus, max(1, mp.cpu_count()))
 
         self.chromosome_processors = sorted(
             [ChromosomeProcessor(self, chrom_name) for chrom_name in self.chrom_sizes.keys()],
@@ -146,23 +75,23 @@ class GenomeProcessor:
             reverse=True
         )
     
-    def __getstate__(self): # Exclude logger and chromosome_processors from pickling
+    def __getstate__(self):
         state = self.__dict__
         if 'logger' in state:
             del state['logger']
         return state
 
-    def set_logger(self):
-        if not hasattr(self, 'logger'):
-            self.logger = root_logger
-            set_logger_config(self.logger, self.logger_level)
-
     def __setstate__(self, state):
         for name, value in state.items():
             setattr(self, name, value)
-        self.set_logger()
-    
-    # Helper functions
+        self.logger = self.set_logger()
+
+    def set_logger(self) -> logging.Logger:
+        if not hasattr(self, 'logger'):
+            return setup_logger(level=self.config.logger_level)
+        else:
+            return self.logger
+
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
         results = sorted(results, key=lambda x: x.identificator)
@@ -390,6 +319,7 @@ class ChromosomeProcessor:
     def __init__(self, genome_processor: GenomeProcessor, chrom_name: str) -> None:
         self.chrom_name = chrom_name
         self.gp = genome_processor
+        self.config = self.gp.config
         self.chrom_size = self.gp.chrom_sizes[chrom_name]
         self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
     
@@ -430,8 +360,8 @@ class ChromosomeProcessor:
 
 
     def infer_potential_peaks_mask(self, agg_cutcounts):
-        if not self.gp.adaptive_signal_tr:
-            outliers_tr = np.quantile(agg_cutcounts.compressed(), self.gp.signal_tr).astype(int)
+        if not self.config.adaptive_signal_tr:
+            outliers_tr = np.quantile(agg_cutcounts.compressed(), self.config.signal_tr).astype(int)
         else:
             # use first threshold with rmsea < 0.05 as signal threshold
             raise NotImplementedError("Adaptive signal threshold is not implemented yet.")
@@ -448,10 +378,10 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
-        write_debug_stats = write_debug_stats or self.gp.save_debug
+        write_debug_stats = write_debug_stats or self.config.save_debug
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         cutcounts = self.extract_cutcounts(cutcounts_file)
-        agg_cutcounts = self.smooth_counts(cutcounts, self.gp.window, dtype=np.float32)
+        agg_cutcounts = self.smooth_counts(cutcounts, self.config.window, dtype=np.float32)
         del cutcounts
         gc.collect()
 
@@ -469,15 +399,15 @@ class ChromosomeProcessor:
 
         bg_sum_mappable = self.smooth_counts(
             mappable_bases,
-            self.gp.bg_window,
+            self.config.bg_window,
             position_skip_mask=high_signal_mask,
             dtype=np.int32
         )
-        bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.gp.min_mappable_bg)
+        bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.config.min_mappable_bg)
         total_mappable_bg = ma.sum(mappable_bases[~high_signal_mask])
         bg_sum_mappable_high_signal = nan_moving_sum(
                 mappable_bases,
-                self.gp.bg_window,
+                self.config.bg_window,
                 position_skip_mask=~high_signal_mask,
                 dtype=np.float32
             )
@@ -508,10 +438,10 @@ class ChromosomeProcessor:
         # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
         window_has_enough_background = self.smooth_counts(
             agg_cutcounts > 0, 
-            window=self.gp.bg_window,
+            window=self.config.bg_window,
             dtype=np.float32, 
             position_skip_mask=high_signal_mask
-        ) / bg_sum_mappable > self.gp.nonzero_windows_to_fit
+        ) / bg_sum_mappable > self.config.nonzero_windows_to_fit
         window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
@@ -536,24 +466,19 @@ class ChromosomeProcessor:
                 sliding_r, sliding_p, outliers_tr,
                 bg_sum_mappable,
                 agg_cutcounts,
-                self.gp.bg_window,
+                self.config.bg_window,
                 position_skip_mask=high_signal_mask,
                 dtype=np.float32,
                 step=step
             )
             
-            epsilon, epsilon_mu = calc_epsilon_and_epsilon_mu(
+            frac_high_signal_bases_exp, epsilon_mu = calc_epsilon_and_epsilon_mu(
                 sliding_r,
                 sliding_p,
                 outliers_tr,
                 step=step
             )
 
-            epsilon_obs = nan_moving_sum(
-                agg_cutcounts,
-                self.gp.bg_window,
-                position_skip_mask=~high_signal_mask,
-            ) / bg_sum_mappable
             del bg_sum_mappable
             gc.collect()
         else:
@@ -593,11 +518,11 @@ class ChromosomeProcessor:
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
                 'rmsea': rmsea.filled(np.nan).astype(np.float16),
-                'frac_high_signal_bases_exp': epsilon.filled(np.nan).astype(np.float16),
+                'frac_high_signal_bases_exp': frac_high_signal_bases_exp.filled(np.nan).astype(np.float16),
                 'epsilon_mu': epsilon_mu.filled(np.nan).astype(np.float16),
                 'frac_high_signal_bases_obs': frac_high_signal_bases.filled(np.nan).astype(np.float16),
             })
-            del sliding_mean, sliding_variance, rmsea, epsilon, epsilon_mu, frac_high_signal_bases
+            del sliding_mean, sliding_variance, rmsea, frac_high_signal_bases_exp, epsilon_mu, frac_high_signal_bases
             gc.collect()
 
         neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
@@ -626,10 +551,10 @@ class ChromosomeProcessor:
         Run MODWT smoothing on cutcounts.
         """
         cutcounts = self.extract_cutcounts(cutcounts_path)
-        agg_counts = self.smooth_counts(cutcounts, self.gp.window, dtype=np.float32).filled(0)
+        agg_counts = self.smooth_counts(cutcounts, self.config.window, dtype=np.float32).filled(0)
         filters = 'haar'
-        self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.gp.modwt_level}) for {self.chrom_name}")
-        smoothed = modwt_smooth(agg_counts, filters, level=self.gp.modwt_level)
+        self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.config.modwt_level}) for {self.chrom_name}")
+        smoothed = modwt_smooth(agg_counts, filters, level=self.config.modwt_level)
         data = pd.DataFrame({
             'smoothed': smoothed,
             'normalized_density': normalize_density(agg_counts, total_cutcounts) 
@@ -642,7 +567,7 @@ class ChromosomeProcessor:
         log10_fdrs = self.read_fdr_path(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
-        smoothed_signif = nan_moving_sum(signif_fdrs, window=self.gp.window, dtype=np.int16)
+        smoothed_signif = nan_moving_sum(signif_fdrs, window=self.config.window, dtype=np.int16)
         smoothed_signif = smoothed_signif.filled(0)
         region_starts, region_ends = find_stretches(smoothed_signif > 0)
 
@@ -711,7 +636,7 @@ class ChromosomeProcessor:
     def fit_windowed_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask):
         bg_sum = self.smooth_counts(
             agg_cutcounts,
-            self.gp.bg_window,
+            self.config.bg_window,
             position_skip_mask=high_signal_mask
         )
 
@@ -721,7 +646,7 @@ class ChromosomeProcessor:
 
         bg_sum_sq = self.smooth_counts(
             agg_cutcounts ** 2,
-            self.gp.bg_window,
+            self.config.bg_window,
             position_skip_mask=high_signal_mask
         )
 
@@ -731,7 +656,7 @@ class ChromosomeProcessor:
     
     def fit_global_background_negbin_model(self, agg_cutcounts, total_mappable_bg, high_signal_mask):
         agg_cutcounts = agg_cutcounts[~high_signal_mask].compressed()
-        has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.gp.nonzero_windows_to_fit
+        has_enough_background = ma.sum(agg_cutcounts > 0) / total_mappable_bg  > self.config.nonzero_windows_to_fit
         if not has_enough_background:
             self.gp.logger.warning(f"Not enough background signal for global fit of {self.chrom_name}. Skipping...")
             raise NoContigPresentError
@@ -790,10 +715,10 @@ class ChromosomeProcessor:
             smoothed_signal,
             columns=['chrom', 'normalized_density']
         ) as smoothed_signal_loader:
-            data_df = smoothed_signal_loader[self.genomic_interval].iloc[::self.gp.density_step]
+            data_df = smoothed_signal_loader[self.genomic_interval].iloc[::self.config.density_step]
         if data_df.empty:
             raise NoContigPresentError
-        data_df['start'] = np.arange(len(data_df)) * self.gp.density_step
+        data_df['start'] = np.arange(len(data_df)) * self.config.density_step
         data_df.query('normalized_density > 0', inplace=True)
         return ProcessorOutputData(self.chrom_name, data_df)
 

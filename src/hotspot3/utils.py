@@ -5,10 +5,25 @@ import shutil
 import logging
 import sys
 import pyBigWig
+import functools
 
+from hotspot3.models import NoContigPresentError
 
-class NoContigPresentError(Exception):
-    ...
+def ensure_contig_exists(func):
+    """
+    Decorator for functions that require a contig to be present in the input data.
+
+    Returns None if the contig is not present.
+    Otherwise, returns the result of the function.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except NoContigPresentError:
+            return None
+    return wrapper
+
 
 
 def is_iterable(obj):
@@ -19,16 +34,6 @@ def is_iterable(obj):
         return True
     except TypeError:
         return False
-    
-
-def set_logger_config(logger: logging.Logger, level: int):
-    logger.setLevel(level)
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setLevel(level)
-        formatter = logging.Formatter('%(asctime)s  %(levelname)s  %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
     
 
 def normalize_density(density, total_cutcounts):
