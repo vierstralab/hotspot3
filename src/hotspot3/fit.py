@@ -49,7 +49,7 @@ class GlobalBackgroundFit(BackgroundFit):
             raise NoContigPresentError
         
         mean = ma.mean(agg_cutcounts)
-        variance = ma.var(agg_cutcounts, mean=mean, ddof=1)
+        variance = ma.var(agg_cutcounts, ddof=1)
         return mean, variance
 
 
