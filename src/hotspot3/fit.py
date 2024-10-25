@@ -38,12 +38,10 @@ class BackgroundFit:
 
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, agg_cutcounts: ma.MaskedArray, tr: int) -> FitResults:
-        high_signal_mask = agg_cutcounts > tr
-        data = agg_cutcounts[~high_signal_mask].compressed()
-        mean, var = self.estimate_global_mean_and_var(data)
+        mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
-        unique, counts = np.unique(data, return_counts=True)
+        unique, counts = np.unique(agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
         return FitResults(mean, var, p, r, rmsea)
         
@@ -79,14 +77,14 @@ class WindowBackgroundFit(BackgroundFit):
     
     @wrap_masked
     def sliding_nanvar(self, array, window):
-        return bn.move_var(array, window, ddof=1, min_count=self.config.min_mappable_bg).astype(np.float32)
+        return bn.move_var(array, window, ddof=1, min_count=1).astype(np.float32)
 
     @wrap_masked
     def running_nanmean(self, array, window):
-        return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
+        return bn.move_mean(array, window, min_count=1).astype(np.float32)
     
     @wrap_masked
     def running_nansum(self, array, window):
-        array = array.astype(np.float32)
-        return bn.move_sum(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
+        array = np.asarray(array, np.float32)
+        return bn.move_sum(array, window, min_count=1).astype(np.float32)
     

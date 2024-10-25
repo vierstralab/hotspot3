@@ -335,13 +335,24 @@ class ChromosomeProcessor:
     def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
         write_debug_stats = write_debug_stats or self.config.save_debug
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
-        cutcounts = self.extractor.extract_cutcounts(cutcounts_file)
-        agg_cutcounts = self.smooth_counts(cutcounts, self.config.window, dtype=np.float32)
-        del cutcounts
-        gc.collect()
+        
+        w_fit = WindowBackgroundFit(self.config)
 
         mappable_bases = self.extractor.extract_mappable_bases(self.gp.mappable_bases_file)
-        agg_cutcounts = np.ma.masked_where(mappable_bases.mask, agg_cutcounts)
+        
+        total_bases_with_signal = w_fit.running_nansum(mappable_bases, self.config.bg_window)
+        total_bases_with_signal = ma.masked_where(total_bases_with_signal < self.config.min_mappable, total_bases_with_signal)
+
+        low_sig_mappable_bases = mappable_bases.copy()
+        low_sig_mappable_bases[high_signal_mask] = np.nan
+        low_sig_mappable_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
+        low_sig_mappable_bases = ma.masked_where(total_bases_with_signal.mask, low_sig_mappable_bases)
+        
+        cutcounts = self.extractor.extract_cutcounts(cutcounts_file)
+        agg_cutcounts = w_fit.running_nansum(cutcounts, self.config.window)
+        del cutcounts
+        gc.collect()
+        agg_cutcounts = np.ma.masked_where(total_bases_with_signal.mask, agg_cutcounts)
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
 
@@ -352,41 +363,25 @@ class ChromosomeProcessor:
             return_counts=True
         )
 
-        bg_sum_mappable = self.smooth_counts(
-            mappable_bases,
-            self.config.bg_window,
-            position_skip_mask=high_signal_mask,
-            dtype=np.float32
-        )
-        bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.config.min_mappable_bg)
-
-        low_signal = agg_cutcounts.copy()
-        low_signal[high_signal_mask] = np.nan
-
-        low_sig_mappable_bases = mappable_bases.copy()
-        low_sig_mappable_bases[high_signal_mask] = np.nan
-
         self.gp.logger.debug(f"Calculating prop of mappable bases with signal higher than {outliers_tr} for {self.chrom_name}")
-        w_fit = WindowBackgroundFit(self.config)
 
-        n_low_signal_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
-        total_bases_with_signal = w_fit.running_nansum(mappable_bases, self.config.bg_window)
-        frac_high_signal_bases = 1 - n_low_signal_bases / total_bases_with_signal
+        
+        frac_high_signal_bases = 1 - low_sig_mappable_bases / total_bases_with_signal
 
         del mappable_bases
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
-
+        low_signal = agg_cutcounts.copy()
+        low_signal[high_signal_mask] = np.nan
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(agg_cutcounts, outliers_tr)
+        global_fit = g_fit.fit(low_signal, outliers_tr)
         global_p = global_fit.p
         global_r = global_fit.r
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
         # wrap in fit function
-
         sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(low_signal)
         sliding_p = w_fit.p_from_mean_and_var(sliding_mean, sliding_variance)
         sliding_r = w_fit.r_from_mean_and_var(sliding_mean, sliding_variance)
