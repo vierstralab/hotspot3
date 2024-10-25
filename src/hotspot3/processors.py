@@ -356,7 +356,7 @@ class ChromosomeProcessor:
 
     def infer_potential_peaks_mask(self, agg_cutcounts):
         if not self.config.adaptive_signal_tr:
-            outliers_tr = np.quantile(agg_cutcounts.compressed(), self.config.signal_tr).astype(int)
+            outliers_tr = np.quantile(agg_cutcounts.compressed(), self.config.signal_quantile).astype(int)
         else:
             # use first threshold with rmsea < 0.05 as signal threshold
             raise NotImplementedError("Adaptive signal threshold is not implemented yet.")
