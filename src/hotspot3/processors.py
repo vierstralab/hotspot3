@@ -374,10 +374,10 @@ class ChromosomeProcessor:
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
         low_signal = agg_cutcounts.copy()
-        low_signal[high_signal_mask] = np.nan
+        low_signal = ma.masked_where(high_signal_mask, low_signal)
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(low_signal, outliers_tr)
+        global_fit = g_fit.fit(low_signal.compressed(), outliers_tr)
         global_p = global_fit.p
         global_r = global_fit.r
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
