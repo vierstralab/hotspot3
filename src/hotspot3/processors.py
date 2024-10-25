@@ -392,29 +392,27 @@ class ChromosomeProcessor:
         # )  > self.config.nonzero_windows_to_fit
 
         # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
-        window_has_enough_background = self.smooth_counts(
-            agg_cutcounts > 0, 
-            window=self.config.bg_window,
-            dtype=np.float32, 
-            position_skip_mask=high_signal_mask
-        ) / bg_sum_mappable > self.config.nonzero_windows_to_fit
-        window_has_enough_background = window_has_enough_background.filled(True)
+        # window_has_enough_background = self.smooth_counts(
+        #     agg_cutcounts > 0, 
+        #     window=self.config.bg_window,
+        #     dtype=np.float32, 
+        #     position_skip_mask=high_signal_mask
+        # ) / bg_sum_mappable > self.config.nonzero_windows_to_fit
+        # window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
         
         # Calculate final model parameters
-        sliding_p, sliding_r = w_fit.p_and_r_from_mean_and_var(
-            sliding_mean,
-            sliding_variance,
-        )
+        sliding_p = w_fit.sliding_p(sliding_mean, sliding_variance)
+        sliding_r = w_fit.sliding_r(sliding_mean, sliding_variance)
 
-        reverted_to_global = np.sum(~window_has_enough_background)
+        # reverted_to_global = np.sum(~window_has_enough_background)
         
-        if reverted_to_global > 0:
-            self.gp.logger.warning(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
-            sliding_p[~window_has_enough_background] = global_p
-            sliding_r[~window_has_enough_background] = global_r
+        # if reverted_to_global > 0:
+        #     self.gp.logger.warning(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
+        #     sliding_p[~window_has_enough_background] = global_p
+        #     sliding_r[~window_has_enough_background] = global_r
         
         if write_debug_stats:
             step = 20

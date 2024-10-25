@@ -14,11 +14,15 @@ class BackgroundFit:
     def fit(self) -> FitResults:
         raise NotImplementedError
 
-    def p_and_r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
+    def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
+        with np.errstate(divide='ignore', invalid='ignore'):
+            p = np.asarray(1 - mean / var, dtype=np.float32)
+        return p
+    
+    def r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
             r = np.asarray(mean ** 2 / (var - mean), dtype=np.float32)
-            p = np.asarray(1 - mean / var, dtype=np.float32)
-        return p, r
+        return r
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, r, p, tr):
         N = sum(obs)
@@ -34,7 +38,8 @@ class GlobalBackgroundFit(BackgroundFit):
         high_signal_mask = agg_cutcounts > tr
         data = agg_cutcounts[~high_signal_mask].compressed()
         mean, var = self.estimate_global_mean_and_var(data)
-        p, r = self.p_and_r_from_mean_and_var(mean, var)
+        p = self.p_from_mean_and_var(mean, var)
+        r = self.r_from_mean_and_var(mean, var)
         unique, counts = np.unique(data, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
         return FitResults(mean, var, p, r, rmsea)
@@ -71,9 +76,16 @@ class WindowBackgroundFit(BackgroundFit):
     def running_nanmean(self, array, window):
         return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
     
+    # TODO create a wrapper to handle masked arrays
+    def sliding_r(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
+        assert np.all(mean.mask == var.mask), 'Mean and variance masks do not match'
+        res_r = ma.masked_where(mean.mask, np.full(mean.shape, np.nan), dtype=np.float32)
 
-    def p_and_r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
-        with np.errstate(divide='ignore', invalid='ignore'):
-            r = ma.asarray(mean ** 2 / (var - mean), dtype=np.float32)
-            p = ma.asarray(1 - mean / var, dtype=np.float32)
-        return p, r
+        res_r[~mean.mask] = self.r_from_mean_and_var(mean[~mean.mask], var[~mean.mask])
+        return res_r
+
+    def sliding_p(self, mean: ma.MaskedArray, var: ma.MaskedArray) -> ma.MaskedArray:
+        assert np.all(mean.mask == var.mask), 'Mean and variance masks do not match'
+        res_p = ma.masked_where(mean.mask, np.full(mean.shape, np.nan), dtype=np.float32)
+        res_p[~mean.mask] = self.p_from_mean_and_var(mean[~mean.mask], var[~mean.mask])
+        return res_p
