@@ -71,6 +71,8 @@ class WindowBackgroundFit(BackgroundFit):
 
         mean = wrap_masked(self.running_nanmean, array, window)
         var = wrap_masked(self.sliding_nanvar, array, window)
+        mean = ma.masked_invalid(mean)
+        var = ma.masked_invalid(var)
         return mean, var
     
     def sliding_nanvar(self, array, window):
