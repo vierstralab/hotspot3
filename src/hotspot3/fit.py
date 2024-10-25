@@ -77,11 +77,11 @@ class WindowBackgroundFit(BackgroundFit):
     
     @wrap_masked
     def sliding_nanvar(self, array, window):
-        return bn.move_var(array, window, ddof=1, min_count=1).astype(np.float32)
+        return bn.move_var(array, window, ddof=1, min_count=2).astype(np.float32)
 
     @wrap_masked
     def running_nanmean(self, array, window):
-        return bn.move_mean(array, window, min_count=1).astype(np.float32)
+        return bn.move_mean(array, window, min_count=2).astype(np.float32)
     
     @wrap_masked
     def running_nansum(self, array, window):
