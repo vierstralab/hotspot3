@@ -359,15 +359,16 @@ class ChromosomeProcessor:
             dtype=np.float32
         )
         bg_sum_mappable = np.ma.masked_less(bg_sum_mappable, self.config.min_mappable_bg)
-        bg_sum_mappable_high_signal = nan_moving_sum(
-                mappable_bases,
-                self.config.bg_window,
-                position_skip_mask=~high_signal_mask,
-                dtype=np.float32
-            )
-        frac_high_signal_bases = bg_sum_mappable_high_signal / (bg_sum_mappable_high_signal + bg_sum_mappable)
 
-        del bg_sum_mappable_high_signal, mappable_bases
+        low_signal = agg_cutcounts.copy()
+        low_signal[high_signal_mask] = np.nan
+
+        w_fit = WindowBackgroundFit(self.config)
+        n_low_signal_bases = w_fit.running_nansum(low_signal > 0, self.config.bg_window)
+        total_bases = w_fit.running_nansum(agg_cutcounts > 0, self.config.bg_window)
+        frac_high_signal_bases = 1 - n_low_signal_bases / total_bases
+
+        del mappable_bases
         gc.collect()
         self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
 
@@ -379,40 +380,17 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
         # Fit sliding window model
-        w_fit = WindowBackgroundFit(self.config)
-
         # wrap in fit function
-        array = agg_cutcounts.copy()
-        array[high_signal_mask] = np.nan
-        sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(array)
+
+        sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(low_signal)
         sliding_p = w_fit.p_from_mean_and_var(sliding_mean, sliding_variance)
         sliding_r = w_fit.r_from_mean_and_var(sliding_mean, sliding_variance)
-        self.gp.logger.debug(f"{sliding_p.count()}/{sliding_p.shape[0]}")
+        self.gp.logger.debug(f"NB parameters are estimated for {sliding_p.count()}/{sliding_p.shape[0]} bases for {self.chrom_name}")
         
-        # window_has_enough_background = w_fit.running_nanmean(
-        #     (agg_cutcounts > 0).filled(np.nan),
-        #     self.config.bg_window
-        # )  > self.config.nonzero_windows_to_fit
-
-        # Require at least nonzero_window_fit of the mappable bases to have nonzero cutcounts
-        # window_has_enough_background = self.smooth_counts(
-        #     agg_cutcounts > 0, 
-        #     window=self.config.bg_window,
-        #     dtype=np.float32, 
-        #     position_skip_mask=high_signal_mask
-        # ) / bg_sum_mappable > self.config.nonzero_windows_to_fit
-        # window_has_enough_background = window_has_enough_background.filled(True)
         if not write_debug_stats:
             del bg_sum_mappable, high_signal_mask
             gc.collect()
 
-        # reverted_to_global = np.sum(~window_has_enough_background)
-        
-        # if reverted_to_global > 0:
-        #     self.gp.logger.warning(f"Reverted to global model for {reverted_to_global} bp for {self.chrom_name}")
-        #     sliding_p[~window_has_enough_background] = global_p
-        #     sliding_r[~window_has_enough_background] = global_r
-        
         if write_debug_stats:
             step = 20
             rmsea = calc_rmsea_all_windows(
@@ -441,16 +419,18 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")        
         
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
-        invalid_fits = ma.where((sliding_r <= 0) | (sliding_p <= 0) | (sliding_p >= 1))[0]
-        n = len(invalid_fits)
-        if n > 0:
-            self.gp.logger.warning(f"Window estimated parameters (r or p) have {n} invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
-            sliding_r[invalid_fits] = global_r
-            sliding_p[invalid_fits] = global_p
+        # invalid_fits = ma.where((sliding_r <= 0) | (sliding_p <= 0) | (sliding_p >= 1))[0]
+        # n = len(invalid_fits)
+        # if n > 0:
+        #     self.gp.logger.warning(f"Window estimated parameters (r or p) have {n} invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
+        #     sliding_r[invalid_fits] = global_r
+        #     sliding_p[invalid_fits] = global_p
         
-        del invalid_fits
-        gc.collect()
-        # Strip masks to free some memory
+        # del invalid_fits
+        # gc.collect()
+
+
+        # Strip masks to free up some memory
         resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, sliding_r.mask, sliding_p.mask])
         sliding_r = sliding_r[~resulting_mask].compressed()
         sliding_p = sliding_p[~resulting_mask].compressed()
@@ -577,27 +557,6 @@ class ChromosomeProcessor:
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
-
-    def fit_windowed_background_negbin_model(self, agg_cutcounts, bg_sum_mappable, high_signal_mask):
-        bg_sum = self.smooth_counts(
-            agg_cutcounts,
-            self.config.bg_window,
-            position_skip_mask=high_signal_mask
-        )
-
-        mean = bg_sum / bg_sum_mappable
-        del bg_sum
-        gc.collect()
-
-        bg_sum_sq = self.smooth_counts(
-            agg_cutcounts ** 2,
-            self.config.bg_window,
-            position_skip_mask=high_signal_mask
-        )
-
-        variance = (bg_sum_sq - bg_sum_mappable * (mean ** 2)) / (bg_sum_mappable - 1)
-
-        return mean, variance
     
     def smooth_counts(self, signal: np.ndarray, window: int, dtype=None, position_skip_mask: np.ndarray=None):
         """

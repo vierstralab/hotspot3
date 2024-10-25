@@ -85,3 +85,7 @@ class WindowBackgroundFit(BackgroundFit):
     def running_nanmean(self, array, window):
         return bn.move_mean(array, window, min_count=self.config.min_mappable_bg).astype(np.float32)
     
+    @wrap_masked
+    def running_nansum(self, array, window):
+        return bn.move_sum(array, window).astype(np.float32)
+    
