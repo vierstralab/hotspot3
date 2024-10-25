@@ -381,12 +381,13 @@ class ChromosomeProcessor:
         # Fit sliding window model
         w_fit = WindowBackgroundFit(self.config)
 
+        # wrap in fit function
         array = agg_cutcounts.copy()
         array[high_signal_mask] = np.nan
         sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(array)
         sliding_p = w_fit.sliding_p(sliding_mean, sliding_variance)
         sliding_r = w_fit.sliding_r(sliding_mean, sliding_variance)
-        self.gp.logger.debug(sliding_p.count(), sliding_p.shape)
+        self.gp.logger.debug(f"{sliding_p.count()}, {sliding_p.shape}")
         
         # window_has_enough_background = w_fit.running_nanmean(
         #     (agg_cutcounts > 0).filled(np.nan),
