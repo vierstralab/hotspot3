@@ -20,9 +20,9 @@ class ChromosomeExtractor:
         Extract mappable bases for the chromosome.
         """
         if mappable_file is None:
-            mappable = np.ones(self.chrom_size, dtype=bool)
+            mappable = np.ones(self.chrom_size, dtype=np.float16)
         else:
-            mappable = np.zeros(self.chrom_size, dtype=bool)
+            mappable = np.zeros(self.chrom_size, dtype=np.float16)
             try:
                 with TabixExtractor(mappable_file, columns=['#chr', 'start', 'end']) as mappable_loader:
                     for _, row in mappable_loader[self.genomic_interval].iterrows():
