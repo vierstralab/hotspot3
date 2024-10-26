@@ -32,7 +32,7 @@ class ChromosomeExtractor:
             except ValueError:
                 raise NoContigPresentError
     
-        return ma.masked_where(~mappable, mappable)
+        return ma.masked_where(mappable == 0, mappable)
     
     def extract_cutcounts(self, cutcounts_file):
         cutcounts = np.zeros(self.chrom_size, dtype=counts_dtype)
