@@ -359,9 +359,7 @@ class ChromosomeProcessor:
         high_signal_mask, outliers_tr = self.infer_potential_peaks_mask(agg_cutcounts)
         
         low_sig_mappable_bases = ma.copy(mappable_bases)
-        print(low_sig_mappable_bases[high_signal_mask])
         low_sig_mappable_bases[high_signal_mask] = np.nan
-        print(low_sig_mappable_bases[high_signal_mask])
         low_sig_mappable_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
         assert not ma.all(low_sig_mappable_bases == total_bases_with_signal)
         low_sig_mappable_bases = ma.masked_where(total_bases_with_signal.mask, low_sig_mappable_bases)

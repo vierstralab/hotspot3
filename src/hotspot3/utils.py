@@ -102,6 +102,6 @@ def wrap_masked(func) -> ma.MaskedArray:
 
 def compress_masked_arg(arg):
     if isinstance(arg, ma.MaskedArray):
-        return arg.astype(np.float32).filled(np.nan)
+        return arg.filled(np.nan)
     else:
         return arg
