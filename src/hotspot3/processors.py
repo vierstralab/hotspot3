@@ -362,7 +362,10 @@ class ChromosomeProcessor:
         low_sig_mappable_bases[high_signal_mask] = np.nan
         low_sig_mappable_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
         assert not ma.all(low_sig_mappable_bases == total_bases_with_signal)
-        low_sig_mappable_bases = ma.masked_where(total_bases_with_signal.mask, low_sig_mappable_bases)
+        low_sig_mappable_bases = ma.masked_where(
+            total_bases_with_signal.mask,
+            low_sig_mappable_bases
+        )
 
         unique_cutcounts, n_obs = np.unique(
             agg_cutcounts[~high_signal_mask].compressed(),
