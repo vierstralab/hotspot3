@@ -1,12 +1,9 @@
-from scipy.signal import find_peaks
 import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
-from hotspot3.signal_smoothing import nan_moving_sum
 import itertools
-from hotspot3.utils import wrap_masked
 
 
 # Calculate p-values and FDR
@@ -113,103 +110,7 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
 
 
 # Find peaks
-def filter_peaks_summits_within_regions(peaks_coordinates: np.ndarray, starts, ends):
-    """
-    Filter peaks which summits are within the regions defined by starts and ends.
 
-    Parameters:
-        - peaks_coordinates: np.array of shape (n_peaks, 3) with peak starts, summits and ends
-        - starts: 1D array of regions' starts
-        - ends: 1D array of regions' ends
-
-    Returns:
-        - filtered_peaks_mask: 1D boolean array of peaks that are within the regions
-    """
-    starts = np.asarray(starts)
-    ends = np.asarray(ends)
-    summits = peaks_coordinates[:, 1]
-
-    closest_left_index = np.searchsorted(starts, summits, side='right') - 1
-    filtered_peaks_mask = (closest_left_index >= 0) & (summits < ends[closest_left_index])
-    
-    return filtered_peaks_mask
-
-
-def find_closest_min_peaks(signal):
-    """
-    Find peak summits (maxima) and peak starts and ends (closest local minima).
-    Returns:
-        - peaks_coordinates: np.array of shape (n_peaks, 3) with peak starts, summits and ends
-    """
-    maxima, _ = find_peaks(signal)
-    minima, _ = find_peaks(-signal)
-    total_dif = len(maxima) - (len(minima) - 1)
-    if total_dif == 1:
-        fist_minima_pos = minima[0]
-        fist_maxima_pos = maxima[0]
-        if fist_minima_pos < fist_maxima_pos:
-            padding = (0, 1)
-        else:
-            padding = (1, 0)
-    elif total_dif == 0:
-        padding = 0
-    else:
-        padding = 1
-    minima = np.pad(minima, padding, mode='constant', constant_values=(0, len(signal) - 1))
-    peaks_coordinates = np.zeros([len(maxima), 3], dtype=int) # start, summit, end
-    peaks_coordinates[:, 1] = maxima
-
-    peaks_coordinates[:, 0] = minima[:len(maxima)]
-    peaks_coordinates[:, 2] = minima[1:]
-    return peaks_coordinates
-
-
-def trim_at_threshold(signal, peaks_coordinates):
-    """
-    Trim peaks at the threshold height.
-    Returns:
-        - peaks_in_hotspots_trimmed: trimmed peaks coordinates
-        - threshold_heights: heights of the threshold
-    """
-    heights = signal[peaks_coordinates]
-    heights[:, 1] = heights[:, 1] / 2
-    threshold_heights = np.max(heights, axis=1)
-
-    peaks_in_hotspots_trimmed = np.zeros(peaks_coordinates.shape, dtype=np.int32)
-    for i, (left, summit, right) in enumerate(peaks_coordinates):
-        threshold = threshold_heights[i]
-        new_left = summit - np.argmax(signal[left:summit + 1][::-1] <= threshold)
-
-        new_right = summit + np.argmax(signal[summit:right + 1] <= threshold) - 1
-        peaks_in_hotspots_trimmed[i, :] = np.array([new_left, summit, new_right])
-    return peaks_in_hotspots_trimmed, threshold_heights
-
-
-def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None):
-    """
-    Find variable width peaks within hotspots.
-
-    Parameters:
-        - signal: 1D array of smoothed signal values.
-        - starts: 1D array of start positions of significant stretches.
-        - ends: 1D array of end positions of significant stretches.
-    
-    Returns:
-        - peaks_in_hotspots_trimmed: 2D array of start, summit, and end positions for each peak.
-        - threshold_heights: 1D array of threshold heights for each peak.
-    """
-    if starts is None:
-        assert ends is None
-        starts = np.zeros(1)
-        ends = np.zeros(1)
-    peaks_coordinates = find_closest_min_peaks(signal)
-    in_sign_stretch = filter_peaks_summits_within_regions(peaks_coordinates, starts, ends)
-    
-    peaks_in_regions = peaks_coordinates[in_sign_stretch, :]
-
-    peaks_in_hotspots_trimmed, threshold_heights = trim_at_threshold(signal, peaks_in_regions)
-    
-    return peaks_in_hotspots_trimmed, threshold_heights
 
 
 def cast_to_original_shape(data, original_shape, original_mask, step):
@@ -269,69 +170,3 @@ def calc_pmf_coefs(r, p, tr):
     
     return pmf_coef, pmf_const
 
-
-def calc_g_sq_for_k(
-        k, r,
-        pmf_coef, pmf_const,
-        agg_cov_masked,
-        bg_sum_mappable,
-        bg_window,
-        position_skip_mask,
-        dtype,
-        step,
-):
-    # same as: exp = st.nbinom.pmf(k, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * bg_sum_mappable
-    exp = fast_nb_pmf(k, r, pmf_coef, pmf_const) * bg_sum_mappable
-
-    obs = nan_moving_sum(
-        agg_cov_masked == k,
-        bg_window,
-        position_skip_mask=position_skip_mask,
-        dtype=dtype,
-    ) * step
-    ratio = obs / exp
-    ratio[ratio == 0] = 1
-    return obs * np.ma.log(ratio) * 2
-
-
-def calc_rmsea_all_windows(
-        r, p, tr,
-        bg_sum_mappable,
-        agg_cov_masked,
-        bg_window,
-        position_skip_mask,
-        dtype,
-        step=20,
-    ):
-    """
-    Calculate RMSEA for all sliding windows with given stride.
-    Stride is required to be a divisor of the window size.
-    """
-    assert (bg_window - 1) % step == 0, "Stride should be a divisor of the window size."
-    initial_shape = r.shape
-    initial_mask = r.mask
-    agg_cov_masked = agg_cov_masked[::step]
-    position_skip_mask = position_skip_mask[::step]
-    bg_sum_mappable = bg_sum_mappable[::step]
-    r = r[::step]
-    p = p[::step]
-    bg_window = (bg_window - 1) // step + 1
-
-    pmf_coef, pmf_const = calc_pmf_coefs(r, p, tr)
-    G_sq = np.ma.masked_where(r.mask, np.zeros_like(r))
-    for k in range(tr):
-        G_sq += calc_g_sq_for_k(
-            k, r,
-            pmf_coef, pmf_const,
-            agg_cov_masked,
-            bg_sum_mappable,
-            bg_window,
-            position_skip_mask,
-            dtype,
-            step,
-        )
-
-    G_sq = np.ma.masked_where(~np.isfinite(G_sq), G_sq)
-    rmsea_stride = np.sqrt(np.clip(G_sq / (tr - 2) - 1, 0, None) / (bg_sum_mappable - 1))
-
-    return cast_to_original_shape(rmsea_stride, initial_shape, initial_mask, step)

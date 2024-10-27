@@ -53,11 +53,11 @@ class ProcessorOutputData:
 
 @dataclasses.dataclass
 class FitResults:
-    mean: np.ndarray
-    var: np.ndarray
     p: np.ndarray
     r: np.ndarray
     rmsea: np.ndarray
+    prop_high_signal: np.ndarray
+    bad_fit_params: np.ndarray = None
 
 
 class NoContigPresentError(Exception):

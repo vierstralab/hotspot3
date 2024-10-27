@@ -12,9 +12,10 @@ import os
 import subprocess
 import importlib.resources as pkg_resources
 from functools import reduce
-from hotspot3.signal_smoothing import modwt_smooth, nan_moving_sum, find_stretches
+from hotspot3.signal_smoothing import modwt_smooth
+from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 
-from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, find_varwidth_peaks, calc_rmsea_all_windows, calc_epsilon_and_epsilon_mu
+from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, calc_epsilon_and_epsilon_mu
 
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
 
@@ -311,25 +312,7 @@ class ChromosomeProcessor:
         self.gp = genome_processor
         self.config = self.gp.config
         self.chrom_size = self.gp.chrom_sizes[chrom_name]
-        self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size)
-
-
-    def infer_potential_peaks_mask(self, agg_cutcounts):
-        if not self.config.adaptive_signal_tr:
-            outliers_tr = np.quantile(agg_cutcounts.compressed(), self.config.signal_quantile).astype(int)
-        else:
-            # use first threshold with rmsea < 0.05 as signal threshold
-            raise NotImplementedError("Adaptive signal threshold is not implemented yet.")
-
-        high_signal_mask = (agg_cutcounts >= outliers_tr).filled(False)
-        if outliers_tr == 0:
-            self.gp.logger.warning(f"No background signal for {self.chrom_name} (outlier threshold: {outliers_tr} == 0). Skipping...")
-            raise NoContigPresentError
-
-        self.gp.logger.debug(f'Found outlier threshold={outliers_tr} for {self.chrom_name}')
-
-        return high_signal_mask, outliers_tr
-
+        self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size, config=self.config)
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
@@ -341,113 +324,58 @@ class ChromosomeProcessor:
         mappable_bases = self.extractor.extract_mappable_bases(
             self.gp.mappable_bases_file
         )
-        
-        total_bases_with_signal = w_fit.running_nansum(
-            mappable_bases,
-            self.config.bg_window
-        )
-        total_bases_with_signal = ma.masked_where(total_bases_with_signal < self.config.min_mappable, total_bases_with_signal)
 
-        cutcounts = self.extractor.extract_cutcounts(cutcounts_file)
-        agg_cutcounts = w_fit.running_nansum(cutcounts, self.config.window)
-        del cutcounts
-        gc.collect()
-        agg_cutcounts = np.ma.masked_where(total_bases_with_signal.mask, agg_cutcounts)
+        agg_cutcounts = self.extractor.extract_aggregated_cutcounts(cutcounts_file)
+        assert isinstance(agg_cutcounts, np.ndarray)
+        agg_cutcounts = np.ma.masked_where(~mappable_bases, agg_cutcounts)
         self.gp.logger.debug(
-            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable")
-
-        high_signal_mask, outliers_tr = self.infer_potential_peaks_mask(agg_cutcounts)
-        
-        low_sig_mappable_bases = ma.copy(mappable_bases)
-        low_sig_mappable_bases[high_signal_mask] = np.nan
-        low_sig_mappable_bases = w_fit.running_nansum(low_sig_mappable_bases, self.config.bg_window)
-        assert not ma.all(low_sig_mappable_bases == total_bases_with_signal)
-        low_sig_mappable_bases = ma.masked_where(
-            total_bases_with_signal.mask,
-            low_sig_mappable_bases
+            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable"
         )
-
-        unique_cutcounts, n_obs = np.unique(
-            agg_cutcounts[~high_signal_mask].compressed(),
-            return_counts=True
-        )
-
-        self.gp.logger.debug(f"Calculating prop of mappable bases with signal higher than {outliers_tr} for {self.chrom_name}")
-
-        
-        frac_high_signal_bases = 1 - low_sig_mappable_bases / total_bases_with_signal
 
         del mappable_bases
         gc.collect()
-        self.gp.logger.debug(f"Background mappable bases calculated for {self.chrom_name}")
-        low_signal = agg_cutcounts.copy()
-        low_signal[high_signal_mask] = np.nan
+
+
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(low_signal.compressed(), outliers_tr)
+        global_fit = g_fit.fit(agg_cutcounts)
         global_p = global_fit.p
         global_r = global_fit.r
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
-        # Fit sliding window model
-        # wrap in fit function
-        sliding_mean, sliding_variance = w_fit.sliding_mean_and_variance(low_signal)
-        sliding_p = w_fit.p_from_mean_and_var(sliding_mean, sliding_variance)
-        sliding_r = w_fit.r_from_mean_and_var(sliding_mean, sliding_variance)
-        self.gp.logger.debug(f"NB parameters are estimated for {sliding_p.count()}/{sliding_p.shape[0]} bases for {self.chrom_name}")
-        
-        if not write_debug_stats:
-            del high_signal_mask
-            gc.collect()
-
-        if write_debug_stats:
-            step = 20
-            rmsea = calc_rmsea_all_windows(
-                sliding_r, sliding_p, outliers_tr,
-                low_sig_mappable_bases,
-                agg_cutcounts,
-                self.config.bg_window,
-                position_skip_mask=high_signal_mask,
-                dtype=np.float32,
-                step=step
-            )
-            
-            frac_high_signal_bases_exp, epsilon_mu = calc_epsilon_and_epsilon_mu(
-                sliding_r,
-                sliding_p,
-                outliers_tr,
-                step=step
-            )
-
-            del low_sig_mappable_bases
-            gc.collect()
-        else:
-            del sliding_mean, sliding_variance
-            gc.collect()
-        
-        self.gp.logger.debug(f"Window fit finished for {self.chrom_name}")        
+        fit_res = w_fit.fit(agg_cutcounts)
+        sliding_p = fit_res.p
+        sliding_r = fit_res.r
+        sliding_rmsea = fit_res.rmsea
+        bad_fits = fit_res.bad_fit_params
+        if bad_fits is not None:
+            self.gp.logger.debug(f"Low variance for {len(bad_fits)} windows for {self.chrom_name}")
+        self.gp.logger.debug(f"NB parameters are estimated for {sliding_p.count()}/{sliding_p.shape[0]} bases for {self.chrom_name}")     
         
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
-        # invalid_fits = ma.where((sliding_r <= 0) | (sliding_p <= 0) | (sliding_p >= 1))[0]
-        # n = len(invalid_fits)
-        # if n > 0:
-        #     self.gp.logger.warning(f"Window estimated parameters (r or p) have {n} invalid values for {self.chrom_name}. Reverting to chromosome-wide model. {invalid_fits}")
-        #     sliding_r[invalid_fits] = global_r
-        #     sliding_p[invalid_fits] = global_p
-        
-        # del invalid_fits
-        # gc.collect()
-
 
         # Strip masks to free up some memory
-        resulting_mask = reduce(ma.mask_or, [agg_cutcounts.mask, sliding_r.mask, sliding_p.mask])
-        sliding_r = sliding_r[~resulting_mask].compressed()
-        sliding_p = sliding_p[~resulting_mask].compressed()
-        agg_cutcounts = agg_cutcounts[~resulting_mask].compressed()
-    
+        resulting_mask = sliding_r.mask
+        good_fit_mask = ~resulting_mask.copy()
+
         neglog_pvals = np.full(self.chrom_size, np.nan, dtype=np.float16)
-        neglog_pvals[~resulting_mask] = negbin_neglog10pvalue(agg_cutcounts, sliding_r, sliding_p)
-        del sliding_r, sliding_p, agg_cutcounts, resulting_mask
+        if bad_fits is not None:
+            import scipy.stats as st
+            indx = bad_fits[:, 0].astype(int)
+            neglog_pvals[indx] = -st.poisson.logsf(
+                agg_cutcounts[indx] - 1,
+                bad_fits[:, 1]
+            ) / np.log(10)
+            good_fit_mask[indx] = False
+        
+        sliding_mean = sliding_r * sliding_p / (1 - sliding_p)
+        sliding_variance = sliding_mean / (1 - sliding_p)
+        sliding_r = sliding_r[good_fit_mask].compressed()
+        sliding_p = sliding_p[good_fit_mask].compressed()
+        agg_cutcounts = agg_cutcounts[good_fit_mask].compressed()
+    
+        neglog_pvals[good_fit_mask] = negbin_neglog10pvalue(agg_cutcounts, sliding_r, sliding_p)
+        del sliding_p, sliding_r, agg_cutcounts, resulting_mask
         gc.collect()
 
         outdir = pvals_outpath.replace('.pvals.parquet', '')
@@ -459,32 +387,30 @@ class ChromosomeProcessor:
             neglog_pvals.update({
                 'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
                 'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
-                'rmsea': rmsea.filled(np.nan).astype(np.float16),
-                'frac_high_signal_bases_exp': frac_high_signal_bases_exp.filled(np.nan).astype(np.float16),
-                'epsilon_mu': epsilon_mu.filled(np.nan).astype(np.float16),
-                'frac_high_signal_bases_obs': frac_high_signal_bases.filled(np.nan).astype(np.float16),
+                'rmsea': sliding_rmsea.filled(np.nan).astype(np.float16),
+                # 'frac_high_signal_bases_exp': frac_high_signal_bases_exp.filled(np.nan).astype(np.float16),
+                # 'epsilon_mu': epsilon_mu.filled(np.nan).astype(np.float16),
+                # 'frac_high_signal_bases_obs': frac_high_signal_bases.filled(np.nan).astype(np.float16),
             })
-            del sliding_mean, sliding_variance, rmsea, frac_high_signal_bases_exp, epsilon_mu, frac_high_signal_bases
-            gc.collect()
 
         neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
         self.to_parquet(neglog_pvals, pvals_outpath)
         del neglog_pvals
         gc.collect()
 
-        epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
-        params_df = pd.DataFrame({
-            'unique_cutcounts': unique_cutcounts,
-            'count': n_obs,
-            'outliers_tr': [outliers_tr] * len(unique_cutcounts),
-            'mean': [global_fit.mean] * len(unique_cutcounts),
-            'variance': [global_fit.var] * len(unique_cutcounts),
-            'rmsea': [global_fit.rmsea] * len(unique_cutcounts),
-            'epsilon': [epsilon_global] * len(unique_cutcounts),
-            'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
-        })
-        self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
-        self.to_parquet(params_df, params_outpath)
+        # epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
+        # params_df = pd.DataFrame({
+        #     'unique_cutcounts': unique_cutcounts,
+        #     'count': n_obs,
+        #     'outliers_tr': [outliers_tr] * len(unique_cutcounts),
+        #     'mean': [global_fit.mean] * len(unique_cutcounts),
+        #     'variance': [global_fit.var] * len(unique_cutcounts),
+        #     'rmsea': [global_fit.rmsea] * len(unique_cutcounts),
+        #     'epsilon': [epsilon_global] * len(unique_cutcounts),
+        #     'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
+        # })
+        # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
+        # self.to_parquet(params_df, params_outpath)
     
 
     @ensure_contig_exists
@@ -492,14 +418,13 @@ class ChromosomeProcessor:
         """
         Run MODWT smoothing on cutcounts.
         """
-        cutcounts = self.extractor.extract_cutcounts(cutcounts_path)
-        agg_counts = self.smooth_counts(cutcounts, self.config.window, dtype=np.float32).filled(0)
+        agg_cutcounts = self.extractor.extract_aggregated_cutcounts(cutcounts_path)
         filters = 'haar'
         self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.config.modwt_level}) for {self.chrom_name}")
-        smoothed = modwt_smooth(agg_counts, filters, level=self.config.modwt_level)
+        smoothed = modwt_smooth(agg_cutcounts, filters, level=self.config.modwt_level)
         data = pd.DataFrame({
             'smoothed': smoothed,
-            'normalized_density': normalize_density(agg_counts, total_cutcounts) 
+            'normalized_density': normalize_density(agg_cutcounts, total_cutcounts) 
         })
         self.to_parquet(data, save_path)
 
@@ -508,18 +433,24 @@ class ChromosomeProcessor:
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
         log10_fdrs = self.extractor.extract_fdr_track(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
-        signif_fdrs = log10_fdrs >= -np.log10(fdr_threshold)
-        smoothed_signif = nan_moving_sum(
+        signif_fdrs = (log10_fdrs >= -np.log10(fdr_threshold)).astype(np.float32)
+        window_fit = WindowBackgroundFit(self.config)
+        smoothed_signif = window_fit.centered_running_nansum(
             signif_fdrs,
             window=self.config.window,
-            dtype=np.float32
-        ).filled(0) > 0
+            min_count=1,
+        ) > 0
         region_starts, region_ends = find_stretches(smoothed_signif)
 
         max_log10_fdrs = np.empty(region_ends.shape)
         for i in range(len(region_starts)):
             start = region_starts[i]
             end = region_ends[i]
+            if np.sum(~np.isnan(log10_fdrs[start:end])) == 0:
+                print(log10_fdrs[start:end])
+                print(start, end)
+                print(smoothed_signif[start:end])
+        
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
         
         self.gp.logger.debug(f"{len(region_starts)} hotspots called for {self.chrom_name}")
@@ -566,18 +497,6 @@ class ChromosomeProcessor:
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
-    
-    def smooth_counts(self, signal: np.ndarray, window: int, dtype=None, position_skip_mask: np.ndarray=None):
-        """
-        Wrapper for nan_moving_sum to smooth cutcounts.
-        Might need to remove the method and call nan_moving_sum directly.
-        """
-        return nan_moving_sum(
-            signal,
-            window=window,
-            dtype=dtype,
-            position_skip_mask=position_skip_mask
-        )
     
     @ensure_contig_exists
     def to_parquet(self, data_df, path):
