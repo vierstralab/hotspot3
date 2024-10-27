@@ -350,7 +350,7 @@ class ChromosomeProcessor:
         # self.to_parquet(params_df, params_outpath)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
 
-        fit_res = w_fit.fit(agg_cutcounts, starting_quantile=global_fit.quantile)
+        fit_res = w_fit.fit(agg_cutcounts, starting_quantile=global_fit.prop_high_signal)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
