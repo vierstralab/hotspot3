@@ -78,13 +78,15 @@ class GlobalBackgroundFit(BackgroundFit):
 
 
 class WindowBackgroundFit(BackgroundFit):
-    def fit(self, array: ma.MaskedArray) -> FitResults:
+    def fit(self, array: ma.MaskedArray, starting_quantile=None) -> FitResults:
+        if starting_quantile is None:
+            starting_quantile = self.config.signal_quantile
         agg_cutcounts = array.copy()
         stratified_cutcounts = self.stratify(agg_cutcounts, 75)
         sliding_ranks = self.centered_running_rank(stratified_cutcounts, self.config.bg_window, min_count=1)
         sliding_ranks = self.interpolate_nan(sliding_ranks, 75)
 
-        high_signal_mask = (sliding_ranks > self.config.signal_quantile).filled(False)
+        high_signal_mask = (sliding_ranks > starting_quantile).filled(False)
         agg_cutcounts[high_signal_mask] = np.nan
         mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=self.config.min_mappable_bg)
         p = self.p_from_mean_and_var(mean, var)
