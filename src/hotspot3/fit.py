@@ -46,6 +46,8 @@ class GlobalBackgroundFit(BackgroundFit):
             res.append((tr, rmsea))
             tr -= 1
         
+        if len(res) == 0:
+            raise NoContigPresentError
         tr, rmsea = min(res, key=lambda x: x[1])
         quantile = np.sum(np.sort(agg_cutcounts) <= tr) / agg_cutcounts.shape[0]
 
