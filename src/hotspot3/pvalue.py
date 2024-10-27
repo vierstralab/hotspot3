@@ -4,10 +4,8 @@ from hotspot3.stats import negbin_neglog10pvalue
 
 
 class PvalueEstimator:
-
     def __init__(self, config):
         self.config = config
-
 
     def estimate_pvalues(self, 
             agg_cutcounts: np.ndarray, 

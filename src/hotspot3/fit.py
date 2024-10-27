@@ -32,20 +32,34 @@ class BackgroundFit:
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray) -> FitResults:
         agg_cutcounts = ma.masked_invalid(array).compressed()
+
+        max_cutoff = np.quantile(agg_cutcounts, 0.90)
+        validation_set = agg_cutcounts[agg_cutcounts <= max_cutoff]
+        unique, counts = np.unique(validation_set, return_counts=True)
+
         tr = np.quantile(agg_cutcounts, self.config.signal_quantile)
+        p, r = self.fit_for_tr(agg_cutcounts, tr)
+        rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
+
+        while rmsea > 0.05 or tr > max_cutoff:
+            tr -= 1
+            p, r = self.fit_for_tr(agg_cutcounts, tr)
+            rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
+        
+        quantile = np.sum(np.sort(agg_cutcounts) <= tr) / agg_cutcounts.shape[0]
+
+        return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), quantile)
+
+    def fit_for_tr(self, agg_cutcounts, tr):
         agg_cutcounts = agg_cutcounts[agg_cutcounts <= tr]
         mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
-    
-        unique, counts = np.unique(agg_cutcounts, return_counts=True)
-        rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
+        return p, r
 
-        return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), self.config.signal_quantile)
-        
 
-    def estimate_global_mean_and_var(self, agg_cutcounts:np.ndarray):
+    def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
         has_enough_background = np.count_nonzero(agg_cutcounts) / agg_cutcounts.size > self.config.nonzero_windows_to_fit
         if not has_enough_background:
             raise NoContigPresentError
@@ -53,14 +67,14 @@ class GlobalBackgroundFit(BackgroundFit):
         mean = np.mean(agg_cutcounts)
         variance = np.var(agg_cutcounts, ddof=1)
         return mean, variance
-    
+
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, r, p, tr):
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
         # chisq = sum((obs - exp) ** 2 / exp)
         G_sq = 2 * sum(obs * np.log(obs / exp))
         df = len(obs) - 2
-        return np.sqrt((G_sq / df - 1) / (N - 1))
+        return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
 
 
 class WindowBackgroundFit(BackgroundFit):

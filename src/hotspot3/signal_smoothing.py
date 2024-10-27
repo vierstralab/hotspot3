@@ -1,8 +1,6 @@
 import numpy as np
-import numpy.ma as ma
 from scipy.signal import convolve
 import pywt
-import bottleneck as bn
 
 
 def convolve1d_fast(arr, ker, mode='wrap', origin=0):

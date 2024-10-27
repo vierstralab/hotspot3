@@ -11,20 +11,17 @@ import shutil
 import os
 import subprocess
 import importlib.resources as pkg_resources
-from hotspot3.signal_smoothing import modwt_smooth
-from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-
-from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
-
-from hotspot3.pvalue import PvalueEstimator
-
-from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
-
-from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
 
 from hotspot3.logging import setup_logger
+from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
 from hotspot3.file_extractors import ChromosomeExtractor
+from hotspot3.pvalue import PvalueEstimator
 from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit
+
+from hotspot3.signal_smoothing import modwt_smooth
+from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
+from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -332,7 +329,11 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(agg_cutcounts)
+        try:
+            global_fit = g_fit.fit(agg_cutcounts)
+        except NoContigPresentError:
+            self.gp.logger.warning(f"Not enough background signal for {self.chrom_name}. Skipping.")
+            raise
         global_p = global_fit.p
         global_r = global_fit.r
         # params_df = pd.DataFrame({
