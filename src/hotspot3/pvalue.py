@@ -19,7 +19,7 @@ class PvalueEstimator:
         result = np.full_like(mask, np.nan, dtype=np.float16)
         
         if bad_fits is not None:
-            indx = bad_fits[:, 0]
+            indx = bad_fits[:, 0].astype(int)
             param = bad_fits[:, 1]
             result[indx] = st.poisson.logsf(agg_cutcounts[indx] - 1, param)
             mask[indx] = False
