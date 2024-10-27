@@ -372,7 +372,7 @@ class ChromosomeProcessor:
         pval_estimator = PvalueEstimator(self.config)
 
         # Strip masks to free up some memory
-        agg_cutcounts = agg_cutcounts.filled(np.nan)
+        agg_cutcounts = np.floor(agg_cutcounts.filled(np.nan))
 
         neglog_pvals = pval_estimator.estimate_pvalues(
             agg_cutcounts,

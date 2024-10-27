@@ -19,7 +19,7 @@ class PvalueEstimator:
         if bad_fits is not None:
             indx = bad_fits[:, 0].astype(int)
             param = bad_fits[:, 1]
-            result[indx] = st.poisson.logsf(agg_cutcounts[indx] - 1, param)
+            result[indx] = -st.poisson.logsf(agg_cutcounts[indx] - 1, param) / np.log(10)
             mask[indx] = False
         
         result[mask] = negbin_neglog10pvalue(agg_cutcounts[mask], r[mask], p[mask])
