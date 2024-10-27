@@ -76,7 +76,7 @@ class WindowBackgroundFit(BackgroundFit):
         p = self.p_from_mean_and_var(mean, var)
         success_fit_mask = ~p.mask
         p = p.filled(np.nan).astype(np.float16)
-        r = self.r_from_mean_and_var(mean, var).filled(np.nan).astype(np.float16)
+        r = self.r_from_mean_and_var(mean, var).filled(np.nan).astype(np.float32)
 
         bad_fit = ma.where(mean >= var)[0]
         if len(bad_fit) > 0:
