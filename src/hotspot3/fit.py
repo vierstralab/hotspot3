@@ -33,13 +33,13 @@ class GlobalBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray) -> FitResults:
         agg_cutcounts = ma.masked_invalid(array).compressed()
 
+        max_cutoff = np.quantile(agg_cutcounts, 0.90)
         validation_set = agg_cutcounts[agg_cutcounts <= max_cutoff]
         unique, counts = np.unique(validation_set, return_counts=True)
 
         res = []
         rmsea = np.inf
         tr = np.quantile(agg_cutcounts, self.config.signal_quantile)
-        max_cutoff = np.quantile(agg_cutcounts, 0.90)
         while rmsea > 0.05 and tr > max_cutoff:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
