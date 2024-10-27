@@ -92,7 +92,7 @@ class WindowBackgroundFit(BackgroundFit):
         
         del mean, var
   
-        rmsea = np.full_like(mean, np.nan)
+        rmsea = np.full_like(p, np.nan)
         return FitResults(
             p, r, rmsea, np.nan, 
             successful_fit_mask=success_fit_mask,
