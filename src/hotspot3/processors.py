@@ -11,11 +11,12 @@ import shutil
 import os
 import subprocess
 import importlib.resources as pkg_resources
-from functools import reduce
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 
-from hotspot3.stats import logfdr_from_logpvals, negbin_neglog10pvalue, calc_epsilon_and_epsilon_mu
+from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
+
+from hotspot3.pvalue import PvalueEstimator
 
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
 
@@ -182,17 +183,13 @@ class GenomeProcessor:
             save_path
         )
 
-    def calc_pval(self, cutcounts_file, pvals_path: str, write_mean_and_var=False):
+    def calc_pval(self, cutcounts_file, pvals_path: str):
         self.logger.info('Calculating per-bp p-values')
-        params_outpath = pvals_path.replace('.pvals', '.pvals.params')
         delete_path(pvals_path)
-        delete_path(params_outpath)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
-            pvals_path,
-            params_outpath,
-            write_mean_and_var
+            pvals_path
         )
     
     def calc_fdr(self, pvals_path, fdrs_path):
@@ -315,19 +312,17 @@ class ChromosomeProcessor:
         self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size, config=self.config)
 
     @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file, pvals_outpath, params_outpath, write_debug_stats=False) -> ProcessorOutputData:
-        write_debug_stats = write_debug_stats or self.config.save_debug
+    def calc_pvals(self, cutcounts_file, pvals_outpath) -> ProcessorOutputData:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         
         w_fit = WindowBackgroundFit(self.config)
-
         mappable_bases = self.extractor.extract_mappable_bases(
             self.gp.mappable_bases_file
         )
 
         agg_cutcounts = self.extractor.extract_aggregated_cutcounts(cutcounts_file)
-        assert isinstance(agg_cutcounts, np.ndarray)
         agg_cutcounts = np.ma.masked_where(~mappable_bases, agg_cutcounts)
+
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable"
         )
@@ -335,70 +330,11 @@ class ChromosomeProcessor:
         del mappable_bases
         gc.collect()
 
-
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts)
         global_p = global_fit.p
         global_r = global_fit.r
-        self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
-
-        fit_res = w_fit.fit(agg_cutcounts)
-        sliding_p = fit_res.p
-        sliding_r = fit_res.r
-        sliding_rmsea = fit_res.rmsea
-        bad_fits = fit_res.bad_fit_params
-        if bad_fits is not None:
-            self.gp.logger.debug(f"Low variance for {len(bad_fits)} windows for {self.chrom_name}")
-        self.gp.logger.debug(f"NB parameters are estimated for {sliding_p.count()}/{sliding_p.shape[0]} bases for {self.chrom_name}")     
-        
-        self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
-
-        # Strip masks to free up some memory
-        resulting_mask = sliding_r.mask
-        good_fit_mask = ~resulting_mask.copy()
-
-        neglog_pvals = np.full(self.chrom_size, np.nan, dtype=np.float16)
-        if bad_fits is not None:
-            import scipy.stats as st
-            indx = bad_fits[:, 0].astype(int)
-            neglog_pvals[indx] = -st.poisson.logsf(
-                agg_cutcounts[indx] - 1,
-                bad_fits[:, 1]
-            ) / np.log(10)
-            good_fit_mask[indx] = False
-        
-        sliding_mean = sliding_r * sliding_p / (1 - sliding_p)
-        sliding_variance = sliding_mean / (1 - sliding_p)
-        sliding_r = sliding_r[good_fit_mask].compressed()
-        sliding_p = sliding_p[good_fit_mask].compressed()
-        agg_cutcounts = agg_cutcounts[good_fit_mask].compressed()
-    
-        neglog_pvals[good_fit_mask] = negbin_neglog10pvalue(agg_cutcounts, sliding_r, sliding_p)
-        del sliding_p, sliding_r, agg_cutcounts, resulting_mask
-        gc.collect()
-
-        outdir = pvals_outpath.replace('.pvals.parquet', '')
-        fname = f'{outdir}.{self.chrom_name}_positions_with_inf_pvals.txt.gz'
-        neglog_pvals = {'log10_pval': self.fix_inf_pvals(neglog_pvals, fname)}
-
-        self.gp.logger.debug(f"Saving p-values for {self.chrom_name}")
-        if write_debug_stats:
-            neglog_pvals.update({
-                'sliding_mean': sliding_mean.filled(np.nan).astype(np.float16),
-                'sliding_variance': sliding_variance.filled(np.nan).astype(np.float16),
-                'rmsea': sliding_rmsea.filled(np.nan).astype(np.float16),
-                # 'frac_high_signal_bases_exp': frac_high_signal_bases_exp.filled(np.nan).astype(np.float16),
-                # 'epsilon_mu': epsilon_mu.filled(np.nan).astype(np.float16),
-                # 'frac_high_signal_bases_obs': frac_high_signal_bases.filled(np.nan).astype(np.float16),
-            })
-
-        neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
-        self.to_parquet(neglog_pvals, pvals_outpath)
-        del neglog_pvals
-        gc.collect()
-
-        # epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
         # params_df = pd.DataFrame({
         #     'unique_cutcounts': unique_cutcounts,
         #     'count': n_obs,
@@ -411,6 +347,55 @@ class ChromosomeProcessor:
         # })
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
+        self.gp.logger.debug(f"Global fit finished for {self.chrom_name}")
+
+        fit_res = w_fit.fit(agg_cutcounts)
+        
+        outdir = pvals_outpath.replace('.pvals.parquet', '')
+        df = pd.DataFrame({
+            'sliding_r': fit_res.r,
+            'sliding_p': fit_res.p,
+            'rmsea': fit_res.rmsea,
+        })
+        self.to_parquet(df, f"{outdir}.fit_results.parquet")
+        del df
+        gc.collect()
+
+        bad_fits = fit_res.bad_fit_params
+        if bad_fits is not None:
+            self.gp.logger.debug(f"Low variance for {len(bad_fits)} windows for {self.chrom_name}")
+  
+        self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
+
+        pval_estimator = PvalueEstimator(self.config)
+
+        # Strip masks to free up some memory
+        agg_cutcounts = agg_cutcounts.filled(np.nan)
+
+        neglog_pvals = pval_estimator.estimate_pvalues(
+            agg_cutcounts,
+            fit_res.r,
+            fit_res.p,
+            fit_res.successful_fit_mask,
+            bad_fits=bad_fits
+        )
+        del agg_cutcounts
+        gc.collect()
+
+        fname = f"{outdir}.{self.chrom_name}.inf_pvals.parquet"
+        neglog_pvals = {'log10_pval': fix_inf_pvals(neglog_pvals, fname)}
+
+        self.gp.logger.debug(f"Saving p-values for {self.chrom_name}")
+
+
+        neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
+        self.to_parquet(neglog_pvals, pvals_outpath)
+        del neglog_pvals
+        gc.collect()
+
+        # epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
+
+
     
 
     @ensure_contig_exists
@@ -537,13 +522,3 @@ class ChromosomeProcessor:
         data_df['start'] = np.arange(len(data_df)) * self.config.density_step
         data_df.query('normalized_density > 0', inplace=True)
         return ProcessorOutputData(self.chrom_name, data_df)
-
-
-    def fix_inf_pvals(self, neglog_pvals, fname):
-        infs = np.isinf(neglog_pvals)
-        n_infs = np.sum(infs) 
-        if n_infs > 0:
-            self.gp.logger.warning(f"Found {n_infs} infinite p-values for {self.chrom_name}. Setting -neglog10(p-value) to 300. Writing positions to file {fname}.")
-            np.savetxt(fname, np.where(infs)[0], fmt='%d')
-            neglog_pvals[infs] = 300
-        return neglog_pvals

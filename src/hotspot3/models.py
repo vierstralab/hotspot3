@@ -57,6 +57,7 @@ class FitResults:
     r: np.ndarray
     rmsea: np.ndarray
     prop_high_signal: np.ndarray
+    successful_fit_mask: np.ndarray
     bad_fit_params: np.ndarray = None
 
 

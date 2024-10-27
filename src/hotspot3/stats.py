@@ -170,3 +170,10 @@ def calc_pmf_coefs(r, p, tr):
     
     return pmf_coef, pmf_const
 
+def fix_inf_pvals(neglog_pvals, fname):
+    infs = np.isinf(neglog_pvals)
+    n_infs = np.sum(infs) 
+    if n_infs > 0:
+        np.savetxt(fname, np.where(infs)[0], fmt='%d')
+        neglog_pvals[infs] = 300
+    return neglog_pvals

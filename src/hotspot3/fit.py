@@ -76,7 +76,9 @@ class WindowBackgroundFit(BackgroundFit):
         agg_cutcounts[high_signal_mask] = np.nan
         mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=self.config.min_mappable_bg)
         p = self.p_from_mean_and_var(mean, var)
-        r = self.r_from_mean_and_var(mean, var)
+        success_fit_mask = ~p.mask
+        p = p.filled(np.nan).astype(np.float16)
+        r = self.r_from_mean_and_var(mean, var).filled(np.nan).astype(np.float16)
 
         bad_fit = ma.where(mean >= var)[0]
         if len(bad_fit) > 0:
@@ -89,9 +91,15 @@ class WindowBackgroundFit(BackgroundFit):
             bad_fit_params[:, 2] = var[bad_fit]
         else:
             bad_fit_params = None
+        
+        del mean, var
   
         rmsea = np.full_like(mean, np.nan)
-        return FitResults(p, r, rmsea, np.nan, bad_fit_params)
+        return FitResults(
+            p, r, rmsea, np.nan, 
+            successful_fit_mask=success_fit_mask,
+            bad_fit_params=bad_fit_params
+        )
 
     def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count):
         window = self.config.bg_window
