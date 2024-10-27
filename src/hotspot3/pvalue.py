@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.stats as st
-from stats import negbin_neglog10pvalue
+from hotspot3.stats import negbin_neglog10pvalue
 
 
 class PvalueEstimator:

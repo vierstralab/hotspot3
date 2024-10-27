@@ -395,9 +395,6 @@ class ChromosomeProcessor:
 
         # epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
 
-
-    
-
     @ensure_contig_exists
     def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path):
         """
