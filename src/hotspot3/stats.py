@@ -4,6 +4,7 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
 import itertools
+from sortedcontainers import SortedList
 
 
 # Calculate p-values and FDR
@@ -177,3 +178,33 @@ def fix_inf_pvals(neglog_pvals, fname):
         np.savetxt(fname, np.where(infs)[0], fmt='%d')
         neglog_pvals[infs] = 300
     return neglog_pvals
+
+
+def rolling_quantile(arr, w, q):
+    N = len(arr)
+    output = np.empty(N, dtype=arr.dtype)
+    half_w = w // 2
+    L = SortedList()
+
+    for i in range(-half_w, half_w + 1):
+        if 0 <= i < N and not np.isnan(arr[i]):
+            L.add(arr[i])
+
+    for i in range(N):
+        idx_out = i - half_w - 1
+        if 0 <= idx_out < N and not np.isnan(arr[idx_out]):
+            L.remove(arr[idx_out])
+
+        idx_in = i + half_w
+        if 0 <= idx_in < N and not np.isnan(arr[idx_in]):
+            L.add(arr[idx_in])
+
+        n = len(L)
+        if n == 0:
+            output[i] = np.nan
+        else:
+            k = int(round(n * q)) - 1
+            k = max(0, min(k, n - 1))
+            output[i] = L[k]
+
+    return output

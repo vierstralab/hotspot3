@@ -39,7 +39,7 @@ class ChromosomeExtractor:
         return mappable
     
     def extract_cutcounts(self, cutcounts_file):
-        cutcounts = np.zeros(self.chrom_size, dtype=counts_dtype)
+        cutcounts = np.zeros(self.chrom_size, dtype=np.int32)
         try:
             with TabixExtractor(cutcounts_file) as cutcounts_loader:
                 data = cutcounts_loader[self.genomic_interval]
@@ -56,6 +56,12 @@ class ChromosomeExtractor:
         
         agg_cutcounts = self.fit_model.centered_running_nansum(cutcounts, window, min_count=1)
         return agg_cutcounts
+    
+
+    def extract_mappable_agg_cutcounts(self, cutcounts_file, mappable_file):
+        agg_cutcounts = self.extract_aggregated_cutcounts(cutcounts_file)
+        mappable = self.extract_mappable_bases(mappable_file)
+        return ma.masked_where(~mappable, agg_cutcounts)
 
     
     def extract_from_parquet(self, signal_parquet, columns) -> pd.DataFrame:

@@ -32,7 +32,9 @@ class ProcessorConfig:
     bg_window: int = 50001
     min_mappable_bg: int = 10000
     density_step: int = 20
-    signal_quantile: float = 0.975
+    max_background_prop: float = 0.99
+    min_background_prop: float = 0.75
+    window_stats_step: int = 10
     adaptive_signal_tr: bool = False
     nonzero_windows_to_fit: float = 0.01
     fdr_method: str = 'bh'
@@ -56,11 +58,18 @@ class FitResults:
     p: np.ndarray
     r: np.ndarray
     rmsea: np.ndarray
-    prop_high_signal: np.ndarray
-    successful_fit_mask: np.ndarray = None
-    bad_fit_params: np.ndarray = None
+    fit_quantile: np.ndarray
+    fit_threshold: np.ndarray
+    enough_bg_mask: np.ndarray = None
+    poisson_fit_params: np.ndarray = None
 
 
 class NoContigPresentError(Exception):
-    ...
+    """Exception raised when a required contig is not present."""
 
+    def __init__(self, message="No contig is present in the provided data."):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}: {self.message}"

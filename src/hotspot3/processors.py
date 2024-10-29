@@ -313,19 +313,11 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         
         w_fit = WindowBackgroundFit(self.config)
-        mappable_bases = self.extractor.extract_mappable_bases(
-            self.gp.mappable_bases_file
-        )
-
-        agg_cutcounts = self.extractor.extract_aggregated_cutcounts(cutcounts_file)
-        agg_cutcounts = np.ma.masked_where(~mappable_bases, agg_cutcounts)
+        agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(cutcounts_file, self.gp.mappable_bases_file)
 
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable"
         )
-
-        del mappable_bases
-        gc.collect()
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
@@ -349,9 +341,9 @@ class ChromosomeProcessor:
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}.")
-        self.gp.logger.debug(f"{self.chrom_name} signal threshold: {global_fit.prop_high_signal:.3f}. Best RMSEA: {global_fit.rmsea:.3f}")
+        self.gp.logger.debug(f"{self.chrom_name} signal threshold: {global_fit.fit_quantile:.3f}. Best RMSEA: {global_fit.rmsea:.3f}")
 
-        fit_res = w_fit.fit(agg_cutcounts, starting_quantile=global_fit.prop_high_signal)
+        fit_res = w_fit.fit(agg_cutcounts, starting_quantile=global_fit.fit_quantile)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({

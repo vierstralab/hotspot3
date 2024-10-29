@@ -27,39 +27,50 @@ class BackgroundFit:
         with np.errstate(divide='ignore', invalid='ignore'):
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
+    
+    def get_signal_quantiles(self, n_bins=20):
+        return np.linspace(self.config.min_background_prop, self.config.max_background_prop, n_bins + 1)
+    
+    def get_all_quantiles(self, signal_bins=20, background_bins=10):
+        background_bin_edges = np.linspace(0, self.config.min_background_prop, background_bins + 1)[1:-1]
+        signal_bin_edges = self.get_signal_quantiles(signal_bins)
+        return np.concatenate([background_bin_edges, signal_bin_edges])
 
 
 class GlobalBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray) -> FitResults:
         agg_cutcounts = ma.masked_invalid(array).compressed()
-
-        max_cutoff = np.quantile(agg_cutcounts, 0.90)
-        validation_set = agg_cutcounts[agg_cutcounts <= max_cutoff]
-        unique, counts = np.unique(validation_set, return_counts=True)
+        unique, counts = self.hist_data_for_tr(agg_cutcounts)
 
         res = []
-        rmsea = np.inf
-        tr = np.quantile(agg_cutcounts, self.config.signal_quantile)
-        while rmsea > 0.05 and tr > max_cutoff:
+        quantiles = self.get_signal_quantiles()
+        trs = np.unique(np.quantile(agg_cutcounts, quantiles))[::-1]
+        for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
-            rmsea = self.calc_rmsea_for_tr(counts, unique, r, p, tr)
+            rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
             res.append((tr, rmsea))
-            tr -= 1
-        
-        if len(res) == 0:
-            raise NoContigPresentError
-        tr, rmsea = min(res, key=lambda x: x[1])
-        quantile = np.sum(np.sort(agg_cutcounts) <= tr) / agg_cutcounts.shape[0]
+            if rmsea <= 0.05:
+                break
+        else:
+            tr, rmsea = min(res, key=lambda x: x[1])
+        quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
 
-        return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), quantile)
+        return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), quantile, tr)
 
     def fit_for_tr(self, agg_cutcounts, tr):
-        agg_cutcounts = agg_cutcounts[agg_cutcounts <= tr]
+        agg_cutcounts = agg_cutcounts[agg_cutcounts < tr]
         mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
         return p, r
+    
+
+    def hist_data_for_tr(self, agg_cutcounts, tr=None):
+        if tr is not None:
+            agg_cutcounts = agg_cutcounts[agg_cutcounts < tr]
+        unique, counts = np.unique(agg_cutcounts, return_counts=True)
+        return unique, counts
 
 
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
@@ -71,55 +82,171 @@ class GlobalBackgroundFit(BackgroundFit):
         variance = np.var(agg_cutcounts, ddof=1)
         return mean, variance
 
-    def calc_rmsea_for_tr(self, obs, unique_cutcounts, r, p, tr):
+    def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr):
+        mask = unique_cutcounts < tr
+        unique_cutcounts = unique_cutcounts[mask]
+        obs = obs[mask].copy()
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
         # chisq = sum((obs - exp) ** 2 / exp)
+        obs[obs == 0] = 1
         G_sq = 2 * sum(obs * np.log(obs / exp))
         df = len(obs) - 2
         return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
 
 
 class WindowBackgroundFit(BackgroundFit):
-    def fit(self, array: ma.MaskedArray, starting_quantile=None) -> FitResults:
-        if starting_quantile is None:
-            starting_quantile = self.config.signal_quantile
+    def fit(self, array: ma.MaskedArray) -> FitResults:
         agg_cutcounts = array.copy()
-        stratified_cutcounts = self.stratify(agg_cutcounts, 75)
-        sliding_ranks = self.centered_running_rank(stratified_cutcounts, self.config.bg_window, min_count=1)
-        sliding_ranks = self.interpolate_nan(sliding_ranks, 75)
 
-        high_signal_mask = (sliding_ranks > starting_quantile).filled(False)
+        per_window_quantiles, per_window_trs, rmsea = self.find_per_window_tr(agg_cutcounts)
+
+        high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
         agg_cutcounts[high_signal_mask] = np.nan
-        mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=self.config.min_mappable_bg)
-        p = self.p_from_mean_and_var(mean, var)
-        success_fit_mask = ~p.mask
-        p = p.filled(np.nan)
+
+        p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(agg_cutcounts)
+
+        return FitResults(
+            p, r, rmsea,
+            fit_quantile=per_window_quantiles,
+            fit_threshold=per_window_trs,
+            enough_bg_mask=enough_bg_mask,
+            poisson_fit_params=poisson_fit_params
+        )
+    
+    def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, min_count=None, window=None):
+        mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=min_count, window=window)
+        enough_bg_mask = ~mean.mask
+
+        p = self.p_from_mean_and_var(mean, var).filled(np.nan)
         r = self.r_from_mean_and_var(mean, var).filled(np.nan)
 
-        bad_fit = ma.where(mean >= var)[0]
-        if len(bad_fit) > 0:
-            p[bad_fit] = 0
-            r[bad_fit] = np.inf
+        poisson_fit_positions = ma.where(mean >= var)[0]
+        if len(poisson_fit_positions) > 0:
+            p[poisson_fit_positions] = 0
+            r[poisson_fit_positions] = np.inf
 
-            bad_fit_params = np.empty((len(bad_fit), 3), dtype=np.float64)
-            bad_fit_params[:, 0] = bad_fit
-            bad_fit_params[:, 1] = mean[bad_fit]
-            bad_fit_params[:, 2] = var[bad_fit]
+            poisson_fit_params = np.empty((len(poisson_fit_positions), 3), dtype=np.float64)
+            poisson_fit_params[:, 0] = poisson_fit_positions
+            poisson_fit_params[:, 1] = mean[poisson_fit_positions]
+            poisson_fit_params[:, 2] = var[poisson_fit_positions]
         else:
-            bad_fit_params = None
+            poisson_fit_params = None
+
+        return p, r, enough_bg_mask, poisson_fit_params
+    
+    @wrap_masked
+    def find_per_window_tr(self, agg_cutcounts):
+        original_shape = agg_cutcounts.shape
+        collapsed_bg_window = self.config.bg_window // self.config.window
+        min_count = self.config.min_mappable_bg // self.config.window_stats_step
+        collapsed_agg_cutcounts = rolling_view_with_nan_padding_subsample(
+            agg_cutcounts[::self.config.window],
+            window_size=collapsed_bg_window,
+            subsample_step=self.config.window_stats_step
+        ) # Shape (n_points, collapsed_bg_window)
+
+        right_edges = np.round(
+            np.nanquantile(collapsed_agg_cutcounts, self.get_all_quantiles(), axis=1).T
+        ).astype(np.int32) # Shape (n_points, num_bins)
+
+        # collapsed_agg_cutcounts = collapsed_agg_cutcounts[collapsed_agg_cutcounts < right_edges[:, -1][:, None]]
         
-        del mean, var
-  
-        rmsea = np.full_like(p, np.nan)
-        return FitResults(
-            p, r, rmsea, np.nan, 
-            successful_fit_mask=success_fit_mask,
-            bad_fit_params=bad_fit_params
+        value_counts = np.full_like(right_edges, 0, dtype=np.int16)
+
+        left_edges = np.zeros(right_edges.shape[0])
+        for i in range(right_edges.shape[1]):
+            bin_membership = (collapsed_agg_cutcounts[:, i] >= left_edges) & (collapsed_agg_cutcounts[:, i] < right_edges[:, i])
+            value_counts[:, i] = np.sum(bin_membership, axis=1)
+            left_edges = right_edges[:, i]
+
+
+        enough_bg_mask = (~np.isnan(collapsed_agg_cutcounts)).sum(axis=1) > min_count
+
+        mean = np.nanmean(collapsed_agg_cutcounts, axis=1)
+        var = np.nanvar(collapsed_agg_cutcounts, axis=1, ddof=1)
+
+        p = self.p_from_mean_and_var(mean, var)
+        r = self.r_from_mean_and_var(mean, var)
+
+        poisson_indices = np.where(mean >= var)[0]
+        p[poisson_indices] = 0
+        r[poisson_indices] = np.inf
+
+        rmsea = np.full(mean.shape, np.nan)
+
+        negbin_fit = enough_bg_mask.copy()
+        negbin_fit[poisson_indices] = False
+
+        rmsea[negbin_fit] = self.calc_rmsea_all_windows(
+            r[negbin_fit], p[negbin_fit],
+            right_edges.T[negbin_fit],
+            value_counts.T[negbin_fit]
         )
 
-    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count):
-        window = self.config.bg_window
+        rmsea[poisson_indices] = -1
+
+        bad_fits = np.where(enough_bg_mask & (rmsea > 0.05))[0]
+        trs = np.full_like(rmsea, np.nan)
+        trs[~bad_fits] = right_edges[~bad_fits, -1]
+
+        for i, r_edge in enumerate(right_edges[:, ::-1].T):
+            if bad_fits.size == 0 or i == 20:
+                break
+            collapsed_agg_cutcounts = collapsed_agg_cutcounts[collapsed_agg_cutcounts <= r_edge[:, None]]
+            right_edges = right_edges[:, :-1]
+            value_counts = value_counts[:, :-1]
+
+            mean = np.nanmean(collapsed_agg_cutcounts, axis=1)
+            var = np.nanvar(collapsed_agg_cutcounts, axis=1, ddof=1)
+
+            enough_bg_mask = (~np.isnan(collapsed_agg_cutcounts)).sum(axis=1) > min_count
+
+            p = self.p_from_mean_and_var(mean, var)
+            r = self.r_from_mean_and_var(mean, var)
+
+            poisson_indices = np.where(mean >= var)[0]
+            p[poisson_indices] = 0
+            r[poisson_indices] = np.inf
+
+            negbin_fit = enough_bg_mask.copy()
+            negbin_fit[poisson_indices] = False
+
+            rmsea[negbin_fit] = self.calc_rmsea_all_windows(
+                r[negbin_fit], p[negbin_fit],
+                right_edges.T[negbin_fit],
+                value_counts.T[negbin_fit]
+            )
+
+            rmsea[poisson_indices] = -1
+
+            bad_fits = np.where(enough_bg_mask & (rmsea > 0.05))[0]
+            new_good_fits = np.isnan(trs) & ~bad_fits
+            trs[new_good_fits] = right_edges[new_good_fits, -1]
+
+        result = np.full_like(original_shape, np.nan)
+        result[::self.config.window][::self.config.window_stats_step] = trs
+        return result
+
+    def get_observed_per_bin(self, cutcounts, cutcounts_bin_edges, collapsed_bg_window):
+        observed_per_bin = np.zeros_like(cutcounts_bin_edges)
+        collapsed_bg_window = np.ceil(self.config.bg_window / self.config.window_stats_step).astype(int)
+
+        for i in range(cutcounts_bin_edges.shape[0] - 1):
+            left, right = cutcounts_bin_edges[i], cutcounts_bin_edges[i + 1]
+            observed_per_bin[i] = self.centered_running_nansum(
+                (cutcounts >= left) & (cutcounts < right),
+                collapsed_bg_window
+            )
+
+        return observed_per_bin
+
+    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None):
+        if window is None:
+            window = self.config.bg_window
+
+        if min_count is None:
+            min_count = self.config.min_mappable_bg
 
         mean = self.centered_running_nanmean(array, window, min_count=min_count)
         var = self.centered_running_nanvar(array, window, min_count=min_count)
@@ -201,41 +328,47 @@ class WindowBackgroundFit(BackgroundFit):
     @wrap_masked
     def calc_rmsea_all_windows(
         self,
-        aggregated_cutcounts,
         r, p,
-        bin_edges, # left edge inclusive, must be unique
+        right_bin_edges, # right edges of the bins, left edge of the first bin is 0, right edge not inclusive
+        value_counts_per_bin, # number of observed cutcounts in each bin for each window
     ):
         """
         Calculate RMSEA for all sliding windows.
         """
         # assert (bg_window - 1) % step == 0, "Stride should be a divisor of the window size."
-        bg_sum_mappable = self.centered_running_nansum(~np.isnan(aggregated_cutcounts), self.config.bg_window)
+        bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
+        tr = right_bin_edges[-1]
 
-        G_sq = np.zeros_like(aggregated_cutcounts)
-        prev_cdf = betainc(r, bin_edges[0], 1 - p, dtype=np.float32)
-        norm_coef = betainc(r, bin_edges[-1], 1 - p, dtype=np.float32) - prev_cdf
-        for i in range(len(bin_edges) - 1):
-            left = bin_edges[i]
-            right = bin_edges[i + 1]
+        assert len(r) == len(p) == len(bg_sum_mappable) == len(tr)
 
-            observed = self.centered_running_nansum(
-                (aggregated_cutcounts >= left) & (aggregated_cutcounts < right),
-                self.config.bg_window
-            )
+        G_sq = np.zeros(value_counts_per_bin.shape[1], dtype=np.float32)
+        num_nonzero_bins = np.zeros_like(G_sq)
+        prev_cdf = 0.0
+        norm_coef = betainc(r, tr - 1, 1 - p, dtype=np.float32)
+        for i in range(len(right_bin_edges)):
+            right = right_bin_edges[i]
+            if i == 0:
+                nonzero_expected_count_indicator = np.full_like(right, True, dtype=bool)
+            else:
+                nonzero_expected_count_indicator = right != right_bin_edges[i - 1]
 
-            if i == len(bin_edges) - 2:
+            num_nonzero_bins += nonzero_expected_count_indicator
+            observed = value_counts_per_bin[i]
+
+            if i == len(right_bin_edges) - 1:
                 new_cdf = norm_coef
             else:
-                new_cdf = betainc(r, right, 1 - p, dtype=np.float32)
+                new_cdf = betainc(r, right - 1, 1 - p, dtype=np.float32)
             expected = (new_cdf - prev_cdf) * bg_sum_mappable / norm_coef
             prev_cdf = new_cdf
 
-            G_sq += calc_g_sq(
-                observed, expected
+            G_sq[nonzero_expected_count_indicator] += calc_g_sq(
+                observed[nonzero_expected_count_indicator],
+                expected[nonzero_expected_count_indicator],
             )
 
-        df = len(bin_edges) - 1 - 2 # number of bins - number of parameters
-        return np.sqrt(np.clip(G_sq / df - 1, 0, None) / (bg_sum_mappable - 1))
+        df = num_nonzero_bins - 2 # number of bins - number of parameters
+        return np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1))
 
 
 def correct_offset(function, array, window, *args, **kwargs):
@@ -257,3 +390,34 @@ def calc_g_sq(obs, exp):
     ratio = obs / exp
     ratio[ratio == 0] = 1
     return obs * np.log(ratio) * 2
+
+
+def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step=1000):
+    """
+    Creates a 2D array where each row is a shifted view of the original array with NaN padding.
+    Only every 'subsample_step' row is taken to reduce memory usage.
+
+    Parameters:
+        arr (np.ndarray): Input array of shape (n,)
+        window_size (int): The total size of the shift (default is 501 for shifts from -250 to +250)
+        subsample_step (int): Step size for subsampling (default is 1000)
+
+    Returns:
+        np.ndarray: A subsampled array with NaN padding, of shape (n // subsample_step, window_size)
+    """
+    n = arr.shape[0]
+    assert window_size % 2 == 1, "Window size must be odd to have a center shift of 0."
+    
+    # Calculate padding for out-of-bound shifts
+    pad_width = (window_size - 1) // 2
+    padded_arr = np.pad(arr, pad_width, mode='constant', constant_values=np.nan)
+    
+    # Calculate the number of rows after subsampling
+    subsample_count = (n + subsample_step - 1) // subsample_step
+    
+    # Create a strided view with only every 'subsample_step' row
+    shape = (subsample_count, window_size)
+    strides = (padded_arr.strides[0] * subsample_step, padded_arr.strides[0])
+    subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
+    
+    return subsampled_view
