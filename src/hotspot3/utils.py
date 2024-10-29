@@ -105,3 +105,19 @@ def compress_masked_arg(arg):
         return arg.filled(np.nan)
     else:
         return arg
+
+def correct_offset(function):
+    """
+    Correct offset of a trailing running window to make it centered.
+    """
+    def wrapper(array, window, *args, **kwargs):
+        assert window % 2 == 1, "Window size should be odd"
+        offset = window // 2
+        result = function(
+            np.pad(array, (0, offset), mode='constant', constant_values=np.nan),
+            window,
+            *args,
+            **kwargs
+        )
+        return result[offset:]
+    return wrapper

@@ -2,7 +2,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
-from hotspot3.utils import wrap_masked
+from hotspot3.utils import wrap_masked, correct_offset
 import bottleneck as bn
 from scipy.special import betainc
 
@@ -36,8 +36,22 @@ class BackgroundFit:
         signal_bin_edges = self.get_signal_quantiles(signal_bins)
         return np.concatenate([background_bin_edges, signal_bin_edges])
 
+    def pack_poisson_params(self, mean, var, p, r):
+        poisson_fit_positions = np.where(mean >= var)[0]
+        poisson_fit_params = np.empty((len(poisson_fit_positions), 3), dtype=np.float64)
+        poisson_fit_params[:, 0] = poisson_fit_positions
+        poisson_fit_params[:, 1] = mean[poisson_fit_positions]
+        poisson_fit_params[:, 2] = var[poisson_fit_positions]
+
+        p[poisson_fit_positions] = 0
+        r[poisson_fit_positions] = np.inf
+        return poisson_fit_params
+
 
 class GlobalBackgroundFit(BackgroundFit):
+    """
+    Class to fit the background distribution globally (for chromosome)
+    """
     def fit(self, array: ma.MaskedArray) -> FitResults:
         agg_cutcounts = ma.masked_invalid(array).compressed()
         unique, counts = self.hist_data_for_tr(agg_cutcounts)
@@ -96,16 +110,19 @@ class GlobalBackgroundFit(BackgroundFit):
 
 
 class WindowBackgroundFit(BackgroundFit):
-    def fit(self, array: ma.MaskedArray) -> FitResults:
+    """
+    Class to fit the background distribution in a running window fashion
+    """
+    def fit(self, array: ma.MaskedArray, per_window_trs) -> FitResults:
         agg_cutcounts = array.copy()
-
-        per_window_quantiles, per_window_trs, rmsea = self.find_per_window_tr(agg_cutcounts)
 
         high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
         agg_cutcounts[high_signal_mask] = np.nan
 
         p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(agg_cutcounts)
 
+        rmsea = np.full_like(p, np.nan)
+        per_window_quantiles = np.full_like(p, np.nan)
         return FitResults(
             p, r, rmsea,
             fit_quantile=per_window_quantiles,
@@ -121,125 +138,8 @@ class WindowBackgroundFit(BackgroundFit):
         p = self.p_from_mean_and_var(mean, var).filled(np.nan)
         r = self.r_from_mean_and_var(mean, var).filled(np.nan)
 
-        poisson_fit_positions = ma.where(mean >= var)[0]
-        if len(poisson_fit_positions) > 0:
-            p[poisson_fit_positions] = 0
-            r[poisson_fit_positions] = np.inf
-
-            poisson_fit_params = np.empty((len(poisson_fit_positions), 3), dtype=np.float64)
-            poisson_fit_params[:, 0] = poisson_fit_positions
-            poisson_fit_params[:, 1] = mean[poisson_fit_positions]
-            poisson_fit_params[:, 2] = var[poisson_fit_positions]
-        else:
-            poisson_fit_params = None
-
+        poisson_fit_params = self.pack_poisson_params(mean, var, p, r)
         return p, r, enough_bg_mask, poisson_fit_params
-    
-    @wrap_masked
-    def find_per_window_tr(self, agg_cutcounts):
-        original_shape = agg_cutcounts.shape
-        collapsed_bg_window = self.config.bg_window // self.config.window
-        min_count = self.config.min_mappable_bg // self.config.window_stats_step
-        collapsed_agg_cutcounts = rolling_view_with_nan_padding_subsample(
-            agg_cutcounts[::self.config.window],
-            window_size=collapsed_bg_window,
-            subsample_step=self.config.window_stats_step
-        ) # Shape (n_points, collapsed_bg_window)
-
-        right_edges = np.round(
-            np.nanquantile(collapsed_agg_cutcounts, self.get_all_quantiles(), axis=1).T
-        ).astype(np.int32) # Shape (n_points, num_bins)
-
-        # collapsed_agg_cutcounts = collapsed_agg_cutcounts[collapsed_agg_cutcounts < right_edges[:, -1][:, None]]
-        
-        value_counts = np.full_like(right_edges, 0, dtype=np.int16)
-
-        left_edges = np.zeros(right_edges.shape[0])
-        for i in range(right_edges.shape[1]):
-            bin_membership = (collapsed_agg_cutcounts[:, i] >= left_edges) & (collapsed_agg_cutcounts[:, i] < right_edges[:, i])
-            value_counts[:, i] = np.sum(bin_membership, axis=1)
-            left_edges = right_edges[:, i]
-
-
-        enough_bg_mask = (~np.isnan(collapsed_agg_cutcounts)).sum(axis=1) > min_count
-
-        mean = np.nanmean(collapsed_agg_cutcounts, axis=1)
-        var = np.nanvar(collapsed_agg_cutcounts, axis=1, ddof=1)
-
-        p = self.p_from_mean_and_var(mean, var)
-        r = self.r_from_mean_and_var(mean, var)
-
-        poisson_indices = np.where(mean >= var)[0]
-        p[poisson_indices] = 0
-        r[poisson_indices] = np.inf
-
-        rmsea = np.full(mean.shape, np.nan)
-
-        negbin_fit = enough_bg_mask.copy()
-        negbin_fit[poisson_indices] = False
-
-        rmsea[negbin_fit] = self.calc_rmsea_all_windows(
-            r[negbin_fit], p[negbin_fit],
-            right_edges.T[negbin_fit],
-            value_counts.T[negbin_fit]
-        )
-
-        rmsea[poisson_indices] = -1
-
-        bad_fits = np.where(enough_bg_mask & (rmsea > 0.05))[0]
-        trs = np.full_like(rmsea, np.nan)
-        trs[~bad_fits] = right_edges[~bad_fits, -1]
-
-        for i, r_edge in enumerate(right_edges[:, ::-1].T):
-            if bad_fits.size == 0 or i == 20:
-                break
-            collapsed_agg_cutcounts = collapsed_agg_cutcounts[collapsed_agg_cutcounts <= r_edge[:, None]]
-            right_edges = right_edges[:, :-1]
-            value_counts = value_counts[:, :-1]
-
-            mean = np.nanmean(collapsed_agg_cutcounts, axis=1)
-            var = np.nanvar(collapsed_agg_cutcounts, axis=1, ddof=1)
-
-            enough_bg_mask = (~np.isnan(collapsed_agg_cutcounts)).sum(axis=1) > min_count
-
-            p = self.p_from_mean_and_var(mean, var)
-            r = self.r_from_mean_and_var(mean, var)
-
-            poisson_indices = np.where(mean >= var)[0]
-            p[poisson_indices] = 0
-            r[poisson_indices] = np.inf
-
-            negbin_fit = enough_bg_mask.copy()
-            negbin_fit[poisson_indices] = False
-
-            rmsea[negbin_fit] = self.calc_rmsea_all_windows(
-                r[negbin_fit], p[negbin_fit],
-                right_edges.T[negbin_fit],
-                value_counts.T[negbin_fit]
-            )
-
-            rmsea[poisson_indices] = -1
-
-            bad_fits = np.where(enough_bg_mask & (rmsea > 0.05))[0]
-            new_good_fits = np.isnan(trs) & ~bad_fits
-            trs[new_good_fits] = right_edges[new_good_fits, -1]
-
-        result = np.full_like(original_shape, np.nan)
-        result[::self.config.window][::self.config.window_stats_step] = trs
-        return result
-
-    def get_observed_per_bin(self, cutcounts, cutcounts_bin_edges, collapsed_bg_window):
-        observed_per_bin = np.zeros_like(cutcounts_bin_edges)
-        collapsed_bg_window = np.ceil(self.config.bg_window / self.config.window_stats_step).astype(int)
-
-        for i in range(cutcounts_bin_edges.shape[0] - 1):
-            left, right = cutcounts_bin_edges[i], cutcounts_bin_edges[i + 1]
-            observed_per_bin[i] = self.centered_running_nansum(
-                (cutcounts >= left) & (cutcounts < right),
-                collapsed_bg_window
-            )
-
-        return observed_per_bin
 
     def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None):
         if window is None:
@@ -253,82 +153,140 @@ class WindowBackgroundFit(BackgroundFit):
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
         return mean, var
-
-    @wrap_masked
-    def move_sum_with_dtype(self, array, window, min_count):
-        array = np.asarray(array, np.float32)
-        return bn.move_sum(array, window, min_count=min_count).astype(np.float32)
     
     @wrap_masked
-    def move_rank_with_dtype(self, array, window, min_count):
-        array = np.asarray(array, np.float32)
-        return (bn.move_rank(array, window, min_count=min_count).astype(np.float32) + 1.) / 2.
-    
-    @wrap_masked
-    def centered_running_nanvar(self, array, window, min_count):
-        return correct_offset(bn.move_var, array, window, ddof=1, min_count=min_count).astype(np.float32)
-
-    @wrap_masked
-    def centered_running_nanmean(self, array, window, min_count):
-        return correct_offset(bn.move_mean, array, window, min_count=min_count).astype(np.float32)
-    
-    @wrap_masked
+    @correct_offset
     def centered_running_nansum(self, array: np.ndarray, window, min_count):
-        return correct_offset(self.move_sum_with_dtype, array, window, min_count=min_count)
+        return bn.move_sum(array, window, min_count=min_count).astype(np.float32)
+
+    @wrap_masked
+    @correct_offset
+    def centered_running_nanvar(self, array, window, min_count):
+        return bn.move_var(array, window, ddof=1, min_count=min_count).astype(np.float32)
+
+    @wrap_masked
+    @correct_offset
+    def centered_running_nanmean(self, array, window, min_count):
+        return bn.move_mean(array, window, min_count=min_count).astype(np.float32)
     
     @wrap_masked
     def stratify(self, array, step):
         res = np.full_like(array, np.nan)
         res[::step] = array[::step]
         return res
+
+
+class StridedFit(BackgroundFit):
+    """
+    Class to fit the background distribution using a strided approach.
+    Extemely computationally taxing, use large stride values to compensate.
+    """
+
+    def __init__(self, config=None):
+        super().__init__(config)
+        self.bg_window = self.config.bg_window // self.config.window
+        self.min_count = self.config.min_mappable_bg // self.config.window_stats_step
+        self.window = self.config.window
+        self.window_stats_step = self.config.window_stats_step
+
+
+    def get_right_edges(self, strided_agg_cutcounts):
+        return np.round(
+            np.nanquantile(
+                strided_agg_cutcounts,
+                self.get_all_quantiles(),
+                axis=0
+            )
+        ).astype(np.int32)
     
-    @wrap_masked
-    def interpolate_nan(self, arr, step):
-        indices = np.arange(0, len(arr), step, dtype=np.uint32)
-        subsampled_arr = arr[::step].copy()
+    def value_counts_per_bin(self, strided_cutcounts, right_edges):
+        value_counts = np.full_like(right_edges, 0, dtype=np.int16)
+
+        left_edges = np.zeros(right_edges.shape[0])
+        for i in range(right_edges.shape[1]):
+            bin_membership = (strided_cutcounts[:, i] >= left_edges) & (strided_cutcounts[:, i] < right_edges[:, i])
+            value_counts[:, i] = np.sum(bin_membership, axis=1)
+            left_edges = right_edges[:, i]
         
-        nan_mask = np.isnan(subsampled_arr)
-        if nan_mask.any():
-            valid_indices = np.where(~nan_mask)[0]
-            nan_indices = np.where(nan_mask)[0]
-            subsampled_arr[nan_mask] = np.interp(
-                nan_indices, valid_indices, subsampled_arr[valid_indices]
+        return value_counts
+
+    def fit_for_bin(self, collapsed_agg_cutcounts):
+        enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts), axis=1) > self.min_count
+
+        mean = np.nanmean(collapsed_agg_cutcounts, axis=1)
+        mean[~enough_bg_mask] = np.nan
+        var = np.nanvar(collapsed_agg_cutcounts, axis=1, ddof=1)
+        var[~enough_bg_mask] = np.nan
+
+        p = self.p_from_mean_and_var(mean, var)
+        r = self.r_from_mean_and_var(mean, var)
+        poisson_params = self.pack_poisson_params(mean, var, p, r)
+
+        return p, r, enough_bg_mask, poisson_params
+    
+    def wrap_rmsea_valid_fits(self, p, r, enough_bg_mask, poisson_params, right_edges, value_counts):
+        result = np.full_like(p, np.nan)
+        indices = poisson_params.astype(np.int32)[:, 0]
+        result[indices] = -1
+
+        negbin_fit_mask = enough_bg_mask.copy()
+        negbin_fit_mask[indices] = False
+
+        result[negbin_fit_mask] = self.calc_rmsea_all_windows(
+            r[negbin_fit_mask], p[negbin_fit_mask],
+            right_edges[negbin_fit_mask, :],
+            value_counts[negbin_fit_mask, :]
+        )
+        return result
+        
+    @wrap_masked
+    def find_per_window_tr(self, array: ma.MaskedArray):
+        original_shape = array.shape
+        agg_cutcounts = array[::self.window].copy()
+
+        strided_agg_cutcounts = rolling_view_with_nan_padding_subsample(
+            agg_cutcounts,
+            window_size= self.bg_window,
+            subsample_step=self.window_stats_step
+        ) # shape (bg_window, n_points)
+
+        signal_quantiles = self.get_signal_quantiles()
+
+        right_edges = self.get_right_edges(strided_agg_cutcounts)
+        value_counts = self.value_counts_per_bin(strided_agg_cutcounts, right_edges)
+
+        best_tr = np.full_like(right_edges.shape[1], np.nan)
+        remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
+        for i in range(len(signal_quantiles)):
+            if remaing_fits_mask.sum() == 0:
+                break
+            right_edges = right_edges[:-1, :]
+            value_counts = value_counts[:-1, :]
+            strided_agg_cutcounts[strided_agg_cutcounts >= right_edges[-1, :]] = np.nan
+
+            edges = right_edges[:, remaing_fits_mask]
+            counts = value_counts[:, remaing_fits_mask]
+
+            p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
+                strided_agg_cutcounts[:, remaing_fits_mask]
             )
 
-        return np.interp(
-            np.arange(len(arr), dtype=np.uint32),
-            indices,
-            subsampled_arr,
-            left=None,
-            right=None,
-        )
-
-    @wrap_masked
-    def centered_running_rank(self, array, window, min_count):
-        """
-        Calculate the rank of the center value in a moving window.
-        Ignore NaN values.
-        """
-        assert window % 2 == 1, "Window size should be odd"
-        half_window = window // 2 + 1
-        not_nan = (~np.isnan(array)).astype(np.float32)
-
-        trailing_ranks = self.move_rank_with_dtype(array, half_window, min_count=min_count)
-        trailing_ranks *= self.move_sum_with_dtype(not_nan, half_window, min_count) - 1
-
-        leading_ranks = self.move_rank_with_dtype(array[::-1], half_window, min_count=min_count)[::-1]
-        leading_ranks *= self.move_sum_with_dtype(not_nan[::-1], half_window, min_count)[::-1] - 1
+            rmsea = self.wrap_rmsea_valid_fits(p, r, enough_bg_mask, poisson_params, edges, counts) # shape of r
+            
+            successful_fits = ~enough_bg_mask | (rmsea <= 0.05)
+            remaing_fits_mask[remaing_fits_mask] = ~successful_fits
+    
+            best_tr[remaing_fits_mask] = edges[-1, successful_fits]
         
-        combined_ranks = trailing_ranks + leading_ranks
-        denom = self.centered_running_nansum(not_nan, window, min_count=min_count) - 1
-        denom[denom == 0] = 1.
-        combined_ranks /= denom
-        return combined_ranks
+        result = np.full_like(original_shape, np.nan)
+        result[::self.window][::self.window_stats_step] = best_tr
+        return self.interpolate_nan(result)
+
 
     @wrap_masked
     def calc_rmsea_all_windows(
         self,
-        r, p,
+        p, r,
         right_bin_edges, # right edges of the bins, left edge of the first bin is 0, right edge not inclusive
         value_counts_per_bin, # number of observed cutcounts in each bin for each window
     ):
@@ -370,20 +328,26 @@ class WindowBackgroundFit(BackgroundFit):
         df = num_nonzero_bins - 2 # number of bins - number of parameters
         return np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1))
 
+    @wrap_masked
+    def interpolate_nan(self, arr, step):
+        indices = np.arange(0, len(arr), step, dtype=np.uint32)
+        subsampled_arr = arr[::step].copy()
+        
+        nan_mask = np.isnan(subsampled_arr)
+        if nan_mask.any():
+            valid_indices = np.where(~nan_mask)[0]
+            nan_indices = np.where(nan_mask)[0]
+            subsampled_arr[nan_mask] = np.interp(
+                nan_indices, valid_indices, subsampled_arr[valid_indices]
+            )
 
-def correct_offset(function, array, window, *args, **kwargs):
-    """
-    Correct offset of a trailing running window to make it centered.
-    """
-    assert window % 2 == 1, "Window size should be odd"
-    offset = window // 2
-    result = function(
-        np.pad(array, (0, offset), mode='constant', constant_values=np.nan),
-        window,
-        *args,
-        **kwargs
-    )
-    return result[offset:]
+        return np.interp(
+            np.arange(len(arr), dtype=np.uint32),
+            indices,
+            subsampled_arr,
+            left=None,
+            right=None,
+        )
 
 
 def calc_g_sq(obs, exp):
@@ -420,4 +384,4 @@ def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step
     strides = (padded_arr.strides[0] * subsample_step, padded_arr.strides[0])
     subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
     
-    return subsampled_view
+    return subsampled_view.T

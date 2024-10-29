@@ -16,7 +16,7 @@ from hotspot3.logging import setup_logger
 from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
-from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit
+from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedFit
 
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
@@ -313,7 +313,10 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         
         w_fit = WindowBackgroundFit(self.config)
-        agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(cutcounts_file, self.gp.mappable_bases_file)
+        agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(
+            cutcounts_file,
+            self.gp.mappable_bases_file
+        )
 
         self.gp.logger.debug(
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable"
@@ -342,8 +345,11 @@ class ChromosomeProcessor:
         # self.to_parquet(params_df, params_outpath)
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}.")
         self.gp.logger.debug(f"{self.chrom_name} signal threshold: {global_fit.fit_quantile:.3f}. Best RMSEA: {global_fit.rmsea:.3f}")
+        
+        rmsea_fit = StridedFit(self.config)
+        per_window_signal_trs = rmsea_fit.find_per_window_tr(agg_cutcounts)
 
-        fit_res = w_fit.fit(agg_cutcounts, starting_quantile=global_fit.fit_quantile)
+        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
