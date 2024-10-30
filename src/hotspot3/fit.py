@@ -3,18 +3,29 @@ import numpy as np
 from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
 from hotspot3.utils import wrap_masked, correct_offset
+from hotspot3.logging import setup_logger
 import bottleneck as bn
-from scipy.special import betainc
 
 
 class BackgroundFit:
-    def __init__(self, config: ProcessorConfig=None):
+    def __init__(self, config: ProcessorConfig=None, logger=None):
         if config is None:
             config = ProcessorConfig()
         self.config = config
 
+        if logger is None:
+            logger = setup_logger()
+        self.logger = logger
+
+
     def fit(self) -> FitResults:
         raise NotImplementedError
+    
+    @wrap_masked
+    def get_mean_and_var(self, array: np.ndarray):
+        mean = np.nanmean(array, axis=0, dtype=np.float32)
+        var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32)
+        return mean, var
 
     @wrap_masked
     def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
@@ -85,7 +96,7 @@ class GlobalBackgroundFit(BackgroundFit):
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
             res.append((tr, rmsea))
-            if rmsea <= 0.05:
+            if rmsea <= self.config.rmsea_tr:
                 break
         else:
             tr, rmsea = min(res, key=lambda x: x[1])
@@ -112,10 +123,10 @@ class GlobalBackgroundFit(BackgroundFit):
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
         has_enough_background = np.count_nonzero(agg_cutcounts) / agg_cutcounts.size > self.config.nonzero_windows_to_fit
         if not has_enough_background:
+            self.logger.warning("Not enough background to fit the global mean")
             raise NoContigPresentError
         
-        mean = np.mean(agg_cutcounts)
-        variance = np.var(agg_cutcounts, ddof=1)
+        mean, variance = self.get_mean_and_var(agg_cutcounts)
         return mean, variance
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr):
@@ -129,7 +140,6 @@ class GlobalBackgroundFit(BackgroundFit):
         # obs[obs == 0] = 1
         # G_sq = 2 * sum(obs * np.log(obs / exp))
         df = len(obs) - 2
-        print(df)
         return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
 
 
@@ -206,8 +216,8 @@ class StridedFit(BackgroundFit):
     Extemely computationally taxing, use large stride values to compensate.
     """
 
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, logger=None):
+        super().__init__(config, logger=logger)
         self.sampling_step = self.config.bg_window // self.config.signal_prop_n_samples
         self.interpolation_step = self.config.signal_prop_step // self.sampling_step
     
@@ -274,13 +284,12 @@ class StridedFit(BackgroundFit):
             window_size=self.config.signal_prop_n_samples,
             subsample_step=self.interpolation_step
         ) # shape (bg_window, n_points)
-        print(strided_agg_cutcounts.shape, self.config.signal_prop_n_samples, self.interpolation_step)
         bin_edges = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
         best_tr = bin_edges[-1].copy()
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
-        current_rmsea = np.full_like(best_tr, np.nan, dtype=np.float32)
+        best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
         step = 1
         for i in range(0, self.config.num_signal_bins, step):
             if remaing_fits_mask.sum() == 0:
@@ -299,16 +308,44 @@ class StridedFit(BackgroundFit):
 
             rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
             
-            successful_fits = ~enough_bg_mask | (rmsea <= 0.05)
-            best_tr[remaing_fits_mask] = np.where(successful_fits, edges[-1], best_tr[remaing_fits_mask])   
-            current_rmsea[remaing_fits_mask] = rmsea
-            remaing_fits_mask[remaing_fits_mask] = ~successful_fits
-            print('Remaining fits:', remaing_fits_mask.shape, remaing_fits_mask.sum())
+            # best fit found
+            successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
+            better_fit = np.where(
+                (rmsea < best_rmsea[remaing_fits_mask]),
+                True,
+                False
+            )
+            best_tr[remaing_fits_mask] = np.where(
+                better_fit,
+                edges[-1],
+                best_tr[remaing_fits_mask]
+            )
+            best_rmsea[remaing_fits_mask] = np.where(
+                better_fit,
+                rmsea,
+                best_rmsea[remaing_fits_mask]
+            )
 
-        subsampled_indices = np.arange(0, original_shape[0], self.sampling_step, dtype=np.uint32)[::self.interpolation_step]
-        print(subsampled_indices[remaing_fits_mask])
-        print(np.where(remaing_fits_mask)[0])
-        return self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
+            # Not enough background
+            best_tr[remaing_fits_mask] = np.where(
+                ~enough_bg_mask,
+                np.nan,
+                best_tr[remaing_fits_mask]
+            )
+            best_rmsea[remaing_fits_mask] = np.where(
+                ~enough_bg_mask,
+                np.nan,
+                best_rmsea[remaing_fits_mask]
+            )
+
+            remaing_fits_mask[remaing_fits_mask] = ~successful_fits 
+            self.logger.debug(f"Remaining fits: {remaing_fits_mask.sum()}")
+
+        subsampled_indices = np.arange(
+            0, original_shape[0], self.sampling_step, dtype=np.uint32
+        )[::self.interpolation_step]
+
+        return self.interpolate_nan(original_shape[0], best_tr, subsampled_indices), self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
 
 
     @wrap_masked

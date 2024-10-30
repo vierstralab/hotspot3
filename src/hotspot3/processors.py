@@ -347,7 +347,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name} signal threshold: {global_fit.fit_quantile:.3f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
         rmsea_fit = StridedFit(self.config)
-        per_window_signal_trs = rmsea_fit.find_per_window_tr(agg_cutcounts)
+        per_window_signal_trs, per_window_rmsea = rmsea_fit.find_per_window_tr(agg_cutcounts)
 
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs)
         
@@ -355,13 +355,13 @@ class ChromosomeProcessor:
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea': fit_res.rmsea,
+            'rmsea': per_window_rmsea,
         })
         self.to_parquet(df, f"{outdir}.fit_results.parquet")
         del df
         gc.collect()
 
-        bad_fits = fit_res.bad_fit_params
+        bad_fits = fit_res.poisson_fit_params
         if bad_fits is not None:
             self.gp.logger.debug(f"Low variance for {len(bad_fits)} windows for {self.chrom_name}")
   
@@ -376,7 +376,7 @@ class ChromosomeProcessor:
             agg_cutcounts,
             fit_res.r,
             fit_res.p,
-            fit_res.successful_fit_mask,
+            fit_res.enough_bg_mask,
             bad_fits=bad_fits
         )
         del agg_cutcounts
