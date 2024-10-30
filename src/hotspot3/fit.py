@@ -28,13 +28,36 @@ class BackgroundFit:
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
     
-    def get_signal_quantiles(self, n_bins=20):
-        return np.linspace(self.config.min_background_prop, self.config.max_background_prop, n_bins + 1)
+    def get_min_bg_tr(self, array):
+        return np.nanquantile(array, self.config.min_background_prop, axis=0)
     
-    def get_all_quantiles(self, signal_bins=20, background_bins=10):
-        background_bin_edges = np.linspace(0, self.config.min_background_prop, background_bins + 1)[1:-1]
-        signal_bin_edges = self.get_signal_quantiles(signal_bins)
-        return np.concatenate([background_bin_edges, signal_bin_edges])
+    def get_max_bg_tr(self, array: np.ndarray):
+        return np.nanquantile(array, self.config.max_background_prop, axis=0)
+    
+    def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
+        if min_bg_tr is None:
+            min_bg_tr = self.get_min_bg_tr(array)
+        max_bg_tr = self.get_max_bg_tr(array)
+        n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
+        n_signal_bins = round(n_signal_bins)
+        return np.round(np.linspace(
+            min_bg_tr,
+            max_bg_tr,
+            n_signal_bins + 1
+        )).astype(np.int32)
+        
+    
+    def get_all_bins(self, array: np.ndarray):
+        min_bg_tr = self.get_min_bg_tr(array)
+        n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
+        n_bg_bins = round(n_bg_bins)
+        bg_bins = np.round(np.linspace(
+            0,
+            min_bg_tr,
+            n_bg_bins + 1
+        )).astype(np.int32)
+        signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
+        return np.concatenate([bg_bins[:-1], signal_bins])
 
     def pack_poisson_params(self, mean, var, p, r):
         poisson_fit_positions = np.where(mean >= var)[0]
@@ -57,8 +80,7 @@ class GlobalBackgroundFit(BackgroundFit):
         unique, counts = self.hist_data_for_tr(agg_cutcounts)
 
         res = []
-        quantiles = self.get_signal_quantiles()
-        trs = np.unique(np.quantile(agg_cutcounts, quantiles))[::-1]
+        trs = self.get_signal_bins(agg_cutcounts)[::-1]
         for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
@@ -103,9 +125,11 @@ class GlobalBackgroundFit(BackgroundFit):
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
         # chisq = sum((obs - exp) ** 2 / exp)
-        obs[obs == 0] = 1
-        G_sq = 2 * sum(obs * np.log(obs / exp))
+        G_sq = np.sum(calc_g_sq(obs, exp))
+        # obs[obs == 0] = 1
+        # G_sq = 2 * sum(obs * np.log(obs / exp))
         df = len(obs) - 2
+        print(df)
         return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
 
 
@@ -184,39 +208,28 @@ class StridedFit(BackgroundFit):
 
     def __init__(self, config=None):
         super().__init__(config)
-        self.bg_window = self.config.bg_window // self.config.window
-        self.min_count = self.config.min_mappable_bg // self.config.window_stats_step
-        self.window = self.config.window
-        self.window_stats_step = self.config.window_stats_step
-
-
-    def get_right_edges(self, strided_agg_cutcounts):
-        return np.round(
-            np.nanquantile(
-                strided_agg_cutcounts,
-                self.get_all_quantiles(),
-                axis=0
-            )
-        ).astype(np.int32)
+        self.sampling_step = self.config.bg_window // self.config.signal_prop_n_samples
+        self.interpolation_step = self.config.signal_prop_step // self.sampling_step
     
-    def value_counts_per_bin(self, strided_cutcounts, right_edges):
-        value_counts = np.full_like(right_edges, 0, dtype=np.int16)
-
-        left_edges = np.zeros(right_edges.shape[0])
-        for i in range(right_edges.shape[1]):
-            bin_membership = (strided_cutcounts[:, i] >= left_edges) & (strided_cutcounts[:, i] < right_edges[:, i])
-            value_counts[:, i] = np.sum(bin_membership, axis=1)
-            left_edges = right_edges[:, i]
+    def value_counts_per_bin(self, strided_cutcounts, bin_edges):
+        left_edges = bin_edges[0]
+        right_edges = bin_edges[1:]
+        value_counts = np.full_like(right_edges, 0, dtype=np.int32)
+        for i in range(right_edges.shape[0]):
+            bin_membership = (strided_cutcounts >= left_edges[None, :]) & (strided_cutcounts < right_edges[i][None, :])
+            value_counts[i] = np.sum(bin_membership, axis=0)
+            left_edges = right_edges[i]
         
         return value_counts
 
     def fit_for_bin(self, collapsed_agg_cutcounts):
-        enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts), axis=1) > self.min_count
+        min_count = round(self.config.signal_prop_n_samples * self.config.min_mappable_bg / self.config.bg_window)
+        enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts), axis=0) > min_count
+        mean = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
+        var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
 
-        mean = np.nanmean(collapsed_agg_cutcounts, axis=1)
-        mean[~enough_bg_mask] = np.nan
-        var = np.nanvar(collapsed_agg_cutcounts, axis=1, ddof=1)
-        var[~enough_bg_mask] = np.nan
+        mean[enough_bg_mask] = np.nanmean(collapsed_agg_cutcounts[:, enough_bg_mask], axis=0)
+        var[enough_bg_mask] = np.nanvar(collapsed_agg_cutcounts[:, enough_bg_mask], axis=0, ddof=1)
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
@@ -224,114 +237,116 @@ class StridedFit(BackgroundFit):
 
         return p, r, enough_bg_mask, poisson_params
     
-    def wrap_rmsea_valid_fits(self, p, r, enough_bg_mask, poisson_params, right_edges, value_counts):
+    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, poisson_params=None):
         result = np.full_like(p, np.nan)
+        if enough_bg_mask is None:
+            enough_bg_mask = np.ones_like(p, dtype=bool)
+        if poisson_params is None:
+            poisson_params = np.zeros((0, 3), dtype=np.float64)
+
         indices = poisson_params.astype(np.int32)[:, 0]
-        result[indices] = -1
+        if len(indices) > 0:
+            result[indices] = self.calc_rmsea_all_windows(
+                st.poisson(poisson_params[:, 1]),
+                n_params=1,
+                bin_edges=bin_edges[:, indices],
+                value_counts_per_bin=value_counts[:, indices]
+            )
 
         negbin_fit_mask = enough_bg_mask.copy()
         negbin_fit_mask[indices] = False
 
         result[negbin_fit_mask] = self.calc_rmsea_all_windows(
-            r[negbin_fit_mask], p[negbin_fit_mask],
-            right_edges[negbin_fit_mask, :],
-            value_counts[negbin_fit_mask, :]
+            st.nbinom(r[negbin_fit_mask], 1 - p[negbin_fit_mask]),
+            n_params=2,
+            bin_edges=bin_edges[:, negbin_fit_mask],
+            value_counts_per_bin=value_counts[:, negbin_fit_mask]
         )
         return result
         
     @wrap_masked
     def find_per_window_tr(self, array: ma.MaskedArray):
         original_shape = array.shape
-        agg_cutcounts = array[::self.window].copy()
+        agg_cutcounts = array[::self.sampling_step].copy()
 
         strided_agg_cutcounts = rolling_view_with_nan_padding_subsample(
             agg_cutcounts,
-            window_size= self.bg_window,
-            subsample_step=self.window_stats_step
+            window_size=self.config.signal_prop_n_samples,
+            subsample_step=self.interpolation_step
         ) # shape (bg_window, n_points)
+        print(strided_agg_cutcounts.shape, self.config.signal_prop_n_samples, self.interpolation_step)
+        bin_edges = self.get_all_bins(strided_agg_cutcounts)
+        value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
-        signal_quantiles = self.get_signal_quantiles()
-
-        right_edges = self.get_right_edges(strided_agg_cutcounts)
-        value_counts = self.value_counts_per_bin(strided_agg_cutcounts, right_edges)
-
-        best_tr = np.full_like(right_edges.shape[1], np.nan)
+        best_tr = bin_edges[-1].copy()
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
-        for i in range(len(signal_quantiles)):
+        current_rmsea = np.full_like(best_tr, np.nan, dtype=np.float32)
+        step = 1
+        for i in range(0, self.config.num_signal_bins, step):
             if remaing_fits_mask.sum() == 0:
                 break
-            right_edges = right_edges[:-1, :]
-            value_counts = value_counts[:-1, :]
-            strided_agg_cutcounts[strided_agg_cutcounts >= right_edges[-1, :]] = np.nan
+            if i != 0:
+                bin_edges = bin_edges[:-step, :]
+                value_counts = value_counts[:-step, :]
+            strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
 
-            edges = right_edges[:, remaing_fits_mask]
+            edges = bin_edges[:, remaing_fits_mask]
             counts = value_counts[:, remaing_fits_mask]
 
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
                 strided_agg_cutcounts[:, remaing_fits_mask]
             )
 
-            rmsea = self.wrap_rmsea_valid_fits(p, r, enough_bg_mask, poisson_params, edges, counts) # shape of r
+            rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
             
             successful_fits = ~enough_bg_mask | (rmsea <= 0.05)
+            best_tr[remaing_fits_mask] = np.where(successful_fits, edges[-1], best_tr[remaing_fits_mask])   
+            current_rmsea[remaing_fits_mask] = rmsea
             remaing_fits_mask[remaing_fits_mask] = ~successful_fits
-    
-            best_tr[remaing_fits_mask] = edges[-1, successful_fits]
-        
-        result = np.full_like(original_shape, np.nan)
-        result[::self.window][::self.window_stats_step] = best_tr
-        return self.interpolate_nan(result)
+            print('Remaining fits:', remaing_fits_mask.shape, remaing_fits_mask.sum())
+
+        subsampled_indices = np.arange(0, original_shape[0], self.sampling_step, dtype=np.uint32)[::self.interpolation_step]
+        print(subsampled_indices[remaing_fits_mask])
+        print(np.where(remaing_fits_mask)[0])
+        return self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
 
 
     @wrap_masked
     def calc_rmsea_all_windows(
         self,
-        p, r,
-        right_bin_edges, # right edges of the bins, left edge of the first bin is 0, right edge not inclusive
+        dist: st.rv_discrete,
+        n_params: int,
+        bin_edges, # right edges of the bins, left edge of the first bin is 0, right edge not inclusive
         value_counts_per_bin, # number of observed cutcounts in each bin for each window
     ):
         """
         Calculate RMSEA for all sliding windows.
         """
-        # assert (bg_window - 1) % step == 0, "Stride should be a divisor of the window size."
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
-        tr = right_bin_edges[-1]
+        # print(bin_edges)
+        sf_values = dist.sf(bin_edges - 1)
+        sf_diffs = -np.diff(sf_values, axis=0)
+        assert sf_diffs.shape == value_counts_per_bin.shape, "SF diffs shape should match value counts shape"
+        norm_coef = 1 - sf_values[-1]
+        expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
+        G_sq = np.sum(
+            calc_g_sq(value_counts_per_bin, expected_counts), 
+            axis=0
+        )
+        #print(list(zip(value_counts_per_bin[:, 0], np.diff(bin_edges[:, 0]), ((value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0))[:, 0])))
+        df = np.sum(
+            (value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0),
+            axis=0
+        ) - n_params
 
-        assert len(r) == len(p) == len(bg_sum_mappable) == len(tr)
-
-        G_sq = np.zeros(value_counts_per_bin.shape[1], dtype=np.float32)
-        num_nonzero_bins = np.zeros_like(G_sq)
-        prev_cdf = 0.0
-        norm_coef = betainc(r, tr - 1, 1 - p, dtype=np.float32)
-        for i in range(len(right_bin_edges)):
-            right = right_bin_edges[i]
-            if i == 0:
-                nonzero_expected_count_indicator = np.full_like(right, True, dtype=bool)
-            else:
-                nonzero_expected_count_indicator = right != right_bin_edges[i - 1]
-
-            num_nonzero_bins += nonzero_expected_count_indicator
-            observed = value_counts_per_bin[i]
-
-            if i == len(right_bin_edges) - 1:
-                new_cdf = norm_coef
-            else:
-                new_cdf = betainc(r, right - 1, 1 - p, dtype=np.float32)
-            expected = (new_cdf - prev_cdf) * bg_sum_mappable / norm_coef
-            prev_cdf = new_cdf
-
-            G_sq[nonzero_expected_count_indicator] += calc_g_sq(
-                observed[nonzero_expected_count_indicator],
-                expected[nonzero_expected_count_indicator],
-            )
-
-        df = num_nonzero_bins - 2 # number of bins - number of parameters
-        return np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1))
+        rmsea = np.where(df >= 3, np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1)), -2)
+        assert np.sum(np.isnan(rmsea)) == 0, "RMSEA should not contain NaNs"
+        return rmsea
 
     @wrap_masked
-    def interpolate_nan(self, arr, step):
-        indices = np.arange(0, len(arr), step, dtype=np.uint32)
-        subsampled_arr = arr[::step].copy()
+    def interpolate_nan(self, original_length, subsampled_arr, subsampled_indices):
+        # indices = np.arange(0, len(arr), step, dtype=np.uint32)
+        # subsampled_arr = arr[::step].copy()
         
         nan_mask = np.isnan(subsampled_arr)
         if nan_mask.any():
@@ -342,8 +357,8 @@ class StridedFit(BackgroundFit):
             )
 
         return np.interp(
-            np.arange(len(arr), dtype=np.uint32),
-            indices,
+            np.arange(original_length, dtype=np.uint32),
+            subsampled_indices,
             subsampled_arr,
             left=None,
             right=None,
@@ -351,8 +366,7 @@ class StridedFit(BackgroundFit):
 
 
 def calc_g_sq(obs, exp):
-    ratio = obs / exp
-    ratio[ratio == 0] = 1
+    ratio = np.where((exp != 0) & (obs != 0), obs / exp, 1)
     return obs * np.log(ratio) * 2
 
 
@@ -383,5 +397,5 @@ def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step
     shape = (subsample_count, window_size)
     strides = (padded_arr.strides[0] * subsample_step, padded_arr.strides[0])
     subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
-    
-    return subsampled_view.T
+ 
+    return subsampled_view.T.copy()

@@ -34,7 +34,11 @@ class ProcessorConfig:
     density_step: int = 20
     max_background_prop: float = 0.99
     min_background_prop: float = 0.75
-    window_stats_step: int = 10
+
+    signal_prop_n_samples: int = 667 # out of bg_window
+    signal_prop_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
+    num_background_bins: int = 20
+    num_signal_bins: int = 100
     adaptive_signal_tr: bool = False
     nonzero_windows_to_fit: float = 0.01
     fdr_method: str = 'bh'
