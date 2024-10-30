@@ -324,11 +324,7 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f'Fitting model for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
-        try:
-            global_fit = g_fit.fit(agg_cutcounts)
-        except NoContigPresentError:
-            self.gp.logger.warning(f"Not enough background signal for {self.chrom_name}. Skipping.")
-            raise
+        global_fit = g_fit.fit(agg_cutcounts)
         global_p = global_fit.p
         global_r = global_fit.r
         # params_df = pd.DataFrame({
@@ -346,7 +342,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}.")
         self.gp.logger.debug(f"{self.chrom_name} signal threshold: {global_fit.fit_quantile:.3f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
-        rmsea_fit = StridedFit(self.config)
+        rmsea_fit = StridedFit(self.config, name=self.chrom_name)
         per_window_signal_trs, per_window_rmsea = rmsea_fit.find_per_window_tr(agg_cutcounts)
 
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs)

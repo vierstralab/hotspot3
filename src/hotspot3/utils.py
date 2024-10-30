@@ -95,8 +95,13 @@ def wrap_masked(func) -> ma.MaskedArray:
         args = [compress_masked_arg(arg) for arg in args]
         kwargs = {key: compress_masked_arg(value) for key, value in kwargs.items()}
         result = func(*args, **kwargs)
-        
-        return ma.masked_where(mask, result)
+
+        if isinstance(result, np.ndarray):
+            return ma.masked_where(mask, result)
+        elif isinstance(result, tuple):
+            return tuple(ma.masked_where(mask, r) for r in result)
+        else:
+            return result
     return wrapper
 
 

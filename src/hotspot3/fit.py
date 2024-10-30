@@ -8,7 +8,7 @@ import bottleneck as bn
 
 
 class BackgroundFit:
-    def __init__(self, config: ProcessorConfig=None, logger=None):
+    def __init__(self, config: ProcessorConfig=None, logger=None, name=None):
         if config is None:
             config = ProcessorConfig()
         self.config = config
@@ -16,6 +16,9 @@ class BackgroundFit:
         if logger is None:
             logger = setup_logger()
         self.logger = logger
+        if name is None:
+            name = self.__class__.__name__
+        self.name = name
 
 
     def fit(self) -> FitResults:
@@ -123,7 +126,7 @@ class GlobalBackgroundFit(BackgroundFit):
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
         has_enough_background = np.count_nonzero(agg_cutcounts) / agg_cutcounts.size > self.config.nonzero_windows_to_fit
         if not has_enough_background:
-            self.logger.warning("Not enough background to fit the global mean")
+            self.logger.warning(f"{self.name}: Not enough background to fit the global mean. Skipping.")
             raise NoContigPresentError
         
         mean, variance = self.get_mean_and_var(agg_cutcounts)
@@ -216,8 +219,8 @@ class StridedFit(BackgroundFit):
     Extemely computationally taxing, use large stride values to compensate.
     """
 
-    def __init__(self, config=None, logger=None):
-        super().__init__(config, logger=logger)
+    def __init__(self, config=None, logger=None, name=None):
+        super().__init__(config, logger=logger, name=name)
         self.sampling_step = self.config.bg_window // self.config.signal_prop_n_samples
         self.interpolation_step = self.config.signal_prop_step // self.sampling_step
     
@@ -339,7 +342,7 @@ class StridedFit(BackgroundFit):
             )
 
             remaing_fits_mask[remaing_fits_mask] = ~successful_fits 
-            self.logger.debug(f"Remaining fits: {remaing_fits_mask.sum()}")
+            self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
 
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
