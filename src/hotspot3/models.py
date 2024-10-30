@@ -39,7 +39,7 @@ class ProcessorConfig:
     signal_prop_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
     num_background_bins: int = 20
     num_signal_bins: int = 100
-    rmsea_tr: float = 0.0
+    rmsea_tr: float = 0.05
     adaptive_signal_tr: bool = False
     nonzero_windows_to_fit: float = 0.01
     fdr_method: str = 'bh'
