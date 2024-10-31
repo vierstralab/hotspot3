@@ -303,17 +303,17 @@ class StridedFit(BackgroundFit):
             bin_edges = bin_edges[:n_bins, :]
             value_counts = value_counts[:n_bins, :]
             strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
-            
-            edges = bin_edges[:, remaing_fits_mask]
-            counts = value_counts[:, remaing_fits_mask]
 
-            fit_will_change = last_bin_edge != edges[-1] # shape of remaining_fits
+            fit_will_change = last_bin_edge != bin_edges[-1, remaing_fits_mask] # shape of remaining_fits
 
             changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
 
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
                 strided_agg_cutcounts[:, changing_indices]
             )
+
+            edges = bin_edges[:, changing_indices]
+            counts = value_counts[:, changing_indices]
 
             rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
             
