@@ -424,14 +424,9 @@ def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step
     n = arr.shape[0]
     assert window_size % 2 == 1, "Window size must be odd to have a center shift of 0."
     
-    # Calculate padding for out-of-bound shifts
     pad_width = (window_size - 1) // 2
     padded_arr = np.pad(arr, pad_width, mode='constant', constant_values=np.nan)
-    
-    # Calculate the number of rows after subsampling
     subsample_count = (n + subsample_step - 1) // subsample_step
-    
-    # Create a strided view with only every 'subsample_step' row
     shape = (subsample_count, window_size)
     strides = (padded_arr.strides[0] * subsample_step, padded_arr.strides[0])
     subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
