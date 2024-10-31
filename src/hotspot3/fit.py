@@ -378,7 +378,7 @@ class StridedFit(BackgroundFit):
         # print(bin_edges)
         sf_values = dist.sf(bin_edges - 1)
         sf_diffs = -np.diff(sf_values, axis=0)
-        assert sf_diffs.shape == value_counts_per_bin.shape, "SF diffs shape should match value counts shape"
+        assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
         expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
         G_sq = np.sum(
