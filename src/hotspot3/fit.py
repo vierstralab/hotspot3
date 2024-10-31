@@ -321,7 +321,7 @@ class StridedFit(BackgroundFit):
             )
 
             best_tr[remaing_fits_mask] = np.where(
-                successful_fits,
+                better_fit,
                 edges[-1],
                 best_tr[remaing_fits_mask]
             )
