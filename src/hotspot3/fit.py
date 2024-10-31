@@ -236,14 +236,14 @@ class StridedFit(BackgroundFit):
         
         return value_counts
 
-    def fit_for_bin(self, collapsed_agg_cutcounts):
+    def fit_for_bin(self, collapsed_agg_cutcounts, mask=None):
         min_count = round(self.config.signal_prop_n_samples * self.config.min_mappable_bg / self.config.bg_window)
         enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts), axis=0) > min_count
         mean = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
 
-        mean[enough_bg_mask] = np.nanmean(collapsed_agg_cutcounts[:, enough_bg_mask], axis=0)
-        var[enough_bg_mask] = np.nanvar(collapsed_agg_cutcounts[:, enough_bg_mask], axis=0, ddof=1)
+        mean[enough_bg_mask] = np.nanmean(collapsed_agg_cutcounts[:, enough_bg_mask], axis=0, mask=mask)
+        var[enough_bg_mask] = np.nanvar(collapsed_agg_cutcounts[:, enough_bg_mask], axis=0, ddof=1, mask=mask)
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
@@ -294,20 +294,20 @@ class StridedFit(BackgroundFit):
         best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
-        total_bins = value_counts.shape[0]
         for i in np.arange(0, self.config.num_signal_bins, 1)[::-1]:
             if remaing_fits_mask.sum() == 0:
                 break
-            current_index = total_bins - i
+            current_index = value_counts.shape[0] - i
             right_bin_index = current_index + 1
-            strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[right_bin_index - 1, :]] = np.nan
+            mask = strided_agg_cutcounts >= bin_edges[right_bin_index - 1, :]
 
             fit_will_change = value_counts[current_index - 1][remaing_fits_mask] != 0 # shape of remaining_fits
             
             changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
 
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
-                strided_agg_cutcounts[:, changing_indices]
+                strided_agg_cutcounts[:, changing_indices],
+                mask=mask[:, changing_indices]
             )
 
             edges = bin_edges[:right_bin_index, changing_indices]
