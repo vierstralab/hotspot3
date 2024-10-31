@@ -301,7 +301,7 @@ class StridedFit(BackgroundFit):
                 break
             current_index = value_counts.shape[0] - i
             right_bin_index = current_index + 1
-            mask = strided_agg_cutcounts >= bin_edges[right_bin_index - 1, :]
+            mask = strided_agg_cutcounts < bin_edges[right_bin_index - 1, :]
 
             fit_will_change = value_counts[current_index - 1][remaing_fits_mask] != 0 # shape of remaining_fits
             
