@@ -300,9 +300,8 @@ class StridedFit(BackgroundFit):
         for i in range(0, self.config.num_signal_bins, step):
             if remaing_fits_mask.sum() == 0:
                 break
-            top_bins -= i
-            bin_edges = bin_edges[:top_bins + 1, :]
-            value_counts = value_counts[:top_bins, :]
+            bin_edges = bin_edges[:top_bins - i + 1, :]
+            value_counts = value_counts[:top_bins - i, :]
             strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
 
             fit_will_change = last_bin_value_counts[remaing_fits_mask] != 0 # shape of remaining_fits
