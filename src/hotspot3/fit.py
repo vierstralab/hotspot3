@@ -243,9 +243,15 @@ class StridedFit(BackgroundFit):
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
 
         mean[enough_bg_mask] = np.nanmean(
-            collapsed_agg_cutcounts[:, enough_bg_mask], axis=0, mask=where)
+            collapsed_agg_cutcounts[:, enough_bg_mask],
+            axis=0, 
+            where=where
+        )
         var[enough_bg_mask] = np.nanvar(
-            collapsed_agg_cutcounts[:, enough_bg_mask], axis=0, ddof=1, mask=where)
+            collapsed_agg_cutcounts[:, enough_bg_mask],
+            axis=0, ddof=1, 
+            where=where
+        )
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
