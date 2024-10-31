@@ -295,7 +295,6 @@ class StridedFit(BackgroundFit):
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
         step = 1
 
-        reached_low_rmsea = np.zeros_like(best_tr, dtype=bool)
         for i in range(0, self.config.num_signal_bins, step):
             if remaing_fits_mask.sum() == 0:
                 break
@@ -313,17 +312,12 @@ class StridedFit(BackgroundFit):
 
             rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
             
-            # best fit found
             successful_fits = enough_bg_mask & (rmsea <= self.config.rmsea_tr)
+            # best fit found
             better_fit = np.where(
                 (rmsea < best_rmsea[remaing_fits_mask]),
                 True,
                 False
-            )
-            reached_low_rmsea[remaing_fits_mask] = np.where(
-                successful_fits,
-                True,
-                reached_low_rmsea[remaing_fits_mask]
             )
 
             best_tr[remaing_fits_mask] = np.where(
@@ -348,10 +342,8 @@ class StridedFit(BackgroundFit):
                 np.nan,
                 best_rmsea[remaing_fits_mask]
             )
-            
-            terminal_fit = reached_low_rmsea[remaing_fits_mask] & ~successful_fits
 
-            remaing_fits_mask[remaing_fits_mask] = ~terminal_fit | ~enough_bg_mask 
+            remaing_fits_mask[remaing_fits_mask] = ~successful_fits | ~enough_bg_mask 
             self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
 
         subsampled_indices = np.arange(
