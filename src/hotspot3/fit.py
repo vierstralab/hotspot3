@@ -295,7 +295,7 @@ class StridedFit(BackgroundFit):
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
         step = 1
-        last_bin_edge = np.full_like(best_tr, np.nan)
+        last_bin_value_counts = np.full_like(best_tr, np.nan)
         for n_bins in np.arange(self.config.num_signal_bins, 0, -step):
             if remaing_fits_mask.sum() == 0:
                 break
@@ -304,8 +304,9 @@ class StridedFit(BackgroundFit):
             value_counts = value_counts[:n_bins, :]
             strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
 
-            fit_will_change = last_bin_edge[remaing_fits_mask] != bin_edges[-1, remaing_fits_mask] # shape of remaining_fits
-
+            fit_will_change = last_bin_value_counts[remaing_fits_mask] != 0 # shape of remaining_fits
+            
+            last_bin_value_counts = value_counts[-1]
             changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
 
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
@@ -350,7 +351,6 @@ class StridedFit(BackgroundFit):
 
             remaing_fits_mask[changing_indices] = ~successful_fits
             self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
-            last_bin_edge = edges[-1]
 
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
