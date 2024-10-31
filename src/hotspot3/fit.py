@@ -291,7 +291,7 @@ class StridedFit(BackgroundFit):
         bin_edges = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
-        best_tr = bin_edges[-1].copy()
+        best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
         step = 1
