@@ -4,6 +4,7 @@ from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
 from hotspot3.utils import wrap_masked, correct_offset
 from hotspot3.logging import setup_logger
+from hotspot3.stats import calc_g_sq
 import bottleneck as bn
 
 
@@ -25,7 +26,7 @@ class BackgroundFit:
         raise NotImplementedError
     
     @wrap_masked
-    def get_mean_and_var(self, array: np.ndarray):
+    def get_mean_and_var(self, array: np.ndarray, where=None):
         mean = np.nanmean(array, axis=0, dtype=np.float32)
         var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32)
         return mean, var
@@ -135,7 +136,7 @@ class GlobalBackgroundFit(BackgroundFit):
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr):
         mask = unique_cutcounts < tr
         unique_cutcounts = unique_cutcounts[mask]
-        obs = obs[mask].copy()
+        obs = obs[mask]
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
         # chisq = sum((obs - exp) ** 2 / exp)
@@ -294,20 +295,24 @@ class StridedFit(BackgroundFit):
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
         step = 1
-
-        for i in range(0, self.config.num_signal_bins, step):
+        last_bin_edge = np.full_like(best_tr, np.nan)
+        for n_bins in np.arange(self.config.num_signal_bins, 0, -step):
             if remaing_fits_mask.sum() == 0:
                 break
-            if i != 0:
-                bin_edges = bin_edges[:-step, :]
-                value_counts = value_counts[:-step, :]
-            strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
 
+            bin_edges = bin_edges[:n_bins, :]
+            value_counts = value_counts[:n_bins, :]
+            strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
+            
             edges = bin_edges[:, remaing_fits_mask]
             counts = value_counts[:, remaing_fits_mask]
 
+            fit_will_change = last_bin_edge != edges[-1] # shape of remaining_fits
+
+            changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
+
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
-                strided_agg_cutcounts[:, remaing_fits_mask]
+                strided_agg_cutcounts[:, changing_indices]
             )
 
             rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
@@ -315,42 +320,47 @@ class StridedFit(BackgroundFit):
             successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
             # best fit found
             better_fit = np.where(
-                (rmsea < best_rmsea[remaing_fits_mask]),
+                (rmsea < best_rmsea[changing_indices]),
                 True,
                 False
             )
 
-            best_tr[remaing_fits_mask] = np.where(
+            best_tr[changing_indices] = np.where(
                 better_fit,
                 edges[-1],
-                best_tr[remaing_fits_mask]
+                best_tr[changing_indices]
             )
-            best_rmsea[remaing_fits_mask] = np.where(
+            best_rmsea[changing_indices] = np.where(
                 better_fit,
                 rmsea,
-                best_rmsea[remaing_fits_mask]
+                best_rmsea[changing_indices]
             )
 
             # Not enough background
-            best_tr[remaing_fits_mask] = np.where(
+            best_tr[changing_indices] = np.where(
                 ~enough_bg_mask,
                 np.nan,
-                best_tr[remaing_fits_mask]
+                best_tr[changing_indices]
             )
-            best_rmsea[remaing_fits_mask] = np.where(
+            best_rmsea[changing_indices] = np.where(
                 ~enough_bg_mask,
                 np.nan,
-                best_rmsea[remaing_fits_mask]
+                best_rmsea[changing_indices]
             )
 
-            remaing_fits_mask[remaing_fits_mask] = ~successful_fits
+            remaing_fits_mask[changing_indices] = ~successful_fits
             self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
+            last_bin_edge = edges[-1]
 
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
 
-        return self.interpolate_nan(original_shape[0], best_tr, subsampled_indices), self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
+        best_tr = self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
+        best_tr_with_nan = best_tr.copy()
+        best_tr_with_nan = np.where(~subsampled_indices, np.nan, best_tr_with_nan)
+
+        return best_tr, best_tr_with_nan, self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
 
 
     @wrap_masked
@@ -402,10 +412,6 @@ class StridedFit(BackgroundFit):
             right=None,
         )
 
-
-def calc_g_sq(obs, exp):
-    ratio = np.where((exp != 0) & (obs != 0), obs / exp, 1)
-    return obs * np.log(ratio) * 2
 
 
 def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step=1000):
