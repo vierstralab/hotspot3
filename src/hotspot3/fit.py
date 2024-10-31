@@ -357,8 +357,8 @@ class StridedFit(BackgroundFit):
         )[::self.interpolation_step]
 
         best_tr = self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
-        best_tr_with_nan = best_tr.copy()
-        best_tr_with_nan = np.where(~subsampled_indices, np.nan, best_tr_with_nan)
+        best_tr_with_nan = np.full_like(best_tr, np.nan)
+        best_tr_with_nan[subsampled_indices] = best_tr[subsampled_indices]
 
         return best_tr, best_tr_with_nan, self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
 
