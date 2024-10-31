@@ -238,7 +238,7 @@ class StridedFit(BackgroundFit):
 
     def fit_for_bin(self, collapsed_agg_cutcounts, where=None):
         min_count = round(self.config.signal_prop_n_samples * self.config.min_mappable_bg / self.config.bg_window)
-        enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts, where=mask), axis=0) > min_count
+        enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts, where=where), axis=0) > min_count
         mean = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
 
