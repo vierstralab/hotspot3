@@ -295,12 +295,12 @@ class StridedFit(BackgroundFit):
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
         last_bin_value_counts = np.full_like(best_tr, np.nan)
-        top_bins = value_counts.shape[0]
+        total_bins = value_counts.shape[0]
         for i in range(0, self.config.num_signal_bins, 1):
             if remaing_fits_mask.sum() == 0:
                 break
-            bin_edges = bin_edges[:top_bins - i + 1, :]
-            value_counts = value_counts[:top_bins - i, :]
+            bin_edges = bin_edges[:total_bins - i + 1, :]
+            value_counts = value_counts[:total_bins - i, :]
             strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
 
             fit_will_change = last_bin_value_counts[remaing_fits_mask] != 0 # shape of remaining_fits
