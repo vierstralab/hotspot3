@@ -312,7 +312,7 @@ class StridedFit(BackgroundFit):
 
             rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
             
-            successful_fits = enough_bg_mask & (rmsea <= self.config.rmsea_tr)
+            successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
             # best fit found
             better_fit = np.where(
                 (rmsea < best_rmsea[remaing_fits_mask]),
@@ -343,7 +343,7 @@ class StridedFit(BackgroundFit):
                 best_rmsea[remaing_fits_mask]
             )
 
-            remaing_fits_mask[remaing_fits_mask] = ~successful_fits | ~enough_bg_mask 
+            remaing_fits_mask[remaing_fits_mask] = ~successful_fits
             self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
 
         subsampled_indices = np.arange(
