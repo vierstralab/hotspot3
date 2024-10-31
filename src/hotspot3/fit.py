@@ -294,24 +294,23 @@ class StridedFit(BackgroundFit):
         best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
-        last_bin_value_counts = np.full_like(best_tr, np.nan)
         total_bins = value_counts.shape[0]
         for i in np.arange(0, self.config.num_signal_bins, 1)[::-1]:
             if remaing_fits_mask.sum() == 0:
                 break
             current_index = total_bins - i
-            strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[current_index - 1, :]] = np.nan
+            right_bin_index = current_index + 1
+            strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[right_bin_index - 1, :]] = np.nan
 
-            fit_will_change = last_bin_value_counts[remaing_fits_mask] != 0 # shape of remaining_fits
+            fit_will_change = value_counts[current_index - 1][remaing_fits_mask] != 0 # shape of remaining_fits
             
-            last_bin_value_counts = value_counts[-1]
             changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
 
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
                 strided_agg_cutcounts[:, changing_indices]
             )
 
-            edges = bin_edges[:current_index + 1, changing_indices]
+            edges = bin_edges[:right_bin_index, changing_indices]
             counts = value_counts[:current_index, changing_indices]
 
             rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
