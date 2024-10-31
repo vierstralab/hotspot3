@@ -304,7 +304,7 @@ class StridedFit(BackgroundFit):
             value_counts = value_counts[:n_bins, :]
             strided_agg_cutcounts[strided_agg_cutcounts >= bin_edges[-1, :]] = np.nan
 
-            fit_will_change = last_bin_edge != bin_edges[-1, remaing_fits_mask] # shape of remaining_fits
+            fit_will_change = last_bin_edge[remaing_fits_mask] != bin_edges[-1, remaing_fits_mask] # shape of remaining_fits
 
             changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
 
