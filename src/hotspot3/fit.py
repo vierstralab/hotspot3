@@ -399,12 +399,8 @@ class StridedFit(BackgroundFit):
         # subsampled_arr = arr[::step].copy()
         
         nan_mask = np.isnan(subsampled_arr)
-        if nan_mask.any():
-            valid_indices = np.where(~nan_mask)[0]
-            nan_indices = np.where(nan_mask)[0]
-            subsampled_arr[nan_mask] = np.interp(
-                nan_indices, valid_indices, subsampled_arr[valid_indices]
-            )
+        subsampled_arr = subsampled_arr[~nan_mask]
+        subsampled_indices = subsampled_indices[~nan_mask]
 
         return np.interp(
             np.arange(original_length, dtype=np.uint32),
