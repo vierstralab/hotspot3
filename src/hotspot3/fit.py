@@ -279,20 +279,22 @@ class StridedFit(BackgroundFit):
     @wrap_masked
     def fit_tr(self, array: ma.MaskedArray):
         original_shape = array.shape
-        best_tr, best_rmsea = self.find_per_window_tr(array)
+        agg_cutcounts = array[::self.sampling_step]
+        best_tr, best_rmsea = self.find_per_window_tr(agg_cutcounts)
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
-
-        best_tr = self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
-        best_tr_with_nan = np.full_like(best_tr, np.nan)
+ 
+        best_tr_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_tr_with_nan[subsampled_indices] = best_tr[subsampled_indices]
 
-        return best_tr, best_tr_with_nan, self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
+        best_rmsea_with_nan = np.full_like(array, np.nan, dtype=np.float32)
+        best_rmsea_with_nan[subsampled_indices] = best_rmsea[subsampled_indices]
+
+        return best_tr_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, array: np.ndarray):
-        agg_cutcounts = array[::self.sampling_step]
+    def find_per_window_tr(self, agg_cutcounts: np.ndarray):
         strided_agg_cutcounts = rolling_view_with_nan_padding_subsample(
             agg_cutcounts,
             points_in_window=self.points_in_bg_window,
@@ -395,16 +397,12 @@ class StridedFit(BackgroundFit):
         return rmsea
 
     @wrap_masked
-    def interpolate_nan(self, original_length, subsampled_arr, subsampled_indices):
-        # indices = np.arange(0, len(arr), step, dtype=np.uint32)
-        # subsampled_arr = arr[::step].copy()
-        
-        nan_mask = np.isnan(subsampled_arr)
-        subsampled_arr = subsampled_arr[~nan_mask]
-        subsampled_indices = subsampled_indices[~nan_mask]
+    def interpolate_nan(self, array):
+        subsampled_indices = np.where(~np.isnan(array))[0]
+        subsampled_arr = array[subsampled_indices]
 
         return np.interp(
-            np.arange(original_length, dtype=np.uint32),
+            np.arange(array.shape[0], dtype=np.uint32),
             subsampled_indices,
             subsampled_arr,
             left=None,

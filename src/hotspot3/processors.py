@@ -343,7 +343,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
         rmsea_fit = StridedFit(self.config, name=self.chrom_name)
-        per_window_signal_trs, per_window_signal_trs_with_na, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
+        per_window_signal_trs, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs)
@@ -354,7 +354,6 @@ class ChromosomeProcessor:
             'sliding_p': fit_res.p,
             'rmsea': per_window_rmsea,
             'tr': per_window_signal_trs,
-            'tr_na': per_window_signal_trs_with_na,
         })
         self.to_parquet(df, f"{outdir}.fit_results.parquet")
         del df
