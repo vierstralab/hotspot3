@@ -28,14 +28,14 @@ class ProcessorConfig:
         - logger_level: Logging level.
     """
     window: int = 151
-    bg_window: int = 50001
+    bg_window: int = 10001
     min_mappable_bg_frac: float = 0.2
     density_step: int = 20
     max_background_prop: float = 0.99
     min_background_prop: float = 0.75
 
     signal_prop_sampling_step: int = 75
-    signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
+    signal_prop_interpolation_step: int = 300 # shouldn't be less than signal_prop_n_samples!!!!!
     num_background_bins: int = 20
     num_signal_bins: int = 100
     rmsea_tr: float = 0.05
