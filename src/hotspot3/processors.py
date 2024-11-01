@@ -344,14 +344,10 @@ class ChromosomeProcessor:
         rmsea_fit = StridedFit(self.config, name=self.chrom_name)
         per_window_signal_trs, per_window_signal_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
-        if per_window_signal_trs.shape[0] > 46150000:
-            print(np.nanmax(per_window_signal_trs[46050000:46150000].compressed()), self.chrom_name, 1)
 
         w_fit = WindowBackgroundFit(self.config)
         het_windows_mask = w_fit.find_heterogeneous_windows(agg_cutcounts).filled(True)
         per_window_signal_trs[het_windows_mask] = np.nan
-        if per_window_signal_trs.shape[0] > 46150000:
-            print(np.nanmax(per_window_signal_trs[46050000:46150000].compressed()), self.chrom_name, 2)
 
         interp_signal_tr = interpolate_nan(per_window_signal_trs)
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=interp_signal_tr)
