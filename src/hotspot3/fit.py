@@ -227,6 +227,8 @@ class WindowBackgroundFit(BackgroundFit):
         )[::-1]
 
         score = np.abs(median_right - median_left)
+        import pandas as pd
+        print(pd.Series(score).describe())
         outlier_score = np.nanquantile(score, self.config.outlier_detection_tr)
         print(outlier_score)
         return score > outlier_score
