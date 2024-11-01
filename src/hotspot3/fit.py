@@ -226,8 +226,8 @@ class WindowBackgroundFit(BackgroundFit):
             min_count=self.min_mappable_bg
         )[::-1]
 
-        score = median_right - median_left
-        outlier_score = np.nanquantile(np.abs(score), self.config.outlier_detection_tr)
+        score = np.abs(median_right - median_left)
+        outlier_score = np.nanquantile(score, self.config.outlier_detection_tr)
         return score > outlier_score
     
     @wrap_masked
