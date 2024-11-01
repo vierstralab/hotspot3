@@ -1,6 +1,5 @@
 import logging
 import numpy as np
-import numpy.ma as ma
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
 import pandas as pd
@@ -11,7 +10,7 @@ import shutil
 import os
 import subprocess
 import importlib.resources as pkg_resources
-
+import dataclasses
 from hotspot3.logging import setup_logger
 from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
 from hotspot3.file_extractors import ChromosomeExtractor
@@ -341,14 +340,23 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}.")
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
+        # Estimate bg, 1st round
+        config_round1 = dataclasses.replace(self.config, window=5000)
+        rmsea_fit_round1 = StridedFit(config_round1, name=f"{self.chrom_name} - 1 round")
+        per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit_round1.fit_tr(agg_cutcounts)
+
+        config_round2 = dataclasses.replace(self.config, window=50000)
+        rmsea_fit_round2 = StridedFit(config_round2, name=f"{self.chrom_name} - 2 round")
+        per_window_signal_trs2, per_window_signal_q2, per_window_rmsea2 = rmsea_fit_round2.fit_tr(agg_cutcounts)
+
+        per_window_signal_trs = np.nanmin([per_window_signal_trs1, per_window_signal_trs2], axis=0)
+
         rmsea_fit = StridedFit(self.config, name=self.chrom_name)
-        per_window_signal_trs, per_window_signal_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
-        w_fit = WindowBackgroundFit(self.config)
-        het_windows_mask = w_fit.find_heterogeneous_windows(agg_cutcounts).filled(True)
-        per_window_signal_trs[het_windows_mask] = np.nan
+        self.config
 
+        w_fit = WindowBackgroundFit(self.config)
         interp_signal_tr = interpolate_nan(per_window_signal_trs)
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=interp_signal_tr)
         
@@ -356,10 +364,12 @@ class ChromosomeProcessor:
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea': per_window_rmsea,
+            'rmsea_round1': per_window_rmsea1,
+            'rmsea_round2': per_window_rmsea2,
             'tr': interp_signal_tr,
             'tr_na': per_window_signal_trs,
-            'q': per_window_signal_q,
+            'q_round1': per_window_signal_q1,
+            'q_round2': per_window_signal_q2,
         })
         fit_res_path = f"{outdir}.fit_results.parquet"
         self.to_parquet(df, fit_res_path)
