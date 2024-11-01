@@ -351,10 +351,7 @@ class ChromosomeProcessor:
 
         per_window_signal_trs = np.nanmin([per_window_signal_trs1, per_window_signal_trs2], axis=0)
 
-        rmsea_fit = StridedFit(self.config, name=self.chrom_name)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
-
-        self.config
 
         w_fit = WindowBackgroundFit(self.config)
         interp_signal_tr = interpolate_nan(per_window_signal_trs)
