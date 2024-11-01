@@ -280,7 +280,7 @@ class StridedFit(BackgroundFit):
     def fit_tr(self, array: ma.MaskedArray):
         original_shape = array.shape
         agg_cutcounts = array[::self.sampling_step]
-        best_tr, best_rmsea = self.find_per_window_tr(agg_cutcounts)
+        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(agg_cutcounts)
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
@@ -291,7 +291,10 @@ class StridedFit(BackgroundFit):
         best_rmsea_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_rmsea_with_nan[subsampled_indices] = best_rmsea[subsampled_indices]
 
-        return best_tr_with_nan, best_rmsea_with_nan
+        best_quantile_with_nan = np.full_like(array, np.nan, dtype=np.float32)
+        best_quantile_with_nan[subsampled_indices] = best_quantile[subsampled_indices]
+
+        return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
     def find_per_window_tr(self, agg_cutcounts: np.ndarray):
@@ -361,7 +364,8 @@ class StridedFit(BackgroundFit):
             remaing_fits_mask[changing_indices] = ~successful_fits
             self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
         
-        return best_tr, best_rmsea
+        best_quantile = np.sum(agg_cutcounts < best_tr, axis=0) / agg_cutcounts.shape[0]
+        return best_tr, best_quantile, best_rmsea
 
 
     @wrap_masked
@@ -395,19 +399,6 @@ class StridedFit(BackgroundFit):
         rmsea = np.where(df >= 3, np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1)), -2)
         assert np.sum(np.isnan(rmsea)) == 0, "RMSEA should not contain NaNs"
         return rmsea
-
-    @wrap_masked
-    def interpolate_nan(self, array):
-        subsampled_indices = np.where(~np.isnan(array))[0]
-        subsampled_arr = array[subsampled_indices]
-
-        return np.interp(
-            np.arange(array.shape[0], dtype=np.uint32),
-            subsampled_indices,
-            subsampled_arr,
-            left=None,
-            right=None,
-        )
 
 
 

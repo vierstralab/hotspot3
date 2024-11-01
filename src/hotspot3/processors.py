@@ -21,7 +21,7 @@ from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedFit
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
-from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -343,7 +343,9 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
         rmsea_fit = StridedFit(self.config, name=self.chrom_name)
-        per_window_signal_trs, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
+        per_window_signal_trs, per_window_signal_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
+        interp_signal_tr = interpolate_nan(per_window_signal_trs)
+        interp_rmsea = interpolate_nan(per_window_rmsea)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs)
@@ -352,8 +354,10 @@ class ChromosomeProcessor:
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea': per_window_rmsea,
-            'tr': per_window_signal_trs,
+            'rmsea': interp_rmsea,
+            'tr': interp_signal_tr,
+            'tr_na': per_window_signal_trs,
+            'q': per_window_signal_q,
         })
         self.to_parquet(df, f"{outdir}.fit_results.parquet")
         del df

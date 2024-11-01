@@ -128,3 +128,16 @@ def correct_offset(func):
         )
         return result[offset:]
     return wrapper
+
+@wrap_masked
+def interpolate_nan(array):
+    subsampled_indices = np.where(~np.isnan(array))[0]
+    subsampled_arr = array[subsampled_indices]
+
+    return np.interp(
+        np.arange(array.shape[0], dtype=np.uint32),
+        subsampled_indices,
+        subsampled_arr,
+        left=None,
+        right=None,
+    )
