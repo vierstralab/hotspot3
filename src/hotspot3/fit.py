@@ -159,7 +159,9 @@ class WindowBackgroundFit(BackgroundFit):
 
         high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
         agg_cutcounts[high_signal_mask] = np.nan
-
+        enough_data_mask = self.centered_running_nansum((agg_cutcounts > 0).astype(np.float32), self.config.bg_window, min_count=1) > self.config.bg_window * self.config.nonzero_windows_to_fit
+        agg_cutcounts = ma.masked_where(~enough_data_mask, agg_cutcounts)
+        
         p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(agg_cutcounts)
 
         rmsea = np.full_like(p, np.nan)
@@ -173,10 +175,7 @@ class WindowBackgroundFit(BackgroundFit):
         )
     
     def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, min_count=None, window=None):
-        enough_bg = ((agg_cutcounts > 0).sum() > self.config.nonzero_windows_to_fit * self.config.bg_window)
         mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=min_count, window=window)
-        mean = ma.masked_where(~enough_bg, mean)
-        var = ma.masked_where(~enough_bg, var)
         enough_bg_mask = ~mean.mask
 
         p = self.p_from_mean_and_var(mean, var).filled(np.nan)
@@ -385,7 +384,8 @@ class StridedFit(BackgroundFit):
             )
 
             remaing_fits_mask[changing_indices] = ~successful_fits
-            self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
+            if i % (n_signal_bins // 10) == 0:
+                self.logger.debug(f"{self.name}: Step {i}/{n_signal_bins} done. Remaining fits: {remaing_fits_mask.sum()}")
         
         best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea
