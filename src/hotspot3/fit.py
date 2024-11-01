@@ -215,10 +215,18 @@ class WindowBackgroundFit(BackgroundFit):
     
     @wrap_masked
     def find_heterogeneous_windows(self, array):
-        med_left = self.running_nanmedian(array, window=self.config.bg_window, min_count=self.min_mappable_bg)
-        med_right = self.running_nanmedian(array[::-1], window=self.config.bg_window, min_count=self.min_mappable_bg)[::-1]
+        median_left = self.running_nanmedian(
+            array,
+            window=self.config.bg_window,
+            min_count=self.min_mappable_bg
+        )
+        median_right = self.running_nanmedian(
+            array[::-1],
+            window=self.config.bg_window,
+            min_count=self.min_mappable_bg
+        )[::-1]
 
-        score = np.nan_to_num((med_right - med_left))
+        score = median_right - median_left
         outlier_score = np.nanquantile(np.abs(score), self.config.outlier_detection_tr)
         return score > outlier_score
     

@@ -346,7 +346,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         w_fit = WindowBackgroundFit(self.config)
-        het_windows_mask = w_fit.find_heterogeneous_windows(per_window_signal_trs)
+        het_windows_mask = w_fit.find_heterogeneous_windows(per_window_signal_trs).filled(True)
         per_window_signal_trs[het_windows_mask] = np.nan
 
         interp_signal_tr = interpolate_nan(per_window_signal_trs)
