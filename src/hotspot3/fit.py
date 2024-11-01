@@ -146,7 +146,7 @@ class GlobalBackgroundFit(BackgroundFit):
         else:
             G_sq = np.sum(calc_chisq(obs, exp))
 
-        df = len(obs) - 2
+        df = len(obs) - 2 - 1
         return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
 
 
