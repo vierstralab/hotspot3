@@ -373,7 +373,7 @@ class ChromosomeProcessor:
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
 
-        pval_estimator = PvalueEstimator(self.config)
+        pval_estimator = PvalueEstimator(self.config, self.gp.logger, name=self.chrom_name)
 
         # Strip masks to free up some memory
         agg_cutcounts = np.floor(agg_cutcounts.filled(np.nan))

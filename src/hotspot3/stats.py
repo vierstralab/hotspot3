@@ -3,40 +3,9 @@ import numpy.ma as ma
 import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
-import itertools
 
 
 # Calculate p-values and FDR
-def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
-    assert r.shape == p.shape, "r and p should have the same shape"
-
-    result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type="betainc").astype(np.float16)
-    low_precision = np.isinf(result)
-    assert not np.any(np.isnan(result)), f"Some p-values are NaN for betainc method, {np.where(np.isnan(result))}"
-    for precision, method in itertools.product(
-        (np.float32, np.float64),
-        ("betainc", "hyp2f1", "nbinom")
-    ):
-        if precision == np.float32 and method == "betainc":
-            continue
-        if np.any(low_precision):
-            new_pvals = logpval_for_dtype(
-                x[low_precision],
-                r[low_precision],
-                p[low_precision],
-                dtype=precision,
-                calc_type=method
-            )
-            corrected_infs = np.isfinite(new_pvals)
-            result[low_precision] = np.where(corrected_infs, new_pvals, result[low_precision])
-            low_precision[low_precision] = ~corrected_infs
-
-        else:
-            break
-    result /= -np.log(10).astype(result.dtype)
-    return result
-
-
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="betainc") -> np.ndarray:
     """
     Implementation of log(pval) with high precision
