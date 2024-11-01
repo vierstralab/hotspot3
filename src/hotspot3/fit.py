@@ -4,7 +4,7 @@ from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
 from hotspot3.utils import wrap_masked, correct_offset
 from hotspot3.logging import setup_logger
-from hotspot3.stats import calc_g_sq
+from hotspot3.stats import calc_g_sq, calc_chisq
 import bottleneck as bn
 
 
@@ -134,16 +134,18 @@ class GlobalBackgroundFit(BackgroundFit):
         mean, variance = self.get_mean_and_var(agg_cutcounts)
         return mean, variance
 
-    def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr):
+    def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
+        assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
         mask = unique_cutcounts < tr
         unique_cutcounts = unique_cutcounts[mask]
         obs = obs[mask]
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
-        # chisq = sum((obs - exp) ** 2 / exp)
-        G_sq = np.sum(calc_g_sq(obs, exp))
-        # obs[obs == 0] = 1
-        # G_sq = 2 * sum(obs * np.log(obs / exp))
+        if stat == 'G_sq':
+            G_sq = np.sum(calc_g_sq(obs, exp))
+        else:
+            G_sq = np.sum(calc_chisq(obs, exp))
+
         df = len(obs) - 2
         return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
 

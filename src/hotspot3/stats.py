@@ -151,3 +151,6 @@ def fix_inf_pvals(neglog_pvals, fname):
 def calc_g_sq(obs, exp):
     ratio = np.where((exp != 0) & (obs != 0), obs / exp, 1)
     return obs * np.log(ratio) * 2
+
+def calc_chisq(obs, exp):
+    return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
