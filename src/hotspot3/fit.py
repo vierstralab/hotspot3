@@ -32,9 +32,9 @@ class BackgroundFit:
         raise NotImplementedError
     
     @wrap_masked
-    def get_mean_and_var(self, array: np.ndarray, where=None):
-        mean = np.nanmean(array, axis=0, dtype=np.float32, where=where)
-        var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, where=where)
+    def get_mean_and_var(self, array: np.ndarray, **kwargs):
+        mean = np.nanmean(array, axis=0, dtype=np.float32, **kwargs)
+        var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, **kwargs)
         return mean, var
 
     @wrap_masked
