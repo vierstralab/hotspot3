@@ -312,7 +312,6 @@ class ChromosomeProcessor:
     def calc_pvals(self, cutcounts_file, pvals_outpath) -> ProcessorOutputData:
         self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
         
-        w_fit = WindowBackgroundFit(self.config)
         agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(
             cutcounts_file,
             self.gp.mappable_bases_file
@@ -344,23 +343,26 @@ class ChromosomeProcessor:
         
         rmsea_fit = StridedFit(self.config, name=self.chrom_name)
         per_window_signal_trs, per_window_signal_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts)
-        interp_signal_tr = interpolate_nan(per_window_signal_trs)
-        interp_rmsea = interpolate_nan(per_window_rmsea)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
+        w_fit = WindowBackgroundFit(self.config)
+        het_windows_mask = w_fit.find_heterogeneous_windows(per_window_signal_trs)
+        per_window_signal_trs[het_windows_mask] = np.nan
+
+        interp_signal_tr = interpolate_nan(per_window_signal_trs)
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=interp_signal_tr)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea': interp_rmsea,
+            'rmsea': per_window_rmsea,
             'tr': interp_signal_tr,
             'tr_na': per_window_signal_trs,
             'q': per_window_signal_q,
         })
         self.to_parquet(df, f"{outdir}.fit_results.parquet")
-        del df
+        del df, per_window_signal_trs, per_window_signal_q, per_window_rmsea
         gc.collect()
 
         bad_fits = fit_res.poisson_fit_params

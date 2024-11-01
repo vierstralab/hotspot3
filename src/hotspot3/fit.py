@@ -61,11 +61,7 @@ class BackgroundFit:
         max_bg_tr = self.get_max_bg_tr(array)
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
-        return np.round(np.linspace(
-            min_bg_tr,
-            max_bg_tr,
-            n_signal_bins + 1
-        )).astype(np.int32)
+        return np.round(np.linspace(min_bg_tr, max_bg_tr, n_signal_bins + 1)).astype(np.int32)
         
     
     def get_all_bins(self, array: np.ndarray):
@@ -212,6 +208,19 @@ class WindowBackgroundFit(BackgroundFit):
     @correct_offset
     def centered_running_nanmean(self, array, window, min_count):
         return bn.move_mean(array, window, min_count=min_count).astype(np.float32)
+    
+    @wrap_masked
+    def running_nanmedian(self, array, window, min_count):
+        return bn.move_median(array, window, min_count=min_count).astype(np.float32)
+    
+    @wrap_masked
+    def find_heterogeneous_windows(self, array):
+        med_left = self.running_nanmedian(array, window=self.config.bg_window, min_count=self.min_mappable_bg)
+        med_right = self.running_nanmedian(array[::-1], window=self.config.bg_window, min_count=self.min_mappable_bg)[::-1]
+
+        score = np.nan_to_num((med_right - med_left))
+        outlier_score = np.nanquantile(np.abs(score), self.config.outlier_detection_tr)
+        return score > outlier_score
     
     @wrap_masked
     def stratify(self, array, step):

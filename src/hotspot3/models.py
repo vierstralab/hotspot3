@@ -3,6 +3,7 @@ import pandas as pd
 import logging
 import numpy as np
 
+
 @dataclasses.dataclass
 class ProcessorConfig:
     """
@@ -41,6 +42,7 @@ class ProcessorConfig:
     rmsea_tr: float = 0.05
     adaptive_signal_tr: bool = False
     nonzero_windows_to_fit: float = 0.01
+    outlier_detection_tr: float = 0.99
     fdr_method: str = 'bh'
     cpus: int = 1
     save_debug: bool = False
