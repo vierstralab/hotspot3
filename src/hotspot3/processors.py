@@ -348,7 +348,7 @@ class ChromosomeProcessor:
         interp_rmsea = interpolate_nan(per_window_rmsea)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
-        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs)
+        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=interp_signal_tr)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
