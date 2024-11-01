@@ -362,7 +362,6 @@ class ChromosomeProcessor:
             'q': per_window_signal_q,
         })
         fit_res_path = f"{outdir}.fit_results.parquet"
-        delete_path(fit_res_path)
         self.to_parquet(df, fit_res_path)
         del df, per_window_signal_trs, per_window_signal_q, per_window_rmsea
         gc.collect()
