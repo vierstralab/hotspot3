@@ -24,7 +24,7 @@ class BackgroundFit:
         self.min_mappable_bg = round(self.config.min_mappable_bg_frac * self.config.bg_window)
         self.sampling_step = self.config.signal_prop_sampling_step
         self.interpolation_step = self.config.signal_prop_interpolation_step // self.sampling_step
-        self.point_in_sampled_window = self.config.bg_window // self.sampling_step
+        self.points_in_bg_window = self.config.bg_window // self.sampling_step
 
     def fit(self) -> FitResults:
         raise NotImplementedError
@@ -295,8 +295,8 @@ class StridedFit(BackgroundFit):
         agg_cutcounts = array[::self.sampling_step]
         strided_agg_cutcounts = rolling_view_with_nan_padding_subsample(
             agg_cutcounts,
-            window_size=self.config.signal_prop_n_samples,
-            subsample_step=self.interpolation_step
+            points_in_window=self.points_in_bg_window,
+            interpolation_step=self.interpolation_step
         ) # shape (bg_window, n_points)
         bin_edges = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
@@ -413,7 +413,7 @@ class StridedFit(BackgroundFit):
 
 
 
-def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step=1000):
+def rolling_view_with_nan_padding_subsample(arr, points_in_window=501, interpolation_step=1000):
     """
     Creates a 2D array where each row is a shifted view of the original array with NaN padding.
     Only every 'subsample_step' row is taken to reduce memory usage.
@@ -427,13 +427,13 @@ def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step
         np.ndarray: A subsampled array with NaN padding, of shape (n // subsample_step, window_size)
     """
     n = arr.shape[0]
-    assert window_size % 2 == 1, "Window size must be odd to have a center shift of 0."
+    assert points_in_window % 2 == 1, "Window size must be odd to have a center shift of 0."
     
-    pad_width = (window_size - 1) // 2
+    pad_width = (points_in_window - 1) // 2
     padded_arr = np.pad(arr, pad_width, mode='constant', constant_values=np.nan)
-    subsample_count = (n + subsample_step - 1) // subsample_step
-    shape = (subsample_count, window_size)
-    strides = (padded_arr.strides[0] * subsample_step, padded_arr.strides[0])
+    subsample_count = (n + interpolation_step - 1) // interpolation_step
+    shape = (subsample_count, points_in_window)
+    strides = (padded_arr.strides[0] * interpolation_step, padded_arr.strides[0])
     subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
  
     return subsampled_view.T
