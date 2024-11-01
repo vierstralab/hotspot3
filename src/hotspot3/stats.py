@@ -4,7 +4,6 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
 import itertools
-from sortedcontainers import SortedList
 
 
 # Calculate p-values and FDR
@@ -13,7 +12,7 @@ def negbin_neglog10pvalue(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.nda
 
     result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type="betainc").astype(np.float16)
     low_precision = np.isinf(result)
-    assert not np.any(np.isnan(result)), "Some p-values are NaN for betainc method"
+    assert not np.any(np.isnan(result)), f"Some p-values are NaN for betainc method, {np.where(np.isnan(result))}"
     for precision, method in itertools.product(
         (np.float32, np.float64),
         ("betainc", "hyp2f1", "nbinom")
@@ -183,5 +182,3 @@ def fix_inf_pvals(neglog_pvals, fname):
 def calc_g_sq(obs, exp):
     ratio = np.where((exp != 0) & (obs != 0), obs / exp, 1)
     return obs * np.log(ratio) * 2
-
-
