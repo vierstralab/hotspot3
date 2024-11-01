@@ -21,18 +21,22 @@ class BackgroundFit:
             name = self.__class__.__name__
         self.name = name
 
+        self.min_mappable_bg = round(self.config.min_mappable_bg_frac * self.config.bg_window)
+        self.sampling_step = self.config.signal_prop_sampling_step
+        self.interpolation_step = self.config.signal_prop_interpolation_step // self.sampling_step
+        self.point_in_sampled_window = self.config.bg_window // self.sampling_step
 
     def fit(self) -> FitResults:
         raise NotImplementedError
     
     @wrap_masked
     def get_mean_and_var(self, array: np.ndarray, where=None):
-        mean = np.nanmean(array, axis=0, dtype=np.float32)
-        var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32)
+        mean = np.nanmean(array, axis=0, dtype=np.float32, where=where)
+        var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, where=where)
         return mean, var
 
     @wrap_masked
-    def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
+    def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray, where=None):
         with np.errstate(divide='ignore', invalid='ignore'):
             p = np.array(1 - mean / var, dtype=np.float32)
         return p
@@ -184,7 +188,7 @@ class WindowBackgroundFit(BackgroundFit):
             window = self.config.bg_window
 
         if min_count is None:
-            min_count = self.config.min_mappable_bg
+            min_count = self.min_mappable_bg
 
         mean = self.centered_running_nanmean(array, window, min_count=min_count)
         var = self.centered_running_nanvar(array, window, min_count=min_count)
@@ -219,12 +223,6 @@ class StridedFit(BackgroundFit):
     Class to fit the background distribution using a strided approach.
     Extemely computationally taxing, use large stride values to compensate.
     """
-
-    def __init__(self, config=None, logger=None, name=None):
-        super().__init__(config, logger=logger, name=name)
-        self.sampling_step = self.config.bg_window // self.config.signal_prop_n_samples
-        self.interpolation_step = self.config.signal_prop_step // self.sampling_step
-    
     def value_counts_per_bin(self, strided_cutcounts, bin_edges):
         left_edges = bin_edges[0]
         right_edges = bin_edges[1:]
@@ -237,22 +235,13 @@ class StridedFit(BackgroundFit):
         return value_counts
 
     def fit_for_bin(self, collapsed_agg_cutcounts, where=None):
-        min_count = round(self.config.signal_prop_n_samples * self.config.min_mappable_bg / self.config.bg_window)
+        min_count = round(self.config.bg_window * self.config.min_mappable_bg_frac / self.sampling_step)
         enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts, where=where), axis=0, where=where) > min_count
+
+        
         mean = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
-
-        mean[enough_bg_mask] = np.nanmean(
-            collapsed_agg_cutcounts[:, enough_bg_mask],
-            axis=0, 
-            where=where[:, enough_bg_mask]
-        )
-        var[enough_bg_mask] = np.nanvar(
-            collapsed_agg_cutcounts[:, enough_bg_mask],
-            axis=0,
-            ddof=1, 
-            where=where[:, enough_bg_mask]
-        )
+        mean[enough_bg_mask], var[enough_bg_mask]  = self.get_mean_and_var(collapsed_agg_cutcounts[:, enough_bg_mask], where=where[:, enough_bg_mask])
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
@@ -288,10 +277,22 @@ class StridedFit(BackgroundFit):
         return result
         
     @wrap_masked
-    def find_per_window_tr(self, array: ma.MaskedArray):
+    def fit_tr(self, array: ma.MaskedArray):
         original_shape = array.shape
-        agg_cutcounts = array[::self.sampling_step].copy()
+        best_tr, best_rmsea = self.find_per_window_tr(array)
+        subsampled_indices = np.arange(
+            0, original_shape[0], self.sampling_step, dtype=np.uint32
+        )[::self.interpolation_step]
 
+        best_tr = self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
+        best_tr_with_nan = np.full_like(best_tr, np.nan)
+        best_tr_with_nan[subsampled_indices] = best_tr[subsampled_indices]
+
+        return best_tr, best_tr_with_nan, self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
+
+
+    def find_per_window_tr(self, array: np.ndarray):
+        agg_cutcounts = array[::self.sampling_step]
         strided_agg_cutcounts = rolling_view_with_nan_padding_subsample(
             agg_cutcounts,
             window_size=self.config.signal_prop_n_samples,
@@ -357,16 +358,8 @@ class StridedFit(BackgroundFit):
 
             remaing_fits_mask[changing_indices] = ~successful_fits
             self.logger.debug(f"{self.name}: Remaining fits: {remaing_fits_mask.sum()}")
-
-        subsampled_indices = np.arange(
-            0, original_shape[0], self.sampling_step, dtype=np.uint32
-        )[::self.interpolation_step]
-
-        best_tr = self.interpolate_nan(original_shape[0], best_tr, subsampled_indices)
-        best_tr_with_nan = np.full_like(best_tr, np.nan)
-        best_tr_with_nan[subsampled_indices] = best_tr[subsampled_indices]
-
-        return best_tr, best_tr_with_nan, self.interpolate_nan(original_shape[0], best_rmsea, subsampled_indices)
+        
+        return best_tr, best_rmsea
 
 
     @wrap_masked
@@ -443,4 +436,4 @@ def rolling_view_with_nan_padding_subsample(arr, window_size=501, subsample_step
     strides = (padded_arr.strides[0] * subsample_step, padded_arr.strides[0])
     subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
  
-    return subsampled_view.T.copy()
+    return subsampled_view.T
