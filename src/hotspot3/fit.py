@@ -61,9 +61,8 @@ class BackgroundFit:
         max_bg_tr = self.get_max_bg_tr(array)
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
-        return np.round(np.linspace(min_bg_tr, max_bg_tr, n_signal_bins + 1)).astype(np.int32)
+        return np.round(np.linspace(min_bg_tr, max_bg_tr, n_signal_bins + 1)).astype(np.int32), n_signal_bins
         
-    
     def get_all_bins(self, array: np.ndarray):
         min_bg_tr = self.get_min_bg_tr(array)
         n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
@@ -73,8 +72,8 @@ class BackgroundFit:
             min_bg_tr,
             n_bg_bins + 1
         )).astype(np.int32)
-        signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
-        return np.concatenate([bg_bins[:-1], signal_bins])
+        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
+        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
     def pack_poisson_params(self, mean, var, p, r):
         poisson_fit_positions = np.where(mean >= var)[0]
@@ -97,7 +96,7 @@ class GlobalBackgroundFit(BackgroundFit):
         unique, counts = self.hist_data_for_tr(agg_cutcounts)
 
         res = []
-        trs = self.get_signal_bins(agg_cutcounts)[::-1]
+        trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
@@ -322,13 +321,13 @@ class StridedFit(BackgroundFit):
             points_in_window=self.points_in_bg_window,
             interpolation_step=self.interpolation_step
         ) # shape (bg_window, n_points)
-        bin_edges = self.get_all_bins(strided_agg_cutcounts)
+        bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
         best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
-        for i in np.arange(0, self.config.num_signal_bins, 1)[::-1]:
+        for i in np.arange(0, n_signal_bins, 1)[::-1]:
             if remaing_fits_mask.sum() == 0:
                 break
             current_index = value_counts.shape[0] - i
