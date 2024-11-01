@@ -384,8 +384,8 @@ class StridedFit(BackgroundFit):
             )
 
             remaing_fits_mask[changing_indices] = ~successful_fits
-            if i % (n_signal_bins // 10) == 0:
-                self.logger.debug(f"{self.name}: Step {i}/{n_signal_bins} done. Remaining fits: {remaing_fits_mask.sum()}")
+            if current_index % (n_signal_bins // 10) == 0:
+                self.logger.debug(f"{self.name}: Step {current_index}/{n_signal_bins} done. Remaining fits: {remaing_fits_mask.sum()}")
         
         best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea
