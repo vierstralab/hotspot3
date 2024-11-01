@@ -24,7 +24,9 @@ class BackgroundFit:
         self.min_mappable_bg = round(self.config.min_mappable_bg_frac * self.config.bg_window)
         self.sampling_step = self.config.signal_prop_sampling_step
         self.interpolation_step = self.config.signal_prop_interpolation_step // self.sampling_step
-        self.points_in_bg_window = self.config.bg_window // self.sampling_step
+        self.points_in_bg_window = (self.config.bg_window - 1) // self.sampling_step
+        if self.points_in_bg_window % 2 == 0:
+            self.points_in_bg_window += 1
 
     def fit(self) -> FitResults:
         raise NotImplementedError
