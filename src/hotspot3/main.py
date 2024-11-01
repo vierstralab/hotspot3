@@ -131,10 +131,8 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     # Arguments for calculating p-values
     parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed). Used in fit of background model", default=None)
     parser.add_argument("--window", help="Window size for smoothing cutcounts", type=int, default=151)
-    parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
+    parser.add_argument("--background_window", help="Background window size", type=int, default=10001)
     parser.add_argument("--signal_quantile", help="Chromosome signal quantile. Positions with signal above the threshold considered to be 'potential peaks' and are not used to fit a background model. Ignored if --adaptive_signal_tr is provided", type=float, default=0.99)
-    
-    parser.add_argument("--adaptive_signal_tr", help="Infer signal quantile based on RMSEA of chromosomal background fit.", action='store_true', default=False)
     
     # Arguments to skip previous steps if provided
     parser.add_argument("--bam", help="Path to input bam/cram file", default=None)

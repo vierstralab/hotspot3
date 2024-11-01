@@ -40,7 +40,6 @@ class ProcessorConfig:
     num_background_bins: int = 20
     num_signal_bins: int = 100
     rmsea_tr: float = 0.05
-    adaptive_signal_tr: bool = False
     nonzero_windows_to_fit: float = 0.01
     outlier_detection_tr: float = 0.99
     fdr_method: str = 'bh'
