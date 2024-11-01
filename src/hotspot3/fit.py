@@ -228,6 +228,7 @@ class WindowBackgroundFit(BackgroundFit):
 
         score = np.abs(median_right - median_left)
         outlier_score = np.nanquantile(score, self.config.outlier_detection_tr)
+        print(outlier_score)
         return score > outlier_score
     
     @wrap_masked
