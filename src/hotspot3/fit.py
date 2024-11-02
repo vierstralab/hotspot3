@@ -261,7 +261,7 @@ class StridedFit(BackgroundFit):
     def value_counts_per_bin(self, strided_cutcounts, bin_edges):
         left_edges = bin_edges[0]
         right_edges = bin_edges[1:]
-        value_counts = np.full_like(right_edges, 0, dtype=np.int32)
+        value_counts = np.full_like(right_edges, 0, dtype=np.float32)
         for i in range(right_edges.shape[0]):
             bin_membership = (strided_cutcounts >= left_edges[None, :]) & (strided_cutcounts < right_edges[i][None, :])
             value_counts[i] = np.sum(bin_membership, axis=0)
