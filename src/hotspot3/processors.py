@@ -344,26 +344,27 @@ class ChromosomeProcessor:
         
 
         self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name}")
-        rmsea_fit = StridedFit(self.config, name=self.chrom_name)
-        per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit.fit_tr(agg_cutcounts, global_r=global_r)
+        config = self.config # delete this line after testing
+        rmsea_fit = StridedFit(config, name=self.chrom_name)
+        per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_r=global_r)
 
-        per_window_signal_trs1 = interpolate_nan(per_window_signal_trs1)
+        per_window_trs = interpolate_nan(per_window_trs)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         w_fit = WindowBackgroundFit(self.config)
-        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs1)
+        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea': per_window_rmsea1,
-            'tr': per_window_signal_trs1,
-            'q': per_window_signal_q1,
+            'rmsea': per_window_rmsea,
+            'tr': per_window_trs,
+            'q': per_window_q,
         })
         fit_res_path = f"{outdir}.fit_results.parquet"
         self.to_parquet(df, fit_res_path)
-        del df, per_window_signal_q1, per_window_rmsea1, per_window_signal_trs1
+        del df, per_window_q, per_window_rmsea, per_window_trs
         gc.collect()
 
         poisson_fits = fit_res.poisson_fit_params
