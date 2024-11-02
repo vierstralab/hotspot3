@@ -424,6 +424,7 @@ class StridedFit(BackgroundFit):
             axis=0
         ) - n_params
 
-        rmsea = np.where(df >= 3, np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1)), -2)
+        rmsea = np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1), where=df >= 3)
+        rmsea = np.where(df >= 3, rmsea, -2)
         assert np.sum(np.isnan(rmsea)) == 0, "RMSEA should not contain NaNs"
         return rmsea

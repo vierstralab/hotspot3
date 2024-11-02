@@ -343,7 +343,7 @@ class ChromosomeProcessor:
         # Estimate bg, 1st round
         bg_window_small = 5000
         bg_window_large = 50000
-        self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name} with bg_window=[{bg_window_small}, {bg_window_large}")
+        self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name} for bg_windows: ({bg_window_small}, {bg_window_large})")
         config_round1 = dataclasses.replace(self.config, bg_window=bg_window_small)
         rmsea_fit_round1 = StridedFit(config_round1, name=self.chrom_name)
         per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit_round1.fit_tr(agg_cutcounts)
