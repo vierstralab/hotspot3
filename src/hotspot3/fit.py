@@ -363,7 +363,7 @@ class StridedFit(BackgroundFit):
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
                 strided_agg_cutcounts[:, changing_indices],
                 where=mask[:, changing_indices],
-                r=global_r
+                global_r=global_r
             )
 
             edges = bin_edges[:right_bin_index, changing_indices]
