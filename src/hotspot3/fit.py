@@ -432,7 +432,7 @@ class StridedFit(BackgroundFit):
         df = np.sum(
             (value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0),
             axis=0
-        ) - n_params
+        ) - n_params - 1
 
         G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df >= 3)
 
