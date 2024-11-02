@@ -352,11 +352,13 @@ class ChromosomeProcessor:
         rmsea_fit_round2 = StridedFit(config_round2, name=self.chrom_name)
         per_window_signal_trs2, per_window_signal_q2, per_window_rmsea2 = rmsea_fit_round2.fit_tr(agg_cutcounts)
         both_nan = np.isnan(per_window_signal_trs1) & np.isnan(per_window_signal_trs2)
-        np.nanmin(
-            [per_window_signal_trs1, per_window_signal_trs2],
-            out=per_window_signal_trs1,
+
+        per_window_signal_trs1[~both_nan] = np.nanmin(
+            [
+                per_window_signal_trs1[~both_nan],
+                per_window_signal_trs2[~both_nan]
+            ],
             axis=0, 
-            where=~both_nan
         )
         per_window_signal_trs1 = interpolate_nan(per_window_signal_trs1)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
