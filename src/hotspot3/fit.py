@@ -269,7 +269,7 @@ class StridedFit(BackgroundFit):
         
         return value_counts
 
-    def fit_for_bin(self, collapsed_agg_cutcounts, where=None):
+    def fit_for_bin(self, collapsed_agg_cutcounts, where=None, global_r=None):
         min_count = round(self.config.bg_window * self.config.min_mappable_bg_frac / self.sampling_step)
         enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts, where=where), axis=0, where=where) > min_count
 
@@ -278,8 +278,13 @@ class StridedFit(BackgroundFit):
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         mean[enough_bg_mask], var[enough_bg_mask]  = self.get_mean_and_var(collapsed_agg_cutcounts[:, enough_bg_mask], where=where[:, enough_bg_mask])
 
-        p = self.p_from_mean_and_var(mean, var)
-        r = self.r_from_mean_and_var(mean, var)
+        if global_r is not None:
+            r = np.full_like(mean, global_r, dtype=np.float32)
+        else:
+            r = self.r_from_mean_and_var(mean, var)
+
+        p = mean / (mean + r)
+        
         poisson_params = self.pack_poisson_params(mean, var, p, r)
 
         return p, r, enough_bg_mask, poisson_params
@@ -312,10 +317,10 @@ class StridedFit(BackgroundFit):
         return result
         
     @wrap_masked
-    def fit_tr(self, array: ma.MaskedArray):
+    def fit_tr(self, array: ma.MaskedArray, global_r=None):
         original_shape = array.shape
         agg_cutcounts = array[::self.sampling_step]
-        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(agg_cutcounts)
+        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(agg_cutcounts, global_r=global_r)
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
@@ -332,7 +337,7 @@ class StridedFit(BackgroundFit):
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, agg_cutcounts: np.ndarray):
+    def find_per_window_tr(self, agg_cutcounts: np.ndarray, global_r=None):
         strided_agg_cutcounts = rolling_view_with_nan_padding(
             agg_cutcounts,
             points_in_window=self.points_in_bg_window,
@@ -357,7 +362,8 @@ class StridedFit(BackgroundFit):
 
             p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
                 strided_agg_cutcounts[:, changing_indices],
-                where=mask[:, changing_indices]
+                where=mask[:, changing_indices],
+                r=global_r
             )
 
             edges = bin_edges[:right_bin_index, changing_indices]

@@ -319,7 +319,7 @@ class ChromosomeProcessor:
         )
 
         self.gp.logger.debug(
-            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count()}/{agg_cutcounts.shape[0]} bases are mappable"
+            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count():,}/{agg_cutcounts.shape[0]:,} bases are mappable"
         )
 
         self.gp.logger.debug(f'Constructing background signal model for {self.chrom_name}')
@@ -345,7 +345,7 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name}")
         rmsea_fit = StridedFit(self.config, name=self.chrom_name)
-        per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit.fit_tr(agg_cutcounts)
+        per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit.fit_tr(agg_cutcounts, r=global_r)
 
         per_window_signal_trs1 = interpolate_nan(per_window_signal_trs1)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
