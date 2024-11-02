@@ -378,7 +378,7 @@ class ChromosomeProcessor:
         })
         fit_res_path = f"{outdir}.fit_results.parquet"
         self.to_parquet(df, fit_res_path)
-        del df, per_window_signal_q1, per_window_rmsea1, per_window_signal_trs1
+        del df, per_window_signal_q1, per_window_rmsea1, per_window_signal_trs1, per_window_signal_q2, per_window_rmsea2, per_window_signal_trs2
         gc.collect()
 
         poisson_fits = fit_res.poisson_fit_params

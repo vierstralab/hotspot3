@@ -177,8 +177,8 @@ class WindowBackgroundFit(BackgroundFit):
         
         p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(agg_cutcounts)
 
-        rmsea = np.full_like(p, np.nan)
-        per_window_quantiles = np.full_like(p, np.nan)
+        rmsea = np.full_like(p, np.nan, dtype=np.float16)
+        per_window_quantiles = np.full_like(p, np.nan, dtype=np.float16)
         return FitResults(
             p, r, rmsea,
             fit_quantile=per_window_quantiles,
@@ -323,10 +323,10 @@ class StridedFit(BackgroundFit):
         best_tr_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_tr_with_nan[subsampled_indices] = best_tr
 
-        best_rmsea_with_nan = np.full_like(array, np.nan, dtype=np.float32)
+        best_rmsea_with_nan = np.full_like(array, np.nan, dtype=np.float16)
         best_rmsea_with_nan[subsampled_indices] = best_rmsea
 
-        best_quantile_with_nan = np.full_like(array, np.nan, dtype=np.float32)
+        best_quantile_with_nan = np.full_like(array, np.nan, dtype=np.float16)
         best_quantile_with_nan[subsampled_indices] = best_quantile
 
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
