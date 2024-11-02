@@ -63,19 +63,26 @@ class BackgroundFit:
         max_bg_tr = self.get_max_bg_tr(array)
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
-        return np.round(np.linspace(min_bg_tr, max_bg_tr, n_signal_bins + 1)).astype(np.int32), n_signal_bins
+        
+        result = np.full(array.shape[1], np.nan, dtype=np.int32)
+        nan_tr = np.isnan(min_bg_tr) | np.isnan(max_bg_tr)
+        result[~nan_tr] = np.round(
+            np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
+        )
+        return result
         
     def get_all_bins(self, array: np.ndarray):
         min_bg_tr = self.get_min_bg_tr(array)
+        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
         n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
         n_bg_bins = round(n_bg_bins)
-        bg_bins = np.round(np.linspace(
-            0,
-            min_bg_tr,
-            n_bg_bins + 1
-        )).astype(np.int32)
-        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
-        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
+
+        bg_bins = np.full_like(signal_bins, np.nan)
+        bg_bins[~np.isnan(signal_bins)] = np.round(
+            np.linspace(0, min_bg_tr[~np.isnan(signal_bins)], n_bg_bins + 1, endpoint=False)
+        )
+        
+        return np.concatenate([bg_bins, signal_bins]), n_signal_bins
 
     def pack_poisson_params(self, mean, var, p, r):
         poisson_fit_positions = np.where(mean >= var)[0]
