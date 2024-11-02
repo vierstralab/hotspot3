@@ -81,7 +81,7 @@ class BackgroundFit:
         bg_bins[:, ~np.isnan(min_bg_tr)] = np.round(
             np.linspace(
                 0,
-                min_bg_tr[~np.isnan(signal_bins)],
+                min_bg_tr[~np.isnan(min_bg_tr)],
                 n_bg_bins + 1,
                 endpoint=False
             )
