@@ -52,7 +52,7 @@ class BackgroundFit:
     def get_bg_tr(self, array: np.ndarray, quantile: float):
         all_nan = np.all(np.isnan(array), axis=0)
         result = np.full(array.shape[1], np.nan, dtype=np.float32)
-        result[~all_nan] = np.nanquantile(array[:, ~all_nan],quantile, axis=0)
+        result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0)
         return result
     
     def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
