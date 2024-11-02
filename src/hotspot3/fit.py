@@ -77,17 +77,16 @@ class BackgroundFit:
         n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
         n_bg_bins = round(n_bg_bins)
 
-        bg_bins = np.full((n_bg_bins, *min_bg_tr.shape), np.nan)
+        bg_bins = np.full((n_bg_bins + 1, *min_bg_tr.shape), np.nan)
         bg_bins[:, ~np.isnan(min_bg_tr)] = np.round(
             np.linspace(
                 0,
                 min_bg_tr[~np.isnan(min_bg_tr)],
                 n_bg_bins + 1,
-                endpoint=False
             )
         )
         
-        return np.concatenate([bg_bins, signal_bins]), n_signal_bins
+        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
     def pack_poisson_params(self, mean, var, p, r):
         poisson_fit_positions = np.where(mean >= var)[0]
