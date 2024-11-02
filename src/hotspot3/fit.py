@@ -418,7 +418,6 @@ class StridedFit(BackgroundFit):
             calc_g_sq(value_counts_per_bin, expected_counts), 
             axis=0
         )
-        #print(list(zip(value_counts_per_bin[:, 0], np.diff(bin_edges[:, 0]), ((value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0))[:, 0])))
         df = np.sum(
             (value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0),
             axis=0
