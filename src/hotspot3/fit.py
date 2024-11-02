@@ -51,7 +51,7 @@ class BackgroundFit:
     
     def get_bg_tr(self, array: np.ndarray, quantile: float):
         all_nan = np.all(np.isnan(array), axis=0)
-        if array.dim == 1:
+        if array.ndim == 1:
             return np.nan if all_nan else np.nanquantile(array, quantile)
         result = np.full(array.shape[1], np.nan, dtype=np.float32)
         result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0)
