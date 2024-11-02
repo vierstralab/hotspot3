@@ -64,7 +64,7 @@ class BackgroundFit:
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
         
-        result = np.full(array.shape[1], np.nan, dtype=np.int32)
+        result = np.full(array.shape[-1], np.nan, dtype=np.int32)
         nan_tr = np.isnan(min_bg_tr) | np.isnan(max_bg_tr)
         result[~nan_tr] = np.round(
             np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
