@@ -322,7 +322,7 @@ class ChromosomeProcessor:
             f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count():,}/{agg_cutcounts.shape[0]:,} bases are mappable"
         )
 
-        self.gp.logger.debug(f'Constructing background signal model for {self.chrom_name}')
+        self.gp.logger.debug(f'Estimating background signal for {self.chrom_name}')
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts)
         global_p = global_fit.p
