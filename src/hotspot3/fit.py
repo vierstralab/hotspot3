@@ -42,7 +42,7 @@ class BackgroundFit:
         with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
             p = np.array(1 - mean / var, dtype=np.float32)
         return p
-
+    
     @wrap_masked
     def r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
