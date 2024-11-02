@@ -135,7 +135,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
 
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
-        has_enough_background = np.count_nonzero(agg_cutcounts) / agg_cutcounts.size > self.config.nonzero_windows_to_fit
+        has_enough_background = agg_cutcounts.size > 0 & (np.count_nonzero(agg_cutcounts) / agg_cutcounts.size > self.config.nonzero_windows_to_fit)
         if not has_enough_background:
             self.logger.warning(f"{self.name}: Not enough background to fit the global mean. Skipping.")
             raise NoContigPresentError
