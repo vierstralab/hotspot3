@@ -351,13 +351,18 @@ class ChromosomeProcessor:
         config_round2 = dataclasses.replace(self.config, bg_window=bg_window_large)
         rmsea_fit_round2 = StridedFit(config_round2, name=self.chrom_name)
         per_window_signal_trs2, per_window_signal_q2, per_window_rmsea2 = rmsea_fit_round2.fit_tr(agg_cutcounts)
-        with np.errstate(invalid='ignore'):
-            per_window_signal_trs = np.nanmin([per_window_signal_trs1, per_window_signal_trs2], axis=0)
-        per_window_signal_tr = interpolate_nan(per_window_signal_trs)
+        both_nan = np.isnan(per_window_signal_trs1) & np.isnan(per_window_signal_trs2)
+        np.nanmin(
+            [per_window_signal_trs1, per_window_signal_trs2],
+            out=per_window_signal_trs1,
+            axis=0, 
+            where=~both_nan
+        )
+        per_window_signal_trs1 = interpolate_nan(per_window_signal_trs1)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         w_fit = WindowBackgroundFit(self.config)
-        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_tr)
+        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_trs1)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
@@ -365,7 +370,7 @@ class ChromosomeProcessor:
             'sliding_p': fit_res.p,
             'rmsea_round1': per_window_rmsea1,
             'rmsea_round2': per_window_rmsea2,
-            'tr': per_window_signal_trs,
+            'tr': per_window_signal_trs1,
             'q_round1': per_window_signal_q1,
             'q_round2': per_window_signal_q2,
         })
