@@ -80,7 +80,7 @@ def delete_path(path):
             os.remove(path)
 
 
-def wrap_masked(func) -> ma.MaskedArray:
+def wrap_masked(func, sampling_step=1) -> ma.MaskedArray:
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         masked_arrays = [arg for arg in args if isinstance(arg, ma.MaskedArray)]

@@ -341,11 +341,11 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
         # Estimate bg, 1st round
-        config_round1 = dataclasses.replace(self.config, window=5000)
+        config_round1 = dataclasses.replace(self.config, bg_window=5000)
         rmsea_fit_round1 = StridedFit(config_round1, name=self.chrom_name)
         per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit_round1.fit_tr(agg_cutcounts)
 
-        config_round2 = dataclasses.replace(self.config, window=50000)
+        config_round2 = dataclasses.replace(self.config, bg_window=50000)
         rmsea_fit_round2 = StridedFit(config_round2, name=self.chrom_name)
         per_window_signal_trs2, per_window_signal_q2, per_window_rmsea2 = rmsea_fit_round2.fit_tr(agg_cutcounts)
 
