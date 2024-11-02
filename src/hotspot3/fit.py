@@ -2,7 +2,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
-from hotspot3.utils import wrap_masked, correct_offset
+from hotspot3.utils import wrap_masked, correct_offset, rolling_view_with_nan_padding
 from hotspot3.logging import setup_logger
 from hotspot3.stats import calc_g_sq, calc_chisq
 import bottleneck as bn
@@ -322,7 +322,7 @@ class StridedFit(BackgroundFit):
 
 
     def find_per_window_tr(self, agg_cutcounts: np.ndarray):
-        strided_agg_cutcounts = rolling_view_with_nan_padding_subsample(
+        strided_agg_cutcounts = rolling_view_with_nan_padding(
             agg_cutcounts,
             points_in_window=self.points_in_bg_window,
             interpolation_step=self.interpolation_step
@@ -389,7 +389,8 @@ class StridedFit(BackgroundFit):
             if current_index % (n_signal_bins // 10) == 0:
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion. Step {current_index}/{n_signal_bins} done. Remaining fits: {remaing_fits_mask.sum()}")
         
-        best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
+        with np.errstate(invalid='ignore'):
+            best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea
 
 
@@ -424,30 +425,3 @@ class StridedFit(BackgroundFit):
         rmsea = np.where(df >= 3, np.sqrt(np.maximum(G_sq / df - 1, 0) / (bg_sum_mappable - 1)), -2)
         assert np.sum(np.isnan(rmsea)) == 0, "RMSEA should not contain NaNs"
         return rmsea
-
-
-
-def rolling_view_with_nan_padding_subsample(arr, points_in_window=501, interpolation_step=1000):
-    """
-    Creates a 2D array where each row is a shifted view of the original array with NaN padding.
-    Only every 'subsample_step' row is taken to reduce memory usage.
-
-    Parameters:
-        arr (np.ndarray): Input array of shape (n,)
-        window_size (int): The total size of the shift (default is 501 for shifts from -250 to +250)
-        subsample_step (int): Step size for subsampling (default is 1000)
-
-    Returns:
-        np.ndarray: A subsampled array with NaN padding, of shape (n // subsample_step, window_size)
-    """
-    n = arr.shape[0]
-    assert points_in_window % 2 == 1, "Window size must be odd to have a center shift of 0."
-    
-    pad_width = (points_in_window - 1) // 2
-    padded_arr = np.pad(arr, pad_width, mode='constant', constant_values=np.nan)
-    subsample_count = (n + interpolation_step - 1) // interpolation_step
-    shape = (subsample_count, points_in_window)
-    strides = (padded_arr.strides[0] * interpolation_step, padded_arr.strides[0])
-    subsampled_view = np.lib.stride_tricks.as_strided(padded_arr, shape=shape, strides=strides)
- 
-    return subsampled_view.T
