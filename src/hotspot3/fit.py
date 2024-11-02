@@ -152,7 +152,7 @@ class GlobalBackgroundFit(BackgroundFit):
         assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
         mask = unique_cutcounts < tr
         unique_cutcounts = unique_cutcounts[mask]
-        obs = obs[mask]
+        obs = obs[mask].astype(np.float32)
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
         if stat == 'G_sq':
