@@ -49,18 +49,16 @@ class BackgroundFit:
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
     
-    def get_min_bg_tr(self, array: np.ndarray):
-        with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
-            return np.nanquantile(array, self.config.min_background_prop, axis=0)
-    
-    def get_max_bg_tr(self, array: np.ndarray):
-        with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
-            return np.nanquantile(array, self.config.max_background_prop, axis=0)
+    def get_bg_tr(self, array: np.ndarray, quantile: float):
+        all_nan = np.all(np.isnan(array), axis=0)
+        result = np.full(array.shape[1], np.nan, dtype=np.float32)
+        result[~all_nan] = np.nanquantile(array[:, ~all_nan],quantile, axis=0)
+        return result
     
     def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
         if min_bg_tr is None:
-            min_bg_tr = self.get_min_bg_tr(array)
-        max_bg_tr = self.get_max_bg_tr(array)
+            min_bg_tr = self.get_bg_tr(array, self.config.min_background_prop)
+        max_bg_tr = self.get_bg_tr(array, self.config.max_background_prop)
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
         
@@ -72,7 +70,7 @@ class BackgroundFit:
         return result, n_signal_bins
         
     def get_all_bins(self, array: np.ndarray):
-        min_bg_tr = self.get_min_bg_tr(array)
+        min_bg_tr = self.get_bg_tr(array, self.config.min_background_prop)
         signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
         n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
         n_bg_bins = round(n_bg_bins)
