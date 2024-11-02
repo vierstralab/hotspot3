@@ -379,9 +379,9 @@ class ChromosomeProcessor:
         del df, per_window_signal_trs, per_window_signal_q1, per_window_rmsea1
         gc.collect()
 
-        bad_fits = fit_res.poisson_fit_params
-        if bad_fits is not None:
-            self.gp.logger.debug(f"Low variance for {len(bad_fits)} windows for {self.chrom_name}")
+        poisson_fits = fit_res.poisson_fit_params
+        if poisson_fits is not None:
+            self.gp.logger.debug(f"Using poisson distribution for {len(poisson_fits)} windows for {self.chrom_name}")
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
 
@@ -395,7 +395,7 @@ class ChromosomeProcessor:
             fit_res.r,
             fit_res.p,
             fit_res.enough_bg_mask,
-            bad_fits=bad_fits
+            bad_fits=poisson_fits
         )
         del agg_cutcounts
         gc.collect()

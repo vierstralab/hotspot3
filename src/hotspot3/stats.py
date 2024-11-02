@@ -43,7 +43,7 @@ def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.n
             - betaln(x, r, dtype=r.dtype)
         )
 
-def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
+def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
     """
     Reimplementation of scipy.stats.false_discovery_control to work with neglog-transformed p-values.
     Accepts log-transformed p-values and returns log-transformed FDR values.
@@ -61,12 +61,13 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32):
     if log_pvals.ndim != 1:
         raise NotImplementedError("Only 1D arrays are supported.")
 
-    m = log_pvals.shape[0]
+    if m is None:
+        m = log_pvals.shape[0]
     order = np.argsort(log_pvals) # can save argsort as uint32
     
     log_pvals = log_pvals[order]
 
-    log_i = np.log(np.arange(1, m + 1, dtype=dtype))
+    log_i = np.log(np.arange(1, log_pvals.shape[0] + 1, dtype=dtype))
     log_pvals += np.log(m).astype(dtype) - log_i  # p_adj = p * m / i => log10(p_adj) = log10(p) + log10(m) - log10(i)
     if method == 'by':
         log_pvals += logsumexp(-log_i)
