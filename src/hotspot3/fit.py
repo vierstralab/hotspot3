@@ -400,7 +400,7 @@ class StridedFit(BackgroundFit):
 
             idx = n_signal_bins - i
             if idx % (n_signal_bins // 5) == 0:
-                self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{n_signal_bins}). Remaining fits: {remaing_fits_mask.sum()}")
+                self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{n_signal_bins})")
         
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
