@@ -289,7 +289,7 @@ class StridedFit(BackgroundFit):
 
         return p, r, enough_bg_mask, poisson_params
     
-    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, poisson_params=None):
+    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, poisson_params=None, fit_params=2):
         result = np.full_like(p, np.nan)
         if enough_bg_mask is None:
             enough_bg_mask = np.ones_like(p, dtype=bool)
@@ -310,7 +310,7 @@ class StridedFit(BackgroundFit):
 
         result[negbin_fit_mask] = self.calc_rmsea_all_windows(
             st.nbinom(r[negbin_fit_mask], 1 - p[negbin_fit_mask]),
-            n_params=2,
+            n_params=fit_params,
             bin_edges=bin_edges[:, negbin_fit_mask],
             value_counts_per_bin=value_counts[:, negbin_fit_mask]
         )
@@ -365,11 +365,16 @@ class StridedFit(BackgroundFit):
                 where=mask[:, changing_indices],
                 global_r=global_r
             )
+            
+            n_params = 1 if global_r is not None else 2
+            
 
             edges = bin_edges[:right_bin_index, changing_indices]
             counts = value_counts[:current_index, changing_indices]
 
-            rmsea = self.wrap_rmsea_valid_fits(p, r, edges, counts, enough_bg_mask, poisson_params) # shape of r
+            rmsea = self.wrap_rmsea_valid_fits(
+                p, r, edges, counts, 
+                enough_bg_mask, poisson_params, fit_params=n_params) # shape of r
             
             successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
             # best fit found
