@@ -39,21 +39,23 @@ class BackgroundFit:
 
     @wrap_masked
     def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray, where=None):
-        with np.errstate(divide='ignore', invalid='ignore'):
+        with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
             p = np.array(1 - mean / var, dtype=np.float32)
         return p
     
     @wrap_masked
     def r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
-        with np.errstate(divide='ignore', invalid='ignore'):
+        with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
     
-    def get_min_bg_tr(self, array):
-        return np.nanquantile(array, self.config.min_background_prop, axis=0)
+    def get_min_bg_tr(self, array: np.ndarray):
+        with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
+            return np.nanquantile(array, self.config.min_background_prop, axis=0)
     
     def get_max_bg_tr(self, array: np.ndarray):
-        return np.nanquantile(array, self.config.max_background_prop, axis=0)
+        with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
+            return np.nanquantile(array, self.config.max_background_prop, axis=0)
     
     def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
         if min_bg_tr is None:

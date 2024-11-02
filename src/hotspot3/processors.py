@@ -341,21 +341,23 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
         # Estimate bg, 1st round
-        config_round1 = dataclasses.replace(self.config, bg_window=5000)
+        bg_window_small = 5000
+        bg_window_large = 50000
+        self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name} with bg_window=[{bg_window_small}, {bg_window_large}")
+        config_round1 = dataclasses.replace(self.config, bg_window=bg_window_small)
         rmsea_fit_round1 = StridedFit(config_round1, name=self.chrom_name)
         per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit_round1.fit_tr(agg_cutcounts)
 
-        config_round2 = dataclasses.replace(self.config, bg_window=50000)
+        config_round2 = dataclasses.replace(self.config, bg_window=bg_window_large)
         rmsea_fit_round2 = StridedFit(config_round2, name=self.chrom_name)
         per_window_signal_trs2, per_window_signal_q2, per_window_rmsea2 = rmsea_fit_round2.fit_tr(agg_cutcounts)
 
         per_window_signal_trs = np.nanmin([per_window_signal_trs1, per_window_signal_trs2], axis=0)
-
+        per_window_signal_tr = interpolate_nan(per_window_signal_trs)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         w_fit = WindowBackgroundFit(self.config)
-        interp_signal_tr = interpolate_nan(per_window_signal_trs)
-        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=interp_signal_tr)
+        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_signal_tr)
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
@@ -363,8 +365,7 @@ class ChromosomeProcessor:
             'sliding_p': fit_res.p,
             'rmsea_round1': per_window_rmsea1,
             'rmsea_round2': per_window_rmsea2,
-            'tr': interp_signal_tr,
-            'tr_na': per_window_signal_trs,
+            'tr': per_window_signal_trs,
             'q_round1': per_window_signal_q1,
             'q_round2': per_window_signal_q2,
         })
