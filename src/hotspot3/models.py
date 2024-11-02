@@ -36,7 +36,7 @@ class ProcessorConfig:
     min_background_prop: float = 0.75
 
     signal_prop_sampling_step: int = 75
-    signal_prop_interpolation_step: int = 300 # shouldn't be less than signal_prop_n_samples!!!!!
+    signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
     num_background_bins: int = 20
     num_signal_bins: int = 100
     rmsea_tr: float = 0.05

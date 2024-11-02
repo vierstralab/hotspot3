@@ -395,7 +395,7 @@ class StridedFit(BackgroundFit):
             remaing_fits_mask[changing_indices] = ~successful_fits
 
             idx = n_signal_bins - i
-            if idx % (n_signal_bins // 10) == 0:
+            if idx % (n_signal_bins // 5) == 0:
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion. Step {idx}/{n_signal_bins} done. Remaining fits: {remaing_fits_mask.sum()}")
         
         with np.errstate(invalid='ignore'):
