@@ -188,7 +188,7 @@ class GenomeProcessor:
             pvals_path
         )
     
-    def calc_fdr(self, pvals_path, fdrs_path):
+    def calc_fdr(self, pvals_path, fdrs_path, max_fdr=1):
         self.logger.info('Calculating per-bp FDRs')
         log_pval = pd.read_parquet(
             pvals_path,
@@ -201,14 +201,16 @@ class GenomeProcessor:
         ends = [*starts[1:], log_pval.shape[0]]
         log_pval = log_pval['log10_pval'].values
 
+        result = np.full_like(log_pval, np.nan)
+        mask = ~np.isnan(log_pval)
+        not_nan_shape = np.sum(mask)
+        mask = mask & (log_pval >= -np.log10(max_fdr))
+
         # Cast to natural log
+        log_pval = log_pval[mask]
         log_pval *= -np.log(10).astype(log_pval.dtype)
 
-        result = np.full_like(log_pval, np.nan)
-        not_nan = ~np.isnan(log_pval)
-        log_pval = log_pval[not_nan]
-
-        result[not_nan] = logfdr_from_logpvals(log_pval, method=self.config.fdr_method)
+        result[mask] = logfdr_from_logpvals(log_pval, method=self.config.fdr_method, m=not_nan_shape)
         del log_pval
         gc.collect()
         # Cast to neglog10
@@ -340,26 +342,11 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Global fit finished for {self.chrom_name}.")
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
-        # Estimate bg, 1st round
-        bg_window_small = 5000
-        bg_window_large = 50000
-        self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name} for bg_windows: ({bg_window_small}, {bg_window_large})")
-        config_round1 = dataclasses.replace(self.config, bg_window=bg_window_small, signal_prop_sampling_step=10)
-        rmsea_fit_round1 = StridedFit(config_round1, name=self.chrom_name)
-        per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit_round1.fit_tr(agg_cutcounts)
 
-        config_round2 = dataclasses.replace(self.config, bg_window=bg_window_large)
-        rmsea_fit_round2 = StridedFit(config_round2, name=self.chrom_name)
-        per_window_signal_trs2, per_window_signal_q2, per_window_rmsea2 = rmsea_fit_round2.fit_tr(agg_cutcounts)
-        both_nan = np.isnan(per_window_signal_trs1) & np.isnan(per_window_signal_trs2)
+        self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name}")
+        rmsea_fit = StridedFit(self.config, name=self.chrom_name)
+        per_window_signal_trs1, per_window_signal_q1, per_window_rmsea1 = rmsea_fit.fit_tr(agg_cutcounts)
 
-        per_window_signal_trs1[~both_nan] = np.nanmin(
-            [
-                per_window_signal_trs1[~both_nan],
-                per_window_signal_trs2[~both_nan]
-            ],
-            axis=0, 
-        )
         per_window_signal_trs1 = interpolate_nan(per_window_signal_trs1)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
@@ -370,15 +357,13 @@ class ChromosomeProcessor:
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea_round1': per_window_rmsea1,
-            'rmsea_round2': per_window_rmsea2,
+            'rmsea': per_window_rmsea1,
             'tr': per_window_signal_trs1,
-            'q_round1': per_window_signal_q1,
-            'q_round2': per_window_signal_q2,
+            'q': per_window_signal_q1,
         })
         fit_res_path = f"{outdir}.fit_results.parquet"
         self.to_parquet(df, fit_res_path)
-        del df, per_window_signal_q1, per_window_rmsea1, per_window_signal_trs1, per_window_signal_q2, per_window_rmsea2, per_window_signal_trs2
+        del df, per_window_signal_q1, per_window_rmsea1, per_window_signal_trs1
         gc.collect()
 
         poisson_fits = fit_res.poisson_fit_params
@@ -402,13 +387,9 @@ class ChromosomeProcessor:
         del agg_cutcounts
         gc.collect()
 
-        fname = f"{outdir}.{self.chrom_name}.inf_pvals.parquet"
-        neglog_pvals = {'log10_pval': fix_inf_pvals(neglog_pvals, fname)}
-
         self.gp.logger.debug(f"Saving p-values for {self.chrom_name}")
-
-
-        neglog_pvals = pd.DataFrame.from_dict(neglog_pvals)
+        fname = f"{outdir}.{self.chrom_name}.inf_pvals.parquet"
+        neglog_pvals = pd.DataFrame.from_dict({'log10_pval': fix_inf_pvals(neglog_pvals, fname)})
         self.to_parquet(neglog_pvals, pvals_outpath)
         del neglog_pvals
         gc.collect()

@@ -29,7 +29,7 @@ class ProcessorConfig:
         - logger_level: Logging level.
     """
     window: int = 151
-    bg_window: int = 10001
+    bg_window: int = 50001
     min_mappable_bg_frac: float = 0.2
     density_step: int = 20
     max_background_prop: float = 0.99

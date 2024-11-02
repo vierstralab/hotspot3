@@ -27,13 +27,13 @@ def main() -> None:
         chromosomes=args.chromosomes,
         config=config,
     )
-    precomp_fdrs = args.fdrs_parquet
+    precomp_pvals = args.pvals_parquet
     cutcounts_path = args.cutcounts
     smoothed_signal_path = args.signal_parquet
     sample_id = args.id
     outdir_pref = f"{args.outdir}/{sample_id}"
 
-    if smoothed_signal_path is None or precomp_fdrs is None:
+    if smoothed_signal_path is None or precomp_pvals is None:
         if cutcounts_path is None:
             cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
             genome_processor.write_cutcounts(args.bam, cutcounts_path)
@@ -44,12 +44,13 @@ def main() -> None:
             np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
             genome_processor.modwt_smooth_signal(cutcounts_path, total_cutcounts=total_cutcounts, save_path=smoothed_signal_path)
 
-        if precomp_fdrs is None:
+        if precomp_pvals is None:
             precomp_pvals = f"{outdir_pref}.pvals.parquet"
             genome_processor.calc_pval(cutcounts_path, precomp_pvals)
     
-            precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
-            genome_processor.calc_fdr(precomp_pvals, precomp_fdrs)
+
+    precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
+    genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
@@ -138,7 +139,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     parser.add_argument("--bam", help="Path to input bam/cram file", default=None)
     parser.add_argument("--cutcounts", help="Path to pre-calculated cutcounts tabix file. Skip extracting cutcounts from bam file", default=None)
     parser.add_argument("--signal_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips modwt signal smoothing", default=None)
-    parser.add_argument("--fdrs_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp FDRs. Skips p-value calculation", default=None)
+    parser.add_argument("--pvals_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp p-values. Skips p-value calculation", default=None)
 
     parser.add_argument("--chromosomes", help="List of chromosomes to process. Used for debug", nargs='+', default=None)
 
@@ -150,7 +151,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     root_logger = setup_logger(level=logger_level)
 
     
-    if args.signal_parquet is not None and args.fdrs_parquet is not None:
+    if args.signal_parquet is not None and args.pvals_parquet is not None:
         ignored_atrs = ['cutcounts', 'bam', 'mappable_bases']
         for atr in ignored_atrs:
             if getattr(args, atr) is not None:
