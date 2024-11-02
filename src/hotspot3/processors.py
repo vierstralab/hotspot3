@@ -383,7 +383,7 @@ class ChromosomeProcessor:
 
         poisson_fits = fit_res.poisson_fit_params
         if poisson_fits is not None:
-            self.gp.logger.debug(f"Using poisson distribution for {len(poisson_fits)} windows for {self.chrom_name}")
+            self.gp.logger.debug(f"Using Poisson distribution for {len(poisson_fits):,} windows for {self.chrom_name}")
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
 
