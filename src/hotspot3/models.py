@@ -33,7 +33,7 @@ class ProcessorConfig:
     min_mappable_bg_frac: float = 0.2
     density_step: int = 20
     max_background_prop: float = 0.99
-    min_background_prop: float = 0.55
+    min_background_prop: float = 0.75
 
     signal_prop_sampling_step: int = 75
     signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!

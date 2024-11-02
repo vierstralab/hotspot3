@@ -349,7 +349,7 @@ class ChromosomeProcessor:
         per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_r=global_r)
 
         per_window_trs = np.where(
-            (per_window_rmsea <= 0.1) | np.isnan(per_window_trs),
+            (per_window_rmsea <= self.config.rmsea_tr) | np.isnan(per_window_trs),
             per_window_trs,
             global_fit.fit_threshold
         )
