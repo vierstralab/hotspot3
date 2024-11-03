@@ -311,6 +311,7 @@ class StridedFit(BackgroundFit):
 
         import pandas as pd
         print(pd.Series(best_rmsea).describe())
+        print((best_rmsea <= 0.05).sum())
  
         best_tr_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_tr_with_nan[subsampled_indices] = best_tr

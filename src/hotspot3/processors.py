@@ -339,7 +339,7 @@ class ChromosomeProcessor:
         # })
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
-        self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
+        self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
 
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
