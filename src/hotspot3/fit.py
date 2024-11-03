@@ -70,7 +70,6 @@ class BackgroundFit:
         result[:, ~nan_tr] = np.round(
             np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
         )
-        print(result)
         return result, n_signal_bins
         
     def get_all_bins(self, array: np.ndarray):
@@ -104,15 +103,12 @@ class GlobalBackgroundFit(BackgroundFit):
         for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
-            if np.isnan(rmsea):
-                print(p, r, tr)
             res.append((tr, rmsea))
             # if rmsea <= self.config.rmsea_tr:
             #     break
         else:
             tr, rmsea = min(res, key=lambda x: x[1])
         quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
-        print(tr)
         return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), quantile, tr)
 
     def fit_for_tr(self, agg_cutcounts, tr):
@@ -142,7 +138,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
         assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
-        if p < 0 or p > 1 or r < 0:
+        if p <= 0 or p >= 1 or r <= 0:
             return np.inf
         mask = unique_cutcounts < tr
         unique_cutcounts = unique_cutcounts[mask]
@@ -430,7 +426,8 @@ class StridedFit(BackgroundFit):
         """
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
         # print(bin_edges)
-        sf_values = betainc(bin_edges, r, p)
+        # sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
+        sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
