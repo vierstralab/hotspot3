@@ -343,16 +343,16 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
 
-        self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name}")
+        self.gp.logger.debug(f"Approximating per-window signal thresholds for {self.chrom_name}")
         config = self.config # delete this line after testing
         rmsea_fit = StridedFit(config, name=self.chrom_name)
         per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
 
         per_window_trs = interpolate_nan(per_window_trs)
-        self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
+        self.gp.logger.debug(f"Signal thresholds approximated for {self.chrom_name}")
 
         w_fit = WindowBackgroundFit(self.config)
-        self.gp.logger.debug(f"Estimating per-bp parameters of negbin model for {self.chrom_name}")
+        self.gp.logger.debug(f"Estimating per-bp parameters of background model for {self.chrom_name}")
         good_fit = interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr # FIXME, don't interpolate rmsea
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs, where=good_fit)
         fit_res.r[~good_fit] = global_fit.r
