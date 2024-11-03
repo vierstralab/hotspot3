@@ -358,7 +358,7 @@ class ChromosomeProcessor:
             'start': starts,
             'ref_counts': x,
             'alt_counts': [global_r] * len(x),
-        })
+        }).dropna()
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         gs = GenomeSegmentator(
             snps_collection=snps_collection.data,
