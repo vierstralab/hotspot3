@@ -381,7 +381,6 @@ class ChromosomeProcessor:
 
         # Strip masks to free up some memory
         agg_cutcounts = np.floor(agg_cutcounts.filled(np.nan))
-
         neglog_pvals = pval_estimator.estimate_pvalues(agg_cutcounts, fit_res)
         del agg_cutcounts
         gc.collect()
