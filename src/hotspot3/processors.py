@@ -311,7 +311,7 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath) -> ProcessorOutputData:
-        self.gp.logger.debug(f'Aggregating cutcounts for chromosome {self.chrom_name}')
+        self.gp.logger.debug(f'{self.chrom_name}: Aggregating cutcounts')
         
         agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(
             cutcounts_file,
@@ -319,10 +319,10 @@ class ChromosomeProcessor:
         )
 
         self.gp.logger.debug(
-            f"Cutcounts aggregated for {self.chrom_name}, {agg_cutcounts.count():,}/{agg_cutcounts.shape[0]:,} bases are mappable"
+            f"{self.chrom_name}: Cutcounts aggregated, {agg_cutcounts.count():,}/{agg_cutcounts.shape[0]:,} bases are mappable"
         )
 
-        self.gp.logger.debug(f'Estimating background signal for {self.chrom_name}')
+        self.gp.logger.debug(f'{self.chrom_name}: Estimating proportion of background signal')
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts)
         global_p = global_fit.p
@@ -353,7 +353,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
         w_fit = WindowBackgroundFit(self.config)
-        self.gp.logger.debug(f"Estimating per-bp parameters of background model for {self.chrom_name}")
+        self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
         good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) # FIXME, don't interpolate rmsea
         need_global_fit = ~good_fit & fit_res.enough_bg_mask
