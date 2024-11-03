@@ -3,7 +3,7 @@ import numpy.ma as ma
 import scipy.stats as st
 import gc
 from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
-
+from hotspot3.models import FitResults
 
 # Calculate p-values and FDR
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="betainc") -> np.ndarray:
@@ -158,3 +158,7 @@ def calc_g_sq(obs, exp):
 
 def calc_chisq(obs, exp):
     return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
+
+
+def check_valid_fit(fit: FitResults):
+    return (fit.r >= 0.) & (fit.p >= 0.) & (fit.p <= 1.) & fit.enough_bg_mask

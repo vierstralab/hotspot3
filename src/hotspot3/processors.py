@@ -19,7 +19,7 @@ from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedFit
 
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
+from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
 
 
@@ -355,7 +355,8 @@ class ChromosomeProcessor:
         w_fit = WindowBackgroundFit(self.config)
         self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
-        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) # FIXME, don't interpolate rmsea
+        success_fits = check_valid_fit(fit_res)
+        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) & success_fits # FIXME, don't interpolate rmsea
         need_global_fit = ~good_fit & fit_res.enough_bg_mask
         fit_res.r[need_global_fit] = global_fit.r
         fit_res.p[need_global_fit] = w_fit.fit(
