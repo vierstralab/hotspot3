@@ -361,7 +361,7 @@ class ChromosomeProcessor:
             per_window_trs=per_window_trs,
             global_fit=global_fit
         ).p[~good_fit]
-        
+        self.gp.logger.debug(f"Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases for {self.chrom_name}")
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
@@ -382,10 +382,7 @@ class ChromosomeProcessor:
         # Strip masks to free up some memory
         agg_cutcounts = np.floor(agg_cutcounts.filled(np.nan))
 
-        neglog_pvals = pval_estimator.estimate_pvalues(
-            agg_cutcounts,
-            fit_res
-        )
+        neglog_pvals = pval_estimator.estimate_pvalues(agg_cutcounts, fit_res)
         del agg_cutcounts
         gc.collect()
 
