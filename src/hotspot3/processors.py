@@ -361,7 +361,7 @@ class ChromosomeProcessor:
         })
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         gs = GenomeSegmentator(
-            snps_collection=snps_collection,
+            snps_collection=snps_collection.data,
             out=f"{self.chrom_name}.test.bed",
             chromosomes_order=[self.chrom_name],
             jobs=1,
