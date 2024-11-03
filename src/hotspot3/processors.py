@@ -21,7 +21,9 @@ from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
-from babachi.bad_estimation import GenomeSegmentator, GenomeSNPsHandler, ChromosomesWrapper
+from babachi.models import GenomeSNPsHandler
+from babachi.segmentation import GenomeSegmentator
+from babachi.chrom_wrapper import init_wrapper
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -355,7 +357,6 @@ class ChromosomeProcessor:
         per_window_trs = interpolate_nan(per_window_trs)
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
-        chromosomes_wrapper = ChromosomesWrapper()
         step = 1500
         x = agg_cutcounts.filled(np.nan)[::step]
         x[x >= per_window_trs[::step]] = np.nan
@@ -367,9 +368,9 @@ class ChromosomeProcessor:
             'ref_counts': [global_r] * len(x),
             'alt_counts': x, 
         }).dropna()
+        chromosomes_wrapper = init_wrapper()
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         bad = (1 - global_p) / global_p
-        print(global_p, bad)
         mult = np.linspace(1, 5, 10)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
@@ -386,7 +387,13 @@ class ChromosomeProcessor:
             allele_reads_tr=0,
             b_penalty=4
         )
-        gs.estimate_BAD()
+        bad_segments = gs.estimate_BAD()
+        babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
+        for segment in bad_segments:
+            babachi_result[segment.start:segment.end] = segment.BAD
+        del bad_segments
+        gc.collect()
+
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
 
         w_fit = WindowBackgroundFit(self.config)
@@ -411,6 +418,7 @@ class ChromosomeProcessor:
             'rmsea': per_window_rmsea,
             'tr': per_window_trs,
             'q': per_window_q,
+            'bad': babachi_result,
         })
         self.to_parquet(df, fit_res_path)
         del df, per_window_q, per_window_rmsea, per_window_trs
