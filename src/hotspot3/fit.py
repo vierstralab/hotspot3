@@ -315,10 +315,10 @@ class StridedFit(BackgroundFit):
         best_tr_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_tr_with_nan[subsampled_indices] = best_tr
 
-        best_rmsea_with_nan = np.full_like(array, np.nan, dtype=np.float16)
+        best_rmsea_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_rmsea_with_nan[subsampled_indices] = best_rmsea
 
-        best_quantile_with_nan = np.full_like(array, np.nan, dtype=np.float16)
+        best_quantile_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_quantile_with_nan[subsampled_indices] = best_quantile
 
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
