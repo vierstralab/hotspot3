@@ -1,6 +1,7 @@
 import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
+from scipy.special import betainc
 from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
 from hotspot3.utils import wrap_masked, correct_offset, rolling_view_with_nan_padding
 from hotspot3.logging import setup_logger
@@ -291,7 +292,8 @@ class StridedFit(BackgroundFit):
             enough_bg_mask = np.ones_like(p, dtype=bool)
 
         result[enough_bg_mask] = self.calc_rmsea_all_windows(
-            st.nbinom(r[enough_bg_mask], 1 - p[enough_bg_mask]), # FIXME use betainc
+            r[enough_bg_mask],
+            p[enough_bg_mask],
             n_params=fit_params,
             bin_edges=bin_edges[:, enough_bg_mask],
             value_counts_per_bin=value_counts[:, enough_bg_mask]
@@ -413,9 +415,10 @@ class StridedFit(BackgroundFit):
     @wrap_masked
     def calc_rmsea_all_windows(
         self,
-        dist: st.rv_discrete,
+        r: np.ndarray,
+        p: np.ndarray,
         n_params: int,
-        bin_edges, # right edges of the bins, left edge of the first bin is 0, right edge not inclusive
+        bin_edges, # edges of the bins, right edge not inclusive
         value_counts_per_bin, # number of observed cutcounts in each bin for each window
     ):
         """
@@ -423,7 +426,7 @@ class StridedFit(BackgroundFit):
         """
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
         # print(bin_edges)
-        sf_values = dist.sf(bin_edges - 1)
+        sf_values = betainc(bin_edges, r, p)
         sf_diffs = -np.diff(sf_values, axis=0)
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
