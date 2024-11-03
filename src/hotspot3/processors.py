@@ -328,7 +328,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'{self.chrom_name}: Estimating proportion of background signal')
         min_signal_quantile = (agg_cutcounts > 4).sum() / agg_cutcounts.count()
         if min_signal_quantile < 0.02:
-            raise ValueError(f"Not enough signal to fit the background model. {min_signal_quantile*100}% of data have coverage less than 4.")
+            self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% of data have # of cutcounts less than 4.")
+            raise NoContigPresentError
         self.config = dataclasses.replace(self.config, min_background_prop=(1-min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts)

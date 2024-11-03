@@ -109,7 +109,6 @@ class GlobalBackgroundFit(BackgroundFit):
         else:
             tr, rmsea, p, r = min(res, key=lambda x: x[1])
         quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
-        print(r, p)
         return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), quantile, tr)
 
     def fit_for_tr(self, agg_cutcounts, tr):
