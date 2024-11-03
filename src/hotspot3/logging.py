@@ -2,7 +2,7 @@ import logging
 import sys
 
 
-def setup_logger(name=None, level=None, outstream=None) -> logging.Logger:
+def setup_logger(name='hotspot3', level=None, outstream=None) -> logging.Logger:
     if outstream is None:
         outstream = sys.stderr
 
