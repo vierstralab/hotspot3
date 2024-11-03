@@ -371,7 +371,8 @@ class ChromosomeProcessor:
             logger_level=self.config.logger_level,
             segmentation_mode='binomial',
             chromosomes_wrapper=chromosomes_wrapper,
-            states=[1, *np.arange(1, 6) * bad]
+            states=[1, *np.arange(1, 6) * bad],
+            logger=self.gp.logger,
         )
         gs.estimate_BAD()
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
