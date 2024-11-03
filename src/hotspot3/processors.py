@@ -329,7 +329,7 @@ class ChromosomeProcessor:
         min_signal_quantile = (agg_cutcounts > 4).sum() / agg_cutcounts.count()
         if min_signal_quantile < 0.02:
             raise ValueError(f"Not enough signal to fit the background model. {min_signal_quantile*100}% of data have coverage less than 4.")
-        self.config = dataclasses.replace(self.config, signal_tr=(1-min_signal_quantile))
+        self.config = dataclasses.replace(self.config, min_background_prop=(1-min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts)
         global_p = global_fit.p
