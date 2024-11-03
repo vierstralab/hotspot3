@@ -376,7 +376,6 @@ class ChromosomeProcessor:
 
         gs = GenomeSegmentator(
             snps_collection=snps_collection.data,
-            out=f"{self.chrom_name}.test.bed",
             chromosomes_order=[self.chrom_name],
             jobs=1,
             logger_level=self.config.logger_level,
