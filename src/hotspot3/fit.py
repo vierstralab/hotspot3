@@ -286,15 +286,15 @@ class StridedFit(BackgroundFit):
 
         return p, r, enough_bg_mask
     
-    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, fit_params=2):
+    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, n_params=2):
         result = np.full_like(p, np.nan)
         if enough_bg_mask is None:
             enough_bg_mask = np.ones_like(p, dtype=bool)
 
         result[enough_bg_mask] = self.calc_rmsea_all_windows(
-            r[enough_bg_mask],
             p[enough_bg_mask],
-            n_params=fit_params,
+            r[enough_bg_mask],
+            n_params=n_params,
             bin_edges=bin_edges[:, enough_bg_mask],
             value_counts_per_bin=value_counts[:, enough_bg_mask]
         )
@@ -365,7 +365,7 @@ class StridedFit(BackgroundFit):
                 p, r,
                 edges, counts, 
                 enough_bg_mask,
-                fit_params=n_params
+                n_params=n_params
             ) # shape of r
             
             successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
@@ -412,7 +412,7 @@ class StridedFit(BackgroundFit):
                 np.maximum(global_quantile_tr, global_fit.fit_threshold),
                 best_tr
             )
-        
+        print(np.isnan(best_rmsea).sum())
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea
@@ -420,8 +420,8 @@ class StridedFit(BackgroundFit):
     @wrap_masked
     def calc_rmsea_all_windows(
         self,
-        r: np.ndarray,
         p: np.ndarray,
+        r: np.ndarray,
         n_params: int,
         bin_edges, # edges of the bins, right edge not inclusive
         value_counts_per_bin, # number of observed cutcounts in each bin for each window

@@ -353,8 +353,8 @@ class ChromosomeProcessor:
         w_fit = WindowBackgroundFit(self.config)
         self.gp.logger.debug(f"Estimating per-bp parameters of background model for {self.chrom_name}")
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
-        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) #
-        need_global_fit = ~good_fit & fit_res.enough_bg_mask # FIXME, don't interpolate rmsea
+        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) # FIXME, don't interpolate rmsea
+        need_global_fit = ~good_fit & fit_res.enough_bg_mask
         fit_res.r[need_global_fit] = global_fit.r
         fit_res.p[need_global_fit] = w_fit.fit(
             agg_cutcounts,
