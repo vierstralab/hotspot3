@@ -349,7 +349,7 @@ class ChromosomeProcessor:
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
         chromosomes_wrapper = ChromosomesWrapper()
-        step = 150
+        step = 500
         x = agg_cutcounts.filled(np.nan)[::step]
         starts = np.arange(0, len(x), dtype=np.uint32) * step
 
@@ -360,8 +360,10 @@ class ChromosomeProcessor:
             'alt_counts': [global_r] * len(x),
         }).dropna()
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
-        bad = 1-global_p / (global_p)
-        bad = bad if bad > 1 else 1/bad
+        bad = (1 - global_p) / global_p
+        mult = np.linspace(1, 3, 10)
+        bads = [*(mult * bad), *(1/mult[1:] * bad)]
+
         print(bad)
         gs = GenomeSegmentator(
             snps_collection=snps_collection.data,
@@ -371,7 +373,7 @@ class ChromosomeProcessor:
             logger_level=self.config.logger_level,
             segmentation_mode='binomial',
             chromosomes_wrapper=chromosomes_wrapper,
-            states=[1, *np.arange(1, 6) * bad],
+            states=bads,
             logger=self.gp.logger,
         )
         gs.estimate_BAD()
