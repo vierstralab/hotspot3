@@ -182,12 +182,13 @@ class GenomeProcessor:
     def calc_pval(self, cutcounts_file, pvals_path: str):
         self.logger.info('Calculating per-bp p-values')
         delete_path(pvals_path)
-        params_path = pvals_path.replace('.pvals.parquet', '.params.parquet')
-        delete_path(pvals_path)
+        fit_res_path = pvals_path.replace('.pvals.parquet', '.fit_results.parquet')
+        delete_path(fit_res_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
-            pvals_path
+            pvals_path,
+            fit_res_path
         )
     
     def calc_fdr(self, pvals_path, fdrs_path, max_fdr=1):
@@ -312,7 +313,7 @@ class ChromosomeProcessor:
         self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size, config=self.config)
 
     @ensure_contig_exists
-    def calc_pvals(self, cutcounts_file, pvals_outpath) -> ProcessorOutputData:
+    def calc_pvals(self, cutcounts_file, pvals_outpath, fit_res_path) -> ProcessorOutputData:
         self.gp.logger.debug(f'{self.chrom_name}: Aggregating cutcounts')
         
         agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(
@@ -372,7 +373,6 @@ class ChromosomeProcessor:
             'tr': per_window_trs,
             'q': per_window_q,
         })
-        fit_res_path = f"{outdir}.fit_results.parquet"
         self.to_parquet(df, fit_res_path)
         del df, per_window_q, per_window_rmsea, per_window_trs
         gc.collect()
