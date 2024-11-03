@@ -356,6 +356,7 @@ class ChromosomeProcessor:
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
         good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) | ~fit_res.enough_bg_mask # FIXME, don't interpolate rmsea
         print("before", fit_res.r[49602138], fit_res.p[49602138])
+        print((~good_fit).sum())
         fit_res.r[~good_fit] = global_fit.r
         fit_res.p[~good_fit] = w_fit.fit(
             agg_cutcounts,
