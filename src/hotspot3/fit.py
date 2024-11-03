@@ -190,17 +190,18 @@ class WindowBackgroundFit(BackgroundFit):
         )
     
     def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, where=None, global_r=None):
-        mean, var = self.sliding_mean_and_variance(agg_cutcounts, where=where)
+        mean, var = self.sliding_mean_and_variance(agg_cutcounts, where=where, min_count=1)
         enough_bg_mask = ~mean.mask
 
         if global_r is not None:
             r = np.full_like(mean, global_r, dtype=np.float32)
             p = (mean / (mean + r)).filled(np.nan)
+            poisson_fit_params = None
         else:
             p = self.p_from_mean_and_var(mean, var).filled(np.nan)
             r = self.r_from_mean_and_var(mean, var).filled(np.nan)
-
-        poisson_fit_params = self.pack_poisson_params(mean, var, p, r)
+            poisson_fit_params = self.pack_poisson_params(mean, var, p, r)
+        
         return p, r, enough_bg_mask, poisson_fit_params
 
     def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None, where=None):

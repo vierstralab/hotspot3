@@ -352,7 +352,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
 
         w_fit = WindowBackgroundFit(self.config)
-        self.gp.logger.debug(f"Estimating per-bp p and r for {self.chrom_name}")
+        self.gp.logger.debug(f"Estimating per-bp parameters of negbin model for {self.chrom_name}")
         good_fit = interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr # FIXME, don't interpolate rmsea
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs, where=good_fit)
         fit_res.r[~good_fit] = global_fit.r
