@@ -364,8 +364,8 @@ class ChromosomeProcessor:
         chrom_data_df = pd.DataFrame({
             'chr': [self.chrom_name] * len(x),
             'start': starts,
-            'ref_counts': x,
-            'alt_counts': [global_r] * len(x),
+            'ref_counts': [global_r] * len(x),
+            'alt_counts': x, 
         }).dropna()
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         bad = (1 - global_p) / global_p
