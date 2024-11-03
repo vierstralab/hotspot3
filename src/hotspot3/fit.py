@@ -362,8 +362,11 @@ class StridedFit(BackgroundFit):
             counts = value_counts[:current_index, changing_indices]
 
             rmsea = self.wrap_rmsea_valid_fits(
-                p, r, edges, counts, 
-                enough_bg_mask, fit_params=n_params) # shape of r
+                p, r,
+                edges, counts, 
+                enough_bg_mask,
+                fit_params=n_params
+            ) # shape of r
             
             successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
             # best fit found
@@ -428,8 +431,8 @@ class StridedFit(BackgroundFit):
         """
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
         # print(bin_edges)
-        # sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
-        sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
+        sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
+        #sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
