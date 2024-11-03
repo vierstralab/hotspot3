@@ -348,9 +348,17 @@ class ChromosomeProcessor:
         # })
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
+        self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
+        config = self.config # delete this line after testing
+        rmsea_fit = StridedFit(config, name=self.chrom_name)
+        per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
+        per_window_trs = interpolate_nan(per_window_trs)
+        self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
+
         chromosomes_wrapper = ChromosomesWrapper()
         step = 1500
         x = agg_cutcounts.filled(np.nan)[::step]
+        x[x >= per_window_trs[::step]] = np.nan
         starts = np.arange(0, len(x), dtype=np.uint32) * step
 
         chrom_data_df = pd.DataFrame({
@@ -365,7 +373,6 @@ class ChromosomeProcessor:
         mult = np.linspace(1, 5, 10)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
-        print(bad)
         gs = GenomeSegmentator(
             snps_collection=snps_collection.data,
             out=f"{self.chrom_name}.test.bed",
@@ -381,14 +388,6 @@ class ChromosomeProcessor:
         )
         gs.estimate_BAD()
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
-        
-
-        self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
-        config = self.config # delete this line after testing
-        rmsea_fit = StridedFit(config, name=self.chrom_name)
-        per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
-        per_window_trs = interpolate_nan(per_window_trs)
-        self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
         w_fit = WindowBackgroundFit(self.config)
         self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
