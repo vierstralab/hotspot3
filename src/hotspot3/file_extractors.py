@@ -58,7 +58,7 @@ class ChromosomeExtractor:
         return agg_cutcounts
     
 
-    def extract_mappable_agg_cutcounts(self, cutcounts_file, mappable_file):
+    def extract_mappable_agg_cutcounts(self, cutcounts_file, mappable_file) -> ma.MaskedArray:
         agg_cutcounts = self.extract_aggregated_cutcounts(cutcounts_file)
         mappable = self.extract_mappable_bases(mappable_file)
         return ma.masked_where(~mappable, agg_cutcounts)

@@ -100,8 +100,6 @@ class GlobalBackgroundFit(BackgroundFit):
 
         res = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
-        print(np.nanquantile(agg_cutcounts, self.config.min_background_prop))
-        print(trs)
         for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
