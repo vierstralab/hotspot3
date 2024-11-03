@@ -196,7 +196,7 @@ class WindowBackgroundFit(BackgroundFit):
         if global_r is not None:
             r = np.full_like(mean, global_r, dtype=np.float32)
             p = (mean / (mean + r)).filled(np.nan)
-            print(p[49602138], enough_bg_mask[49602138], mean[49602138])
+            print(p[49602138], enough_bg_mask[49602138], mean[49602138], global_r)
         else:
             p = self.p_from_mean_and_var(mean, var).filled(np.nan)
             r = self.r_from_mean_and_var(mean, var).filled(np.nan)

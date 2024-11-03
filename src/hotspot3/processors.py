@@ -361,6 +361,7 @@ class ChromosomeProcessor:
             per_window_trs=per_window_trs,
             global_fit=global_fit
         ).p[~good_fit]
+        print(global_p)
         self.gp.logger.debug(f"Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases for {self.chrom_name}")
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
