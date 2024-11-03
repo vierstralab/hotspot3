@@ -142,6 +142,8 @@ class GlobalBackgroundFit(BackgroundFit):
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
         assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
+        if p < 0 or p > 1 or r < 0:
+            return np.inf
         mask = unique_cutcounts < tr
         unique_cutcounts = unique_cutcounts[mask]
         obs = obs[mask].astype(np.float32)
