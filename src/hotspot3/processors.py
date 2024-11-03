@@ -374,8 +374,6 @@ class ChromosomeProcessor:
         self.to_parquet(df, fit_res_path)
         del df, per_window_q, per_window_rmsea, per_window_trs
         gc.collect()
-
-
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
 
