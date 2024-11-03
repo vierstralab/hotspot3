@@ -21,6 +21,7 @@ from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
+from babachi.bad_estimation import GenomeSegmentator, GenomeSNPsHandler, ChromosomesWrapper
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -328,7 +329,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'{self.chrom_name}: Estimating proportion of background signal')
         min_signal_quantile = (agg_cutcounts > 4).sum() / agg_cutcounts.count()
         if min_signal_quantile < 0.02:
-            self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% of data have # of cutcounts less than 4.")
+            self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% (<2%) of data have # of cutcounts more than 4.")
             raise NoContigPresentError
         self.config = dataclasses.replace(self.config, min_background_prop=(1-min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
@@ -347,6 +348,28 @@ class ChromosomeProcessor:
         # })
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
+        chromosomes_wrapper = ChromosomesWrapper()
+        step = 1500
+        x = agg_cutcounts.filled(np.nan)[::step]
+        starts = np.arange(0, len(x), dtype=np.uint32) * step
+
+        chrom_data_df = pd.DataFrame({
+            'chr': [self.chrom_name] * len(x),
+            'start': starts,
+            'ref_counts': x,
+            'alt_counts': [global_r] * len(x),
+        })
+        snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
+        gs = GenomeSegmentator(
+            snps_collection=snps_collection,
+            out=f"{self.chrom_name}.test.bed",
+            chromosomes_order=[self.chrom_name],
+            jobs=1,
+            logger_level=self.config.logger_level,
+            segmentation_mode='binomial',
+            chromosomes_wrapper=chromosomes_wrapper,
+        )
+        gs.estimate_BAD()
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         
 
@@ -371,7 +394,7 @@ class ChromosomeProcessor:
         ).p[need_global_fit]
 
         self.gp.logger.debug(f"{self.chrom_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases")
-        self.gp.logger.debug(f"{self.chrom_name}: Good fits for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases ")
+        self.gp.logger.debug(f"{self.chrom_name}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases")
         outdir = pvals_outpath.replace('.pvals.parquet', '.fit_results.parquet')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
