@@ -409,7 +409,6 @@ class StridedFit(BackgroundFit):
                 np.maximum(global_quantile_tr, global_fit.fit_threshold),
                 best_tr
             )
-        print(np.isnan(best_rmsea).sum())
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea

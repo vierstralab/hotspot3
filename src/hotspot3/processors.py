@@ -182,6 +182,8 @@ class GenomeProcessor:
     def calc_pval(self, cutcounts_file, pvals_path: str):
         self.logger.info('Calculating per-bp p-values')
         delete_path(pvals_path)
+        params_path = pvals_path.replace('.pvals.parquet', '.params.parquet')
+        delete_path(pvals_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
@@ -362,7 +364,7 @@ class ChromosomeProcessor:
         ).p[need_global_fit]
         self.gp.logger.debug(f"{self.chrom_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases")
         self.gp.logger.debug(f"{self.chrom_name}: Good fits for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases ")
-        outdir = pvals_outpath.replace('.pvals.parquet', '')
+        outdir = pvals_outpath.replace('.pvals.parquet', '.fit_results.parquet')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
