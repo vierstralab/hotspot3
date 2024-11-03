@@ -70,6 +70,7 @@ class BackgroundFit:
         result[:, ~nan_tr] = np.round(
             np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
         )
+        print(result)
         return result, n_signal_bins
         
     def get_all_bins(self, array: np.ndarray):
