@@ -355,16 +355,12 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Estimating per-bp parameters of background model for {self.chrom_name}")
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
         good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) | ~fit_res.enough_bg_mask # FIXME, don't interpolate rmsea
-        print("before", fit_res.r[49602138], fit_res.p[49602138], good_fit[49602138])
-        print((~good_fit).sum())
         fit_res.r[~good_fit] = global_fit.r
         fit_res.p[~good_fit] = w_fit.fit(
             agg_cutcounts,
             per_window_trs=per_window_trs,
             global_fit=global_fit
         ).p[~good_fit]
-        print(global_p, global_fit.r)
-        print(fit_res.r[49602138], fit_res.p[49602138])
         self.gp.logger.debug(f"Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases for {self.chrom_name}")
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
