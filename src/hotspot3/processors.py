@@ -349,7 +349,7 @@ class ChromosomeProcessor:
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
         chromosomes_wrapper = ChromosomesWrapper()
-        step = 1500
+        step = 150
         x = agg_cutcounts.filled(np.nan)[::step]
         starts = np.arange(0, len(x), dtype=np.uint32) * step
 
