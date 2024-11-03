@@ -349,7 +349,7 @@ class ChromosomeProcessor:
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
         chromosomes_wrapper = ChromosomesWrapper()
-        step = 500
+        step = 1500
         x = agg_cutcounts.filled(np.nan)[::step]
         starts = np.arange(0, len(x), dtype=np.uint32) * step
 
@@ -377,7 +377,7 @@ class ChromosomeProcessor:
             states=bads,
             logger=self.gp.logger,
             allele_reads_tr=0,
-            b_penalty=0.1
+            b_penalty=4
         )
         gs.estimate_BAD()
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
