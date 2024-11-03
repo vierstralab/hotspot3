@@ -155,12 +155,12 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
         ignored_atrs = ['cutcounts', 'bam', 'mappable_bases']
         for atr in ignored_atrs:
             if getattr(args, atr) is not None:
-                root_logger.warning(f"Ignoring {atr}. Precomputed smoothed signal and per-bp FDRs are provided")
+                root_logger.warning(f"Ignoring {atr}. Precomputed smoothed signal and per-bp P-values are provided")
     
     elif args.cutcounts is not None and args.bam is not None:
         root_logger.warning("Ignoring bam file. Precomputed cutcounts are provided")
     elif args.cutcounts is None and args.bam is None:
-        parser.error("Either provide both precomputed FDRs and smoothed signal or bam/cutcounts")
+        parser.error("Either provide both precomputed P-values and smoothed signal or bam/cutcounts")
     
     return args, logger_level
 
