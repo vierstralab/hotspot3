@@ -127,11 +127,11 @@ class GlobalBackgroundFit(BackgroundFit):
         return unique, counts
 
 
-    def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray, tr: float):
+    def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
         nonzero_count = np.count_nonzero(agg_cutcounts)
         has_enough_background = (agg_cutcounts.size > 0) and (nonzero_count / agg_cutcounts.size > self.config.nonzero_windows_to_fit)
         if not has_enough_background:
-            self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}. Threshold {tr}. Skipping.")
+            self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}. Skipping.")
             raise NoContigPresentError
         
         mean, variance = self.get_mean_and_var(agg_cutcounts)
