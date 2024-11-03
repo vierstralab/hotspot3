@@ -308,6 +308,9 @@ class StridedFit(BackgroundFit):
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
+
+        import pandas as pd
+        print(pd.Series(best_rmsea).describe())
  
         best_tr_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_tr_with_nan[subsampled_indices] = best_tr
