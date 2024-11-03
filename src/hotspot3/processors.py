@@ -368,7 +368,7 @@ class ChromosomeProcessor:
             'ref_counts': [global_r] * len(x),
             'alt_counts': x, 
         }).dropna()
-        chromosomes_wrapper = init_wrapper()
+        chromosomes_wrapper = init_wrapper(None)
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         bad = (1 - global_p) / global_p
         mult = np.linspace(1, 5, 10)
