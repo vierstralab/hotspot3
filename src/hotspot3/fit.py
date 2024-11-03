@@ -95,7 +95,7 @@ class GlobalBackgroundFit(BackgroundFit):
     Class to fit the background distribution globally (for chromosome)
     """
     def fit(self, array: ma.MaskedArray) -> FitResults:
-        agg_cutcounts = ma.masked_invalid(array)[::150].compressed()
+        agg_cutcounts = ma.masked_invalid(array)[::self.config.window].compressed()
         unique, counts = self.hist_data_for_tr(agg_cutcounts)
 
         res = []
