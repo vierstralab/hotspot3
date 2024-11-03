@@ -317,10 +317,10 @@ class StridedFit(BackgroundFit):
         return result
         
     @wrap_masked
-    def fit_tr(self, array: ma.MaskedArray, global_r=None):
+    def fit_tr(self, array: ma.MaskedArray, global_fit: FitResults=None):
         original_shape = array.shape
         agg_cutcounts = array[::self.sampling_step]
-        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(agg_cutcounts, global_r=global_r)
+        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(agg_cutcounts, global_fit=global_fit)
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
@@ -337,7 +337,7 @@ class StridedFit(BackgroundFit):
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, agg_cutcounts: np.ndarray, global_r=None):
+    def find_per_window_tr(self, agg_cutcounts: np.ndarray, global_fit: FitResults=None):
         strided_agg_cutcounts = rolling_view_with_nan_padding(
             agg_cutcounts,
             points_in_window=self.points_in_bg_window,
@@ -345,6 +345,8 @@ class StridedFit(BackgroundFit):
         ) # shape (bg_window, n_points)
         bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
+
+        global_r = global_fit.r if global_fit is not None else None
 
         best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
         remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
@@ -412,6 +414,14 @@ class StridedFit(BackgroundFit):
             idx = n_signal_bins - i
             if idx % (n_signal_bins // 5) == 0:
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{n_signal_bins})")
+        
+        if global_fit is not None:
+            global_quantile_tr = self.get_bg_tr(strided_agg_cutcounts, global_fit.fit_quantile)
+            best_tr = np.where(
+                best_rmsea <= self.config.rmsea_tr,
+                best_tr,
+                np.maximum(global_quantile_tr, global_fit.fit_threshold)
+            )
         
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)

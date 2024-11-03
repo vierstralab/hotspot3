@@ -346,13 +346,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Estimating per-window signal thresholds for {self.chrom_name}")
         config = self.config # delete this line after testing
         rmsea_fit = StridedFit(config, name=self.chrom_name)
-        per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_r=global_r)
-
-        per_window_trs = np.where(
-            (per_window_rmsea <= self.config.rmsea_tr) | np.isnan(per_window_trs),
-            per_window_trs,
-            global_fit.fit_threshold
-        )
+        per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
 
         per_window_trs = interpolate_nan(per_window_trs)
         self.gp.logger.debug(f"Per-window signal thresholds calculated for {self.chrom_name}")
