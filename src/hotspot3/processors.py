@@ -356,7 +356,12 @@ class ChromosomeProcessor:
         good_fit = interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr # FIXME, don't interpolate rmsea
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs, where=good_fit)
         fit_res.r[~good_fit] = global_fit.r
-        fit_res.p[~good_fit] = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs, where=~good_fit).p[~good_fit]
+        fit_res.p[~good_fit] = w_fit.fit(
+            agg_cutcounts,
+            per_window_trs=per_window_trs,
+            where=~good_fit,
+            global_r=global_r
+        ).p[~good_fit]
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
