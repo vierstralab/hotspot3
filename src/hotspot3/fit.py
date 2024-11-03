@@ -88,17 +88,6 @@ class BackgroundFit:
         
         return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
-    def pack_poisson_params(self, mean, var, p, r):
-        poisson_fit_positions = np.where(mean >= var)[0]
-        poisson_fit_params = np.empty((len(poisson_fit_positions), 3), dtype=np.float64)
-        poisson_fit_params[:, 0] = poisson_fit_positions
-        poisson_fit_params[:, 1] = mean[poisson_fit_positions]
-        poisson_fit_params[:, 2] = var[poisson_fit_positions]
-
-        p[poisson_fit_positions] = 0
-        r[poisson_fit_positions] = np.inf
-        return poisson_fit_params
-
 
 class GlobalBackgroundFit(BackgroundFit):
     """
@@ -282,7 +271,10 @@ class StridedFit(BackgroundFit):
         
         mean = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
-        mean[enough_bg_mask], var[enough_bg_mask]  = self.get_mean_and_var(collapsed_agg_cutcounts[:, enough_bg_mask], where=where[:, enough_bg_mask])
+        mean[enough_bg_mask], var[enough_bg_mask]  = self.get_mean_and_var(
+            collapsed_agg_cutcounts[:, enough_bg_mask],
+            where=where[:, enough_bg_mask]
+        )
 
         if global_r is not None:
             r = np.full_like(mean, global_r, dtype=np.float32)
@@ -290,35 +282,19 @@ class StridedFit(BackgroundFit):
             r = self.r_from_mean_and_var(mean, var)
 
         p = mean / (mean + r)
-        
-        poisson_params = self.pack_poisson_params(mean, var, p, r)
 
-        return p, r, enough_bg_mask, poisson_params
+        return p, r, enough_bg_mask
     
-    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, poisson_params=None, fit_params=2):
+    def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, fit_params=2):
         result = np.full_like(p, np.nan)
         if enough_bg_mask is None:
             enough_bg_mask = np.ones_like(p, dtype=bool)
-        if poisson_params is None:
-            poisson_params = np.zeros((0, 3), dtype=np.float64)
 
-        indices = poisson_params.astype(np.int32)[:, 0]
-        if len(indices) > 0:
-            result[indices] = self.calc_rmsea_all_windows(
-                st.poisson(poisson_params[:, 1]),
-                n_params=1,
-                bin_edges=bin_edges[:, indices],
-                value_counts_per_bin=value_counts[:, indices]
-            )
-
-        negbin_fit_mask = enough_bg_mask.copy()
-        negbin_fit_mask[indices] = False
-
-        result[negbin_fit_mask] = self.calc_rmsea_all_windows(
-            st.nbinom(r[negbin_fit_mask], 1 - p[negbin_fit_mask]),
+        result[enough_bg_mask] = self.calc_rmsea_all_windows(
+            st.nbinom(r[enough_bg_mask], 1 - p[enough_bg_mask]), # FIXME use betainc
             n_params=fit_params,
-            bin_edges=bin_edges[:, negbin_fit_mask],
-            value_counts_per_bin=value_counts[:, negbin_fit_mask]
+            bin_edges=bin_edges[:, enough_bg_mask],
+            value_counts_per_bin=value_counts[:, enough_bg_mask]
         )
         return result
         
@@ -368,7 +344,7 @@ class StridedFit(BackgroundFit):
             
             changing_indices = np.where(remaing_fits_mask)[0][fit_will_change]
 
-            p, r, enough_bg_mask, poisson_params = self.fit_for_bin(
+            p, r, enough_bg_mask = self.fit_for_bin(
                 strided_agg_cutcounts[:, changing_indices],
                 where=mask[:, changing_indices],
                 global_r=global_r
@@ -382,7 +358,7 @@ class StridedFit(BackgroundFit):
 
             rmsea = self.wrap_rmsea_valid_fits(
                 p, r, edges, counts, 
-                enough_bg_mask, poisson_params, fit_params=n_params) # shape of r
+                enough_bg_mask, fit_params=n_params) # shape of r
             
             successful_fits = ~enough_bg_mask | (rmsea <= self.config.rmsea_tr)
             # best fit found
