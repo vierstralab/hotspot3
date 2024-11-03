@@ -100,12 +100,12 @@ class GlobalBackgroundFit(BackgroundFit):
 
         res = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
-        for tr in trs[::-1]:
+        for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
             res.append((tr, rmsea))
-            if rmsea <= self.config.rmsea_tr:
-                break
+            # if rmsea <= self.config.rmsea_tr:
+            #     break
         else:
             tr, rmsea = min(res, key=lambda x: x[1])
         quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
