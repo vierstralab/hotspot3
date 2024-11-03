@@ -376,6 +376,8 @@ class ChromosomeProcessor:
             chromosomes_wrapper=chromosomes_wrapper,
             states=bads,
             logger=self.gp.logger,
+            allele_reads_tr=0,
+            b_penalty=0.1
         )
         gs.estimate_BAD()
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
