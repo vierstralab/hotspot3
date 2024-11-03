@@ -25,7 +25,7 @@ class PvalueEstimator:
         r = fit_results.r
         p = fit_results.p
         mask = fit_results.enough_bg_mask
-        print(agg_cutcounts[49602138], logpval_for_dtype(agg_cutcounts[49602138], r[49602138], p[49602138], dtype=np.float32, calc_type="betainc"))
+        print(agg_cutcounts[49602138], r[49602138], p[49602138], logpval_for_dtype(agg_cutcounts[49602138], r[49602138], p[49602138], dtype=np.float32, calc_type="betainc"))
         data, invalid = self.negbin_neglog10pvalue(agg_cutcounts[mask], r[mask], p[mask])
         result[mask] = data
         if invalid is not None:
