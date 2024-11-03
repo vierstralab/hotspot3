@@ -346,9 +346,6 @@ class ChromosomeProcessor:
         config = self.config # delete this line after testing
         rmsea_fit = StridedFit(config, name=self.chrom_name)
         per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
-        import pandas as pd
-        print(pd.Series(interpolate_nan(per_window_rmsea)).describe())
-        print(pd.Series(per_window_rmsea).describe())
         per_window_trs = interpolate_nan(per_window_trs)
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 

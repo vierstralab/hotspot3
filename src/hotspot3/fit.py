@@ -308,10 +308,6 @@ class StridedFit(BackgroundFit):
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
-
-        import pandas as pd
-        print(pd.Series(best_rmsea).describe())
-        print((best_rmsea <= 0.05).sum())
  
         best_tr_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_tr_with_nan[subsampled_indices] = best_tr
@@ -321,8 +317,6 @@ class StridedFit(BackgroundFit):
 
         best_quantile_with_nan = np.full_like(array, np.nan, dtype=np.float32)
         best_quantile_with_nan[subsampled_indices] = best_quantile
-
-        print(pd.Series(best_rmsea_with_nan).describe())
 
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
@@ -434,8 +428,8 @@ class StridedFit(BackgroundFit):
         """
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
         # print(bin_edges)
-        sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
-        #sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
+        #sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
+        sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
