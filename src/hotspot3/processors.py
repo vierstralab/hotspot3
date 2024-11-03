@@ -354,14 +354,16 @@ class ChromosomeProcessor:
         w_fit = WindowBackgroundFit(self.config)
         self.gp.logger.debug(f"Estimating per-bp parameters of background model for {self.chrom_name}")
         fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
-        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) | ~fit_res.enough_bg_mask # FIXME, don't interpolate rmsea
-        fit_res.r[~good_fit] = global_fit.r
-        fit_res.p[~good_fit] = w_fit.fit(
+        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) #
+        need_global_fit = ~good_fit & fit_res.enough_bg_mask # FIXME, don't interpolate rmsea
+        fit_res.r[need_global_fit] = global_fit.r
+        fit_res.p[need_global_fit] = w_fit.fit(
             agg_cutcounts,
             per_window_trs=per_window_trs,
             global_fit=global_fit
-        ).p[~good_fit]
-        self.gp.logger.debug(f"Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases for {self.chrom_name}")
+        ).p[need_global_fit]
+        self.gp.logger.debug(f"{self.chrom_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases")
+        self.gp.logger.debug(f"{self.chrom_name}: Good fits for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases ")
         outdir = pvals_outpath.replace('.pvals.parquet', '')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
