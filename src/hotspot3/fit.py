@@ -167,15 +167,17 @@ class WindowBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution in a running window fashion
     """
-    def fit(self, array: ma.MaskedArray, per_window_trs) -> FitResults:
+    def fit(self, array: ma.MaskedArray, per_window_trs, where=None, global_r=None) -> FitResults:
         agg_cutcounts = array.copy()
 
         high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
         agg_cutcounts[high_signal_mask] = np.nan
-        enough_data_mask = self.centered_running_nansum((agg_cutcounts > 0).astype(np.float32), self.config.bg_window, min_count=1) > self.config.bg_window * self.config.nonzero_windows_to_fit
-        agg_cutcounts = ma.masked_where(~enough_data_mask, agg_cutcounts)
         
-        p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(agg_cutcounts)
+        p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(
+            agg_cutcounts,
+            where=where,
+            global_r=global_r
+        )
 
         rmsea = np.full_like(p, np.nan, dtype=np.float16)
         per_window_quantiles = np.full_like(p, np.nan, dtype=np.float16)
@@ -187,17 +189,21 @@ class WindowBackgroundFit(BackgroundFit):
             poisson_fit_params=poisson_fit_params
         )
     
-    def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, min_count=None, window=None):
-        mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=min_count, window=window)
+    def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, where=None, global_r=None):
+        mean, var = self.sliding_mean_and_variance(agg_cutcounts, where=where)
         enough_bg_mask = ~mean.mask
 
-        p = self.p_from_mean_and_var(mean, var).filled(np.nan)
-        r = self.r_from_mean_and_var(mean, var).filled(np.nan)
+        if global_r is not None:
+            r = np.full_like(mean, global_r, dtype=np.float32)
+            p = mean / (mean + r).filled(np.nan)
+        else:
+            p = self.p_from_mean_and_var(mean, var).filled(np.nan)
+            r = self.r_from_mean_and_var(mean, var).filled(np.nan)
 
         poisson_fit_params = self.pack_poisson_params(mean, var, p, r)
         return p, r, enough_bg_mask, poisson_fit_params
 
-    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None):
+    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None, where=None):
         if window is None:
             window = self.config.bg_window
 
@@ -208,6 +214,9 @@ class WindowBackgroundFit(BackgroundFit):
         var = self.centered_running_nanvar(array, window, min_count=min_count)
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
+        if where is not None:
+            mean = ma.masked_where(~where, mean)
+            var = ma.masked_where(~where, var)
         return mean, var
     
     @wrap_masked
@@ -418,9 +427,9 @@ class StridedFit(BackgroundFit):
         if global_fit is not None:
             global_quantile_tr = self.get_bg_tr(strided_agg_cutcounts, global_fit.fit_quantile)
             best_tr = np.where(
-                best_rmsea <= self.config.rmsea_tr,
-                best_tr,
-                np.maximum(global_quantile_tr, global_fit.fit_threshold)
+                remaing_fits_mask,
+                np.maximum(global_quantile_tr, global_fit.fit_threshold),
+                best_tr
             )
         
         with np.errstate(invalid='ignore'):
