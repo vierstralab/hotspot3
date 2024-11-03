@@ -360,6 +360,8 @@ class ChromosomeProcessor:
             'alt_counts': [global_r] * len(x),
         }).dropna()
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
+        bad = 1-global_p / (global_p)
+        bad = bad if bad > 1 else 1/bad
         gs = GenomeSegmentator(
             snps_collection=snps_collection.data,
             out=f"{self.chrom_name}.test.bed",
@@ -368,6 +370,7 @@ class ChromosomeProcessor:
             logger_level=self.config.logger_level,
             segmentation_mode='binomial',
             chromosomes_wrapper=chromosomes_wrapper,
+            states=np.arange(6) * bad
         )
         gs.estimate_BAD()
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
