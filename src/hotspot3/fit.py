@@ -113,7 +113,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
     def fit_for_tr(self, agg_cutcounts, tr):
         agg_cutcounts = agg_cutcounts[agg_cutcounts < tr]
-        mean, var = self.estimate_global_mean_and_var(agg_cutcounts, tr=tr)
+        mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
 
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
