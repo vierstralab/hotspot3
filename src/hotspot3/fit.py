@@ -103,6 +103,8 @@ class GlobalBackgroundFit(BackgroundFit):
         for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
+            if np.isnan(rmsea):
+                print(p, r, tr)
             res.append((tr, rmsea))
             # if rmsea <= self.config.rmsea_tr:
             #     break
