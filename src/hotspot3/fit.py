@@ -100,7 +100,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
         res = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
-        for tr in trs:
+        for tr in trs[::-1]:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
             res.append((tr, rmsea))
