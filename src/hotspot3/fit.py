@@ -167,15 +167,16 @@ class WindowBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution in a running window fashion
     """
-    def fit(self, array: ma.MaskedArray, per_window_trs, where=None, global_r=None) -> FitResults:
+    def fit(self, array: ma.MaskedArray, per_window_trs, global_fit: FitResults=None) -> FitResults:
         agg_cutcounts = array.copy()
 
         high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
         agg_cutcounts[high_signal_mask] = np.nan
+
+        global_r = global_fit.r if global_fit is not None else None
         
         p, r, enough_bg_mask, poisson_fit_params = self.sliding_method_of_moments_fit(
             agg_cutcounts,
-            where=where,
             global_r=global_r
         )
 
@@ -189,8 +190,8 @@ class WindowBackgroundFit(BackgroundFit):
             poisson_fit_params=poisson_fit_params
         )
     
-    def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, where=None, global_r=None):
-        mean, var = self.sliding_mean_and_variance(agg_cutcounts, where=where, min_count=1)
+    def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, global_r=None):
+        mean, var = self.sliding_mean_and_variance(agg_cutcounts, min_count=1)
         enough_bg_mask = ~mean.mask
 
         if global_r is not None:
@@ -204,7 +205,7 @@ class WindowBackgroundFit(BackgroundFit):
         
         return p, r, enough_bg_mask, poisson_fit_params
 
-    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None, where=None):
+    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None):
         if window is None:
             window = self.config.bg_window
 
@@ -215,9 +216,6 @@ class WindowBackgroundFit(BackgroundFit):
         var = self.centered_running_nanvar(array, window, min_count=min_count)
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
-        if where is not None:
-            mean = ma.masked_where(~where, mean)
-            var = ma.masked_where(~where, var)
         return mean, var
     
     @wrap_masked
