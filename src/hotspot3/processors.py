@@ -354,13 +354,12 @@ class ChromosomeProcessor:
         w_fit = WindowBackgroundFit(self.config)
         self.gp.logger.debug(f"Estimating per-bp parameters of background model for {self.chrom_name}")
         good_fit = interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr # FIXME, don't interpolate rmsea
-        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs, where=good_fit)
+        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
         fit_res.r[~good_fit] = global_fit.r
         fit_res.p[~good_fit] = w_fit.fit(
             agg_cutcounts,
             per_window_trs=per_window_trs,
-            where=~good_fit,
-            global_r=global_r
+            global_fit=global_fit
         ).p[~good_fit]
         
         outdir = pvals_outpath.replace('.pvals.parquet', '')
@@ -376,9 +375,7 @@ class ChromosomeProcessor:
         del df, per_window_q, per_window_rmsea, per_window_trs
         gc.collect()
 
-        poisson_fits = fit_res.poisson_fit_params
-        if poisson_fits is not None:
-            self.gp.logger.debug(f"Using Poisson distribution for {len(poisson_fits):,}/{agg_cutcounts.count():,} windows for {self.chrom_name}")
+
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
 
@@ -389,10 +386,7 @@ class ChromosomeProcessor:
 
         neglog_pvals = pval_estimator.estimate_pvalues(
             agg_cutcounts,
-            fit_res.r,
-            fit_res.p,
-            fit_res.enough_bg_mask,
-            bad_fits=poisson_fits
+            fit_res
         )
         del agg_cutcounts
         gc.collect()

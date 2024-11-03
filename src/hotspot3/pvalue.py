@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats as st
 from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorConfig
+from hotspot3.models import ProcessorConfig, FitResults
 from hotspot3.stats import logpval_for_dtype
 import itertools
 
@@ -20,21 +20,11 @@ class PvalueEstimator:
             logger = setup_logger()
         self.logger = logger
 
-    def estimate_pvalues(self, 
-            agg_cutcounts: np.ndarray, 
-            r: np.ndarray, 
-            p: np.ndarray,
-            mask: np.ndarray,
-            bad_fits=None
-        ):
-        result = np.full_like(mask, np.nan, dtype=np.float16)
-        
-        if bad_fits is not None:
-            indx = bad_fits[:, 0].astype(int)
-            param = bad_fits[:, 1]
-            result[indx] = -st.poisson.logsf(agg_cutcounts[indx] - 1, param) / np.log(10)
-            mask[indx] = False
-        
+    def estimate_pvalues(self, agg_cutcounts: np.ndarray, fit_results: FitResults) -> np.ndarray:
+        result = np.full_like(agg_cutcounts, np.nan, dtype=np.float16)
+        r = fit_results.r
+        p = fit_results.p
+        mask = fit_results.enough_bg_mask
         data, invalid = self.negbin_neglog10pvalue(agg_cutcounts[mask], r[mask], p[mask])
         result[mask] = data
         if invalid is not None:

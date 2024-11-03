@@ -66,7 +66,6 @@ class FitResults:
     fit_quantile: np.ndarray
     fit_threshold: np.ndarray
     enough_bg_mask: np.ndarray = None
-    poisson_fit_params: np.ndarray = None
 
 
 class NoContigPresentError(Exception):
