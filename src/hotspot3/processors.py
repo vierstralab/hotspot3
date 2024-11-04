@@ -372,16 +372,14 @@ class ChromosomeProcessor:
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
+        valid_counts = ~np.isnan(x)
+
         chrom_handler = ChromosomeSNPsHandler(
             self.chrom_name,
-            positions=starts, 
-            read_counts=np.stack([x, np.full(x.shape[0], global_r, dtype=np.float32)]).T
+            positions=starts[valid_counts], 
+            read_counts=np.stack([x, np.full(x.shape[0], global_r, dtype=np.float32)]).T[valid_counts, :]
         )
-        print(chrom_handler.read_counts.shape, chrom_handler.read_counts.dtype)
         snps_collection = GenomeSNPsHandler(chrom_handler)
-        normalization_tr = {
-            self.chrom_name: chrom_data_df['per_window_tr'].values
-        }
 
         gs = GenomeSegmentator(
             snps_collection=snps_collection,
