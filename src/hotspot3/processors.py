@@ -416,9 +416,6 @@ class ChromosomeProcessor:
         #     )
         # recalc_intervals = np.array(recalc_intervals, dtype=np.uint32)
 
-
-        
-
         w_fit = WindowBackgroundFit(self.config)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
