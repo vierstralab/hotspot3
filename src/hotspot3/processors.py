@@ -375,8 +375,9 @@ class ChromosomeProcessor:
         chrom_handler = ChromosomeSNPsHandler(
             self.chrom_name,
             positions=starts, 
-            read_counts=np.stack([x, np.full_like(x, global_r)]).T
+            read_counts=np.stack([x, np.full(x.shape[0], global_r, dtype=np.float32)]).T
         )
+        print(chrom_handler.read_counts.shape, chrom_handler.read_counts.dtype)
         snps_collection = GenomeSNPsHandler(chrom_handler)
         normalization_tr = {
             self.chrom_name: chrom_data_df['per_window_tr'].values
