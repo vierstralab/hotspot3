@@ -12,7 +12,7 @@ import subprocess
 import importlib.resources as pkg_resources
 import dataclasses
 from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
+from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig, FitResults
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
 from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedFit
@@ -424,6 +424,7 @@ class ChromosomeProcessor:
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         per_window_q = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         per_window_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
         self.gp.logger.debug(f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments')
         for segment in bad_segments:
             start = int(segment.start)
@@ -447,18 +448,20 @@ class ChromosomeProcessor:
             final_p[start:end] = fit_res.p
             per_window_q[start:end] = q
             per_window_rmsea[start:end] = rmsea
+            per_window_trs[start:end] = thresholds
+            enough_bg[start:end] = fit_res.enough_bg_mask
             self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{signal_at_segment.count():,} bases")
             self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{signal_at_segment.count():,} bases")
 
-        self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
+        fit_res = FitResults(final_p, final_r, per_window_rmsea, per_window_q, per_window_trs, enough_bg_mask=enough_bg)
 
         outdir = pvals_outpath.replace('.pvals.parquet', '.fit_results.parquet')
         df = pd.DataFrame({
-            'sliding_r': final_r,
-            'sliding_p': final_p,
-            'rmsea': per_window_rmsea,
-            'q': per_window_q,
-            'tr': per_window_trs,
+            'sliding_r': fit_res.r,
+            'sliding_p': fit_res.p,
+            'rmsea': fit_res.rmsea,
+            'q': fit_res.fit_quantile,
+            'tr': fit_res.fit_threshold,
             'bad': babachi_result,
         })
         self.to_parquet(df, fit_res_path)
