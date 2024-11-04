@@ -357,7 +357,7 @@ class ChromosomeProcessor:
         per_window_trs = interpolate_nan(per_window_trs)
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
-        step = 1500
+        step = 500
         x = agg_cutcounts.filled(np.nan)[::step]
         x[x >= per_window_trs[::step]] = np.nan
         starts = np.arange(0, len(x), dtype=np.uint32) * step
