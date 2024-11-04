@@ -89,6 +89,9 @@ class BackgroundFit:
         
         return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
+    def get_min_count(self, window):
+        return round(window * self.config.min_mappable_bg_frac)
+
 
 class GlobalBackgroundFit(BackgroundFit):
     """
@@ -194,49 +197,47 @@ class WindowBackgroundFit(BackgroundFit):
         
         return p, r, enough_bg_mask
 
-    def sliding_mean_and_variance(self, array: ma.MaskedArray, min_count=None, window=None):
+    def sliding_mean_and_variance(self, array: ma.MaskedArray, window=None):
         if window is None:
             window = self.config.bg_window
 
-        if min_count is None:
-            min_count = self.min_mappable_bg
-
-        mean = self.centered_running_nanmean(array, window, min_count=min_count)
-        var = self.centered_running_nanvar(array, window, min_count=min_count)
+        mean = self.centered_running_nanmean(array, window)
+        var = self.centered_running_nanvar(array, window)
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
         return mean, var
     
     @wrap_masked
     @correct_offset
-    def centered_running_nansum(self, array: np.ndarray, window, min_count):
+    def centered_running_nansum(self, array: np.ndarray, window: int):
+        min_count = self.get_min_count(window)
         return bn.move_sum(array, window, min_count=min_count).astype(np.float32)
 
     @wrap_masked
     @correct_offset
-    def centered_running_nanvar(self, array, window, min_count):
+    def centered_running_nanvar(self, array, window):
+        min_count = self.get_min_count(window)
         return bn.move_var(array, window, ddof=1, min_count=min_count).astype(np.float32)
 
     @wrap_masked
     @correct_offset
-    def centered_running_nanmean(self, array, window, min_count):
+    def centered_running_nanmean(self, array, window):
+        min_count = self.get_min_count(window)
         return bn.move_mean(array, window, min_count=min_count).astype(np.float32)
     
     @wrap_masked
-    def running_nanmedian(self, array, window, min_count):
-        return bn.move_median(array, window, min_count=min_count).astype(np.float32)
+    def running_nanmedian(self, array, window):
+        return bn.move_median(array, window).astype(np.float32)
     
     @wrap_masked
     def find_heterogeneous_windows(self, array):
         median_left = self.running_nanmedian(
             array,
             window=self.config.bg_window,
-            min_count=self.min_mappable_bg
         )
         median_right = self.running_nanmedian(
             array[::-1],
             window=self.config.bg_window,
-            min_count=self.min_mappable_bg
         )[::-1]
 
         score = np.abs(median_right - median_left)
@@ -267,7 +268,8 @@ class StridedFit(BackgroundFit):
         return value_counts
 
     def fit_for_bin(self, collapsed_agg_cutcounts, where=None, global_r=None):
-        min_count = round(self.config.bg_window * self.config.min_mappable_bg_frac / self.sampling_step)
+        window = min(self.config.bg_window, collapsed_agg_cutcounts.shape[0])
+        min_count = self.get_min_count(window / self.sampling_step)
         enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts, where=where), axis=0, where=where) > min_count
 
         
