@@ -363,7 +363,7 @@ class ChromosomeProcessor:
         chrom_data_df = pd.DataFrame({
             'chr': [self.chrom_name] * len(x),
             'start': starts,
-            'ref_counts': [global_r] * len(x),
+            'ref_counts': [*global_r] * len(x),
             'alt_counts': x, 
             'per_window_tr': per_window_trs[::step],
         }).dropna()
