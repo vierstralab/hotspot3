@@ -387,6 +387,7 @@ class ChromosomeProcessor:
             b_penalty=4
         )
         bad_segments = gs.estimate_BAD()
+        gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
         for segment in bad_segments:
             babachi_result[segment.start:segment.end] = segment.BAD
@@ -415,8 +416,8 @@ class ChromosomeProcessor:
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
             'rmsea': per_window_rmsea,
-            'tr': per_window_trs,
             'q': per_window_q,
+            'tr': per_window_trs,
             'bad': babachi_result,
         })
         self.to_parquet(df, fit_res_path)
