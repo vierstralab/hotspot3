@@ -379,8 +379,6 @@ class ChromosomeProcessor:
             self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy().astype(np.float32)
         }
 
-        print(snps_collection)
-
         gs = GenomeSegmentator(
             snps_collection=snps_collection,
             chrom_sizes={self.chrom_name: self.chrom_size},
