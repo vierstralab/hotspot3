@@ -22,7 +22,6 @@ from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
 from babachi.segmentation import GenomeSegmentator
-from babachi.chrom_wrapper import init_wrapper
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -311,7 +310,7 @@ class ChromosomeProcessor:
         self.chrom_name = chrom_name
         self.gp = genome_processor
         self.config = self.gp.config
-        self.chrom_size = self.gp.chrom_sizes[chrom_name]
+        self.chrom_size = int(self.gp.chrom_sizes[chrom_name])
         self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size, config=self.config)
 
     @ensure_contig_exists
@@ -368,7 +367,6 @@ class ChromosomeProcessor:
             'alt_counts': x, 
             'per_window_tr': per_window_trs[::step],
         }).dropna()
-        chromosomes_wrapper = init_wrapper(None)
         bad = (1 - global_p) / global_p
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
@@ -380,6 +378,8 @@ class ChromosomeProcessor:
         snps_collection = {
             self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy()
         }
+
+        print(snps_collection)
 
         gs = GenomeSegmentator(
             snps_collection=snps_collection,
