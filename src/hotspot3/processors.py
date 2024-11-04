@@ -428,10 +428,8 @@ class ChromosomeProcessor:
         for segment in bad_segments:
             start = int(segment.start)
             end = int(segment.end)
-            half_window = self.config.bg_window // 2
-            # Not sure if we need to pad
-            padded_array = np.pad(agg_cutcounts[start:end], half_window, mode='constant', constant_values=np.nan)
-            thresholds, q, rmsea = rmsea_fit.fit_tr(padded_array, global_fit=global_fit)[half_window:-half_window]
+            signal_at_segment = agg_cutcounts[start:end]
+            thresholds, q, rmsea = rmsea_fit.fit_tr(signal_at_segment, global_fit=global_fit)
             thresholds = interpolate_nan(thresholds)
             fit_res = w_fit.fit(agg_cutcounts[start:end], per_window_trs=thresholds)
             success_fits = check_valid_fit(fit_res)
