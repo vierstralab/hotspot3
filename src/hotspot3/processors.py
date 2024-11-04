@@ -353,8 +353,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
         step = self.config.signal_prop_interpolation_step
         config = dataclasses.replace(self.config, signal_prop_interpolation_step=step*3) # delete this line after testing
-        rmsea_fit = StridedFit(config, name=self.chrom_name)
-        per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
+        coarse_signal_level_fit = StridedFit(config, name=self.chrom_name)
+        per_window_trs = coarse_signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)[0]
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
 
@@ -417,6 +417,7 @@ class ChromosomeProcessor:
         # recalc_intervals = np.array(recalc_intervals, dtype=np.uint32)
 
         w_fit = WindowBackgroundFit(self.config)
+        fine_signal_level_fit = StridedFit(self.config, name=self.chrom_name)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         per_window_q = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
@@ -427,7 +428,7 @@ class ChromosomeProcessor:
             start = int(segment.start)
             end = int(segment.end)
             signal_at_segment = agg_cutcounts[start:end]
-            thresholds, q, rmsea = rmsea_fit.fit_tr(signal_at_segment, global_fit=global_fit)
+            thresholds, q, rmsea = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=global_fit)
             thresholds = interpolate_nan(thresholds)
             fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
             success_fits = check_valid_fit(fit_res)
