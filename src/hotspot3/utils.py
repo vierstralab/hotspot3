@@ -118,6 +118,8 @@ def correct_offset(func):
     @functools.wraps(func)
     def wrapper(self, array, window, *args, **kwargs):
         assert window % 2 == 1, "Window size should be odd"
+        if len(array) < window:
+            window = len(array)
         offset = window // 2
         result = func(
             self,
