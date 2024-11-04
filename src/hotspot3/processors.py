@@ -431,14 +431,14 @@ class ChromosomeProcessor:
             signal_at_segment = agg_cutcounts[start:end]
             thresholds, q, rmsea = rmsea_fit.fit_tr(signal_at_segment, global_fit=global_fit)
             thresholds = interpolate_nan(thresholds)
-            fit_res = w_fit.fit(agg_cutcounts[start:end], per_window_trs=thresholds)
+            fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
             success_fits = check_valid_fit(fit_res)
             # FIXME, don't interpolate rmsea
             good_fit = (interpolate_nan(rmsea) <= self.config.rmsea_tr) & success_fits 
             need_global_fit = ~good_fit & fit_res.enough_bg_mask
             fit_res.r[need_global_fit] = global_fit.r
             fit_res.p[need_global_fit] = w_fit.fit(
-                agg_cutcounts,
+                signal_at_segment,
                 per_window_trs=thresholds,
                 global_fit=global_fit
             ).p[need_global_fit]
@@ -447,8 +447,8 @@ class ChromosomeProcessor:
             final_p[start:end] = fit_res.p
             per_window_q[start:end] = q
             per_window_rmsea[start:end] = rmsea
-            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases")
-            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases")
+            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{signal_at_segment.count():,} bases")
+            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{signal_at_segment.count():,} bases")
 
         self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
 
