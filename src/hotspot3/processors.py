@@ -388,7 +388,7 @@ class ChromosomeProcessor:
             chromosomes_wrapper=chromosomes_wrapper,
             states=bads,
             logger=self.gp.logger,
-            normalization_tr=normalization_tr,
+            allele_tr=0,
             b_penalty=4
         )
         bad_segments = gs.estimate_BAD()
