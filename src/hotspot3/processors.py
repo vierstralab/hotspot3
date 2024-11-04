@@ -367,12 +367,17 @@ class ChromosomeProcessor:
             'start': starts,
             'ref_counts': [global_r] * len(x),
             'alt_counts': x, 
+            'per_window_tr': per_window_trs[::step],
         }).dropna()
         chromosomes_wrapper = init_wrapper(None)
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         bad = (1 - global_p) / global_p
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
+
+        normalization_tr = {
+            self.chrom_name: chrom_data_df['per_window_tr'].values
+        }
 
         gs = GenomeSegmentator(
             snps_collection=snps_collection.data,
@@ -383,7 +388,7 @@ class ChromosomeProcessor:
             chromosomes_wrapper=chromosomes_wrapper,
             states=bads,
             logger=self.gp.logger,
-            allele_reads_tr=0,
+            normalization_tr=normalization_tr,
             b_penalty=4
         )
         bad_segments = gs.estimate_BAD()
