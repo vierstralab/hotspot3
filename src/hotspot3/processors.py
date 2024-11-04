@@ -492,7 +492,6 @@ class ChromosomeProcessor:
         smoothed_signif = window_fit.centered_running_nansum(
             signif_fdrs,
             window=self.config.window,
-            min_count=1,
         ) > 0
         region_starts, region_ends = find_stretches(smoothed_signif)
 
