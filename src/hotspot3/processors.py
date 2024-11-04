@@ -22,6 +22,7 @@ from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
 from babachi.segmentation import GenomeSegmentator
+from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -371,12 +372,14 @@ class ChromosomeProcessor:
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
+        chrom_handler = ChromosomeSNPsHandler(
+            self.chrom_name,
+            positions=starts, 
+            read_counts=np.stack([x, np.full_like(x, global_r)])
+        )
+        snps_collection = GenomeSNPsHandler(chrom_handler)
         normalization_tr = {
             self.chrom_name: chrom_data_df['per_window_tr'].values
-        }
-
-        snps_collection = {
-            self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy().astype(np.float64)
         }
 
         gs = GenomeSegmentator(
