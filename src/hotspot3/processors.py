@@ -362,7 +362,7 @@ class ChromosomeProcessor:
         signal = agg_cutcounts.filled(np.nan)[::step]
         
         low_signal = signal.copy()
-        low_signal[low_signal >= interpolate_nan(per_window_trs)] = np.nan
+        low_signal[low_signal >= interpolate_nan(per_window_trs)[::step]] = np.nan
         starts = np.arange(0, len(low_signal), dtype=np.uint32) * step
 
         bad = (1 - global_p) / global_p
