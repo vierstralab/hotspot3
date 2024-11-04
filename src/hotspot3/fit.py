@@ -305,7 +305,7 @@ class StridedFit(BackgroundFit):
     def fit_tr(self, array: ma.MaskedArray, global_fit: FitResults=None):
         original_shape = array.shape
         strided_agg_cutcounts = rolling_view_with_nan_padding(
-            array,
+            array[::self.sampling_step],
             points_in_window=self.points_in_bg_window,
             interpolation_step=self.interpolation_step
         ) # shape (bg_window, n_points)

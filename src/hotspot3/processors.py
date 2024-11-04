@@ -349,6 +349,7 @@ class ChromosomeProcessor:
         # })
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
+        self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
         config = self.config # delete this line after testing
         rmsea_fit = StridedFit(config, name=self.chrom_name)
@@ -415,7 +416,7 @@ class ChromosomeProcessor:
         #     )
         # recalc_intervals = np.array(recalc_intervals, dtype=np.uint32)
 
-        self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
+
         
 
         w_fit = WindowBackgroundFit(self.config)
