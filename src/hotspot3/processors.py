@@ -371,7 +371,7 @@ class ChromosomeProcessor:
         chromosomes_wrapper = init_wrapper(None)
         snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         bad = (1 - global_p) / global_p
-        mult = np.linspace(1, 5, 10)
+        mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
         gs = GenomeSegmentator(
