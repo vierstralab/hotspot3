@@ -21,7 +21,6 @@ from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
-from babachi.models import GenomeSNPsHandler
 from babachi.segmentation import GenomeSegmentator
 from babachi.chrom_wrapper import init_wrapper
 
@@ -370,7 +369,6 @@ class ChromosomeProcessor:
             'per_window_tr': per_window_trs[::step],
         }).dropna()
         chromosomes_wrapper = init_wrapper(None)
-        snps_collection = GenomeSNPsHandler(chrom_data_df, chromosomes_wrapper)
         bad = (1 - global_p) / global_p
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
@@ -379,13 +377,16 @@ class ChromosomeProcessor:
             self.chrom_name: chrom_data_df['per_window_tr'].values
         }
 
+        snps_collection = {
+            self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy()
+        }
+
         gs = GenomeSegmentator(
-            snps_collection=snps_collection.data,
-            chromosomes_order=[self.chrom_name],
+            snps_collection=snps_collection,
+            chrom_sizes={self.chrom_name: self.chrom_size},
             jobs=1,
             logger_level=self.config.logger_level,
             segmentation_mode='binomial',
-            chromosomes_wrapper=chromosomes_wrapper,
             states=bads,
             logger=self.gp.logger,
             allele_reads_tr=0,
