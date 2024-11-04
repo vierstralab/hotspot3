@@ -376,7 +376,7 @@ class ChromosomeProcessor:
         }
 
         snps_collection = {
-            self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy().astype(np.float32)
+            self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy().astype(np.float64)
         }
 
         gs = GenomeSegmentator(
@@ -394,7 +394,7 @@ class ChromosomeProcessor:
         gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
         for segment in bad_segments:
-            babachi_result[segment.start:segment.end] = segment.BAD
+            babachi_result[int(segment.start):int(segment.end)] = segment.BAD
         del bad_segments
         gc.collect()
 
