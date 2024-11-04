@@ -54,7 +54,7 @@ class ChromosomeExtractor:
         cutcounts = self.extract_cutcounts(cutcounts_file).astype(np.float32)
         window = self.fit_model.config.window
         
-        agg_cutcounts = self.fit_model.centered_running_nansum(cutcounts, window, min_count=1)
+        agg_cutcounts = self.fit_model.centered_running_nansum(cutcounts, window)
         return agg_cutcounts
     
 

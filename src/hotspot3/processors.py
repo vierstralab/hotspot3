@@ -398,24 +398,6 @@ class ChromosomeProcessor:
         gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
 
-        
-        # recalc_intervals = []
-        # for segment in bad_segments:
-        #     babachi_result[int(segment.start):int(segment.end)] = segment.BAD
-        #     recalc_intervals.append(
-        #         [
-        #             max(0, segment.start - self.config.bg_window // 2),
-        #             segment.start,
-        #         ]
-        #     )
-        #     recalc_intervals.append(
-        #         [
-        #             segment.end,
-        #             min(self.chrom_size, segment.end + self.config.bg_window // 2)
-        #         ]
-        #     )
-        # recalc_intervals = np.array(recalc_intervals, dtype=np.uint32)
-
         w_fit = WindowBackgroundFit(self.config)
         fine_signal_level_fit = StridedFit(self.config, name=self.chrom_name)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
