@@ -133,14 +133,16 @@ def correct_offset(func):
 def interpolate_nan(array):
     subsampled_indices = np.where(~np.isnan(array))[0]
     subsampled_arr = array[subsampled_indices]
-
-    return np.interp(
-        np.arange(array.shape[0], dtype=np.uint32),
-        subsampled_indices,
-        subsampled_arr,
-        left=None,
-        right=None,
-    )
+    try:
+        return np.interp(
+            np.arange(array.shape[0], dtype=np.uint32),
+            subsampled_indices,
+            subsampled_arr,
+            left=None,
+            right=None,
+        )
+    except ValueError:
+        return np.full(array.shape, np.nan)
 
 
 def rolling_view_with_nan_padding(arr, points_in_window=501, interpolation_step=1000):
