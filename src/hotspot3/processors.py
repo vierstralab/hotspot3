@@ -363,7 +363,7 @@ class ChromosomeProcessor:
         chrom_data_df = pd.DataFrame({
             'chr': [self.chrom_name] * len(x),
             'start': starts,
-            'ref_counts': [*global_r] * len(x),
+            'ref_counts': [global_r] * len(x),
             'alt_counts': x, 
             'per_window_tr': per_window_trs[::step],
         }).dropna()
@@ -376,7 +376,7 @@ class ChromosomeProcessor:
         }
 
         snps_collection = {
-            self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy()
+            self.chrom_name: chrom_data_df[['start', 'ref_counts', 'alt_counts']].to_numpy().astype(np.float32)
         }
 
         print(snps_collection)
