@@ -304,8 +304,16 @@ class StridedFit(BackgroundFit):
     @wrap_masked
     def fit_tr(self, array: ma.MaskedArray, global_fit: FitResults=None):
         original_shape = array.shape
-        agg_cutcounts = array[::self.sampling_step]
-        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(agg_cutcounts, global_fit=global_fit)
+        strided_agg_cutcounts = rolling_view_with_nan_padding(
+            array,
+            points_in_window=self.points_in_bg_window,
+            interpolation_step=self.interpolation_step
+        ) # shape (bg_window, n_points)
+        best_tr, best_quantile, best_rmsea = self.find_per_window_tr(
+            strided_agg_cutcounts,
+            global_fit=global_fit
+        )
+    
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
@@ -322,12 +330,7 @@ class StridedFit(BackgroundFit):
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, agg_cutcounts: np.ndarray, global_fit: FitResults=None):
-        strided_agg_cutcounts = rolling_view_with_nan_padding(
-            agg_cutcounts,
-            points_in_window=self.points_in_bg_window,
-            interpolation_step=self.interpolation_step
-        ) # shape (bg_window, n_points)
+    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: FitResults=None):
         bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 

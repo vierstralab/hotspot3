@@ -353,31 +353,32 @@ class ChromosomeProcessor:
         config = self.config # delete this line after testing
         rmsea_fit = StridedFit(config, name=self.chrom_name)
         per_window_trs, per_window_q, per_window_rmsea = rmsea_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
-        per_window_trs = interpolate_nan(per_window_trs)
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
-        step = 500
-        x = agg_cutcounts.filled(np.nan)[::step]
-        x[x >= per_window_trs[::step]] = np.nan
-        starts = np.arange(0, len(x), dtype=np.uint32) * step
 
-        chrom_data_df = pd.DataFrame({
-            'chr': [self.chrom_name] * len(x),
-            'start': starts,
-            'ref_counts': [global_r] * len(x),
-            'alt_counts': x, 
-            'per_window_tr': per_window_trs[::step],
-        }).dropna()
+        # TODO wrap into a function
+        step = self.config.signal_prop_interpolation_step
+        signal = agg_cutcounts.filled(np.nan)[::step]
+        
+        low_signal = signal.copy()
+        low_signal[low_signal >= per_window_trs] = np.nan
+        starts = np.arange(0, len(low_signal), dtype=np.uint32) * step
+
         bad = (1 - global_p) / global_p
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
-        valid_counts = ~np.isnan(x)
+        valid_counts = ~np.isnan(low_signal)
 
         chrom_handler = ChromosomeSNPsHandler(
             self.chrom_name,
             positions=starts[valid_counts], 
-            read_counts=np.stack([np.full(x.shape[0], global_r, dtype=np.float32), x]).T[valid_counts, :]
+            read_counts=np.stack(
+                [
+                    np.full(low_signal.shape[0], global_r, dtype=np.float32),
+                    low_signal
+                ]
+            ).T[valid_counts, :]
         )
         snps_collection = GenomeSNPsHandler(chrom_handler)
 
@@ -395,32 +396,67 @@ class ChromosomeProcessor:
         bad_segments = gs.estimate_BAD()
         gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
-        for segment in bad_segments:
-            babachi_result[int(segment.start):int(segment.end)] = segment.BAD
-        del bad_segments
-        gc.collect()
+
+        
+        # recalc_intervals = []
+        # for segment in bad_segments:
+        #     babachi_result[int(segment.start):int(segment.end)] = segment.BAD
+        #     recalc_intervals.append(
+        #         [
+        #             max(0, segment.start - self.config.bg_window // 2),
+        #             segment.start,
+        #         ]
+        #     )
+        #     recalc_intervals.append(
+        #         [
+        #             segment.end,
+        #             min(self.chrom_size, segment.end + self.config.bg_window // 2)
+        #         ]
+        #     )
+        # recalc_intervals = np.array(recalc_intervals, dtype=np.uint32)
 
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
+        
 
         w_fit = WindowBackgroundFit(self.config)
-        self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
-        fit_res = w_fit.fit(agg_cutcounts, per_window_trs=per_window_trs)
-        success_fits = check_valid_fit(fit_res)
-        good_fit = (interpolate_nan(per_window_rmsea) <= self.config.rmsea_tr) & success_fits # FIXME, don't interpolate rmsea
-        need_global_fit = ~good_fit & fit_res.enough_bg_mask
-        fit_res.r[need_global_fit] = global_fit.r
-        fit_res.p[need_global_fit] = w_fit.fit(
-            agg_cutcounts,
-            per_window_trs=per_window_trs,
-            global_fit=global_fit
-        ).p[need_global_fit]
+        final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        per_window_q = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        per_window_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        self.gp.logger.debug(f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments')
+        for segment in bad_segments:
+            start = int(segment.start)
+            end = int(segment.end)
+            half_window = self.config.bg_window // 2
+            # Not sure if we need to pad
+            padded_array = np.pad(agg_cutcounts[start:end], half_window, mode='constant', constant_values=np.nan)
+            thresholds, q, rmsea = rmsea_fit.fit_tr(padded_array, global_fit=global_fit)[half_window:-half_window]
+            thresholds = interpolate_nan(thresholds)
+            fit_res = w_fit.fit(agg_cutcounts[start:end], per_window_trs=thresholds)
+            success_fits = check_valid_fit(fit_res)
+            # FIXME, don't interpolate rmsea
+            good_fit = (interpolate_nan(rmsea) <= self.config.rmsea_tr) & success_fits 
+            need_global_fit = ~good_fit & fit_res.enough_bg_mask
+            fit_res.r[need_global_fit] = global_fit.r
+            fit_res.p[need_global_fit] = w_fit.fit(
+                agg_cutcounts,
+                per_window_trs=thresholds,
+                global_fit=global_fit
+            ).p[need_global_fit]
 
-        self.gp.logger.debug(f"{self.chrom_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases")
-        self.gp.logger.debug(f"{self.chrom_name}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases")
+            final_r[start:end] = fit_res.r
+            final_p[start:end] = fit_res.p
+            per_window_q[start:end] = q
+            per_window_rmsea[start:end] = rmsea
+            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{agg_cutcounts.count():,} bases")
+            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{agg_cutcounts.count():,} bases")
+
+        self.gp.logger.debug(f"{self.chrom_name}: Estimating per-bp parameters of background model")
+
         outdir = pvals_outpath.replace('.pvals.parquet', '.fit_results.parquet')
         df = pd.DataFrame({
-            'sliding_r': fit_res.r,
-            'sliding_p': fit_res.p,
+            'sliding_r': final_r,
+            'sliding_p': final_p,
             'rmsea': per_window_rmsea,
             'q': per_window_q,
             'tr': per_window_trs,
