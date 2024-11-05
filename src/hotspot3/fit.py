@@ -90,25 +90,23 @@ class BackgroundFit:
         return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
     def get_min_count(self, window):
-        return round(window * self.config.min_mappable_bg_frac)
+        return max(1, round(window * self.config.min_mappable_bg_frac))
 
 
 class GlobalBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution globally (for chromosome)
     """
-    def fit(self, array: ma.MaskedArray) -> GlobalFitResults:
-        agg_cutcounts = ma.masked_invalid(array).compressed()
-        unique, counts = self.hist_data_for_tr(agg_cutcounts)
+    def fit(self, array: ma.MaskedArray, peak_flanks=None) -> GlobalFitResults:
+        agg_cutcounts = ma.masked_invalid(array).filled(np.nan)
 
         result = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             try:
-                p, r = self.fit_for_tr(agg_cutcounts, tr)
+                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, peak_flanks)
             except NoContigPresentError:
                 continue
-            rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
             result.append((tr, rmsea, p, r))
             # if rmsea <= self.config.rmsea_tr:
             #     break
@@ -118,25 +116,29 @@ class GlobalBackgroundFit(BackgroundFit):
         if not is_good_fit:
             self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {(self.config.max_background_prop * 100):.2f}% as threshold.")
             tr, rmsea, p, r = result[-1]
-        quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
+        quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
 
-    def fit_for_tr(self, agg_cutcounts, tr):
-        agg_cutcounts = agg_cutcounts[agg_cutcounts < tr]
-        mean, var = self.estimate_global_mean_and_var(agg_cutcounts)
+    def fit_for_tr(self, agg_cutcounts, tr, peak_flanks):
+        # FIXME
+        w_fit = WindowBackgroundFit(config=self.config, logger=self.logger)
 
+        if peak_flanks is None:
+            peak_flanks = self.config.window
+
+        assumed_signal_mask = agg_cutcounts >= tr
+        assumed_signal_mask = w_fit.centered_running_nansum(assumed_signal_mask.astype(np.float32), peak_flanks) > 0
+        filtered_agg_cutcounts = agg_cutcounts[~assumed_signal_mask & ~np.isnan(agg_cutcounts)][::self.config.window]
+
+        mean, var = self.estimate_global_mean_and_var(filtered_agg_cutcounts)
         p = self.p_from_mean_and_var(mean, var)
         r = self.r_from_mean_and_var(mean, var)
-        return p, r
+
+        unique, counts = np.unique(filtered_agg_cutcounts, return_counts=True)
+        rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
     
-
-    def hist_data_for_tr(self, agg_cutcounts, tr=None):
-        if tr is not None:
-            agg_cutcounts = agg_cutcounts[agg_cutcounts < tr]
-        unique, counts = np.unique(agg_cutcounts, return_counts=True)
-        return unique, counts
-
+        return p, r, rmsea
 
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
         nonzero_count = np.count_nonzero(agg_cutcounts)
@@ -174,6 +176,7 @@ class WindowBackgroundFit(BackgroundFit):
         agg_cutcounts = array.copy()
 
         high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
+        high_signal_mask = self.centered_running_nansum(high_signal_mask.astype(np.float32), self.config.window) > 0
         agg_cutcounts[high_signal_mask] = np.nan
 
         global_r = global_fit.r if global_fit is not None else None

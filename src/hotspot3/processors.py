@@ -334,7 +334,7 @@ class ChromosomeProcessor:
             raise NoContigPresentError
         self.config = dataclasses.replace(self.config, min_background_prop=(1 - min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(agg_cutcounts[::self.config.window])
+        global_fit = g_fit.fit(agg_cutcounts)
         if global_fit.rmsea > self.config.rmsea_tr:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
             raise NoContigPresentError
@@ -356,30 +356,38 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
 
         signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
-        per_window_trs, qs, rmseas = signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
+        per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
         good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{agg_cutcounts.count():,} bases have RMSEA <= {self.config.rmsea_tr:.2f}")
 
 
         # TODO wrap into a function
         step = self.config.babachi_segmentation_step
-        low_signal = agg_cutcounts.filled(np.nan)[::step]
-        low_signal[low_signal >= interpolate_nan(per_window_trs)[::step]] = np.nan
-        starts = np.arange(0, len(low_signal), dtype=np.uint32) * step
+
+        #FIXME
+        w_fit = WindowBackgroundFit(self.config, logger=self.gp.logger)
+        assumed_signal_mask = (agg_cutcounts >= per_window_trs_global).filled(False)
+        assumed_signal_mask = w_fit.centered_running_nansum(
+            assumed_signal_mask.astype(np.float32),
+            window=self.config.window
+        ) > 0
+        background = agg_cutcounts.filled(np.nan)[::step]
+        background[assumed_signal_mask[::step]] = np.nan
+        starts = np.arange(0, len(background), dtype=np.uint32) * step
 
         bad = (1 - global_p) / global_p
         mult = np.linspace(1, 10, 20)
         bads = [*(mult * bad), *(1/mult[1:] * bad)]
 
-        valid_counts = ~np.isnan(low_signal)
+        valid_counts = ~np.isnan(background)
 
         chrom_handler = ChromosomeSNPsHandler(
             self.chrom_name,
             positions=starts[valid_counts], 
             read_counts=np.stack(
                 [
-                    np.full(low_signal.shape[0], global_r, dtype=np.float32),
-                    low_signal
+                    np.full(background.shape[0], global_r, dtype=np.float32),
+                    background
                 ]
             ).T[valid_counts, :]
         )
@@ -404,6 +412,7 @@ class ChromosomeProcessor:
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
     
         self.gp.logger.debug(
@@ -417,7 +426,9 @@ class ChromosomeProcessor:
             babachi_result[start:end] = segment.BAD
 
             fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
-            segment_fit = GlobalBackgroundFit(self.config, name=segment_name).fit(signal_at_segment)
+            segment_fit = GlobalBackgroundFit(
+                self.config, name=segment_name
+            ).fit(signal_at_segment)
 
             thresholds, _, rmsea = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=segment_fit)
             thresholds = interpolate_nan(thresholds)
@@ -453,6 +464,7 @@ class ChromosomeProcessor:
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
             'tr': per_window_trs,
+            'inital_tr': per_window_trs_global,
             'bad': babachi_result,
             'rmsea': final_rmsea
         })
