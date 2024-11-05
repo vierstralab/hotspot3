@@ -359,7 +359,6 @@ class ChromosomeProcessor:
         per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(
             agg_cutcounts,
             global_fit=global_fit,
-            step=5
         )
         good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
         n_rmsea = np.sum(~np.isnan(rmseas))
@@ -391,16 +390,13 @@ class ChromosomeProcessor:
             signal_at_segment = agg_cutcounts[start:end]
             babachi_result[start:end] = segment.BAD
 
-            segment_fit = GlobalBackgroundFit(
-                self.config, name=segment_name
-            ).fit(signal_at_segment)
+            segment_fit = GlobalBackgroundFit(self.config, name=segment_name).fit(signal_at_segment)
 
 
             fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
             thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
                 signal_at_segment,
                 global_fit=segment_fit,
-                step=5
             )
             thresholds = interpolate_nan(thresholds)
             self.gp.logger.debug(f"{segment_name}: Signal thresholds approximated")
