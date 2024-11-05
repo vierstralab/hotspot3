@@ -176,8 +176,7 @@ class WindowBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray, per_window_trs, global_fit: GlobalFitResults=None) -> WindowedFitResults:
         agg_cutcounts = array.copy()
 
-        high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
-        high_signal_mask = self.centered_running_nansum(high_signal_mask.astype(np.float32), self.config.window) > 0
+        high_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
         agg_cutcounts[high_signal_mask] = np.nan
 
         global_r = global_fit.r if global_fit is not None else None
