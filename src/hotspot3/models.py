@@ -2,7 +2,7 @@ import dataclasses
 import pandas as pd
 import logging
 import numpy as np
-
+from hotspot3.logging import setup_logger
 
 @dataclasses.dataclass
 class ProcessorConfig:
@@ -84,3 +84,18 @@ class NoContigPresentError(Exception):
 
     def __str__(self):
         return f"{self.__class__.__name__}: {self.message}"
+
+
+class WithLogger:
+    def __init__(self, logger=None, config=None, name=None):
+        if logger is None:
+            logger = setup_logger()
+        self.logger = logger
+
+        if config is None:
+            config = ProcessorConfig()
+        self.config = config
+
+        if name is None:
+            name = self.__class__.__name__
+        self.name = name

@@ -16,7 +16,7 @@ from hotspot3.models import ProcessorOutputData, NoContigPresentError, Processor
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
 from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedBackgroundFit
-
+from hotspot3.babachi import Segmentation
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
@@ -334,7 +334,7 @@ class ChromosomeProcessor:
             raise NoContigPresentError
         self.config = dataclasses.replace(self.config, min_background_prop=(1 - min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(agg_cutcounts)
+        global_fit = g_fit.fit(agg_cutcounts, step=self.config.window)
         if global_fit.rmsea > self.config.rmsea_tr:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
             raise NoContigPresentError
@@ -356,64 +356,23 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
 
         signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
-        per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
+        per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(
+            agg_cutcounts,
+            global_fit=global_fit,
+            step=3
+        )
         good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
         n_rmsea = np.sum(~np.isnan(rmseas))
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
 
-
-        # TODO wrap into a function
-        step = self.config.babachi_segmentation_step
-
-        #FIXME
-        w_fit = WindowBackgroundFit(self.config, logger=self.gp.logger)
-        assumed_signal_mask = (agg_cutcounts >= per_window_trs_global).filled(False)
-        assumed_signal_mask = w_fit.centered_running_nansum(
-            assumed_signal_mask.astype(np.float32),
-            window=self.config.window
-        ) > 0
-        background = agg_cutcounts.filled(np.nan)[::step]
-        background[assumed_signal_mask[::step]] = np.nan
-        starts = np.arange(0, len(background), dtype=np.uint32) * step
-
-        bad = (1 - global_p) / global_p
-        mult = np.linspace(1, 10, 20)
-        bads = [*(mult * bad), *(1/mult[1:] * bad)]
-
-        valid_counts = ~np.isnan(background)
-
-        chrom_handler = ChromosomeSNPsHandler(
-            self.chrom_name,
-            positions=starts[valid_counts], 
-            read_counts=np.stack(
-                [
-                    np.full(background.shape[0], global_r, dtype=np.float32),
-                    background
-                ]
-            ).T[valid_counts, :]
-        )
-        snps_collection = GenomeSNPsHandler(chrom_handler)
-
-        gs = GenomeSegmentator(
-            snps_collection=snps_collection,
-            chrom_sizes={self.chrom_name: self.chrom_size},
-            jobs=1,
-            logger_level=self.config.logger_level,
-            segmentation_mode='binomial',
-            states=bads,
-            logger=self.gp.logger,
-            allele_reads_tr=0,
-            b_penalty=5
-        )
-        bad_segments = gs.estimate_BAD()
-        gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
+        seg = Segmentation(self.gp.logger, self.config)
+        bad_segments = seg.run_babachi(agg_cutcounts, per_window_trs_global, global_fit)
+        
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
-
-        w_fit = WindowBackgroundFit(self.config)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
+        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
     
         self.gp.logger.debug(
@@ -431,10 +390,15 @@ class ChromosomeProcessor:
                 self.config, name=segment_name
             ).fit(signal_at_segment)
 
-            thresholds, _, rmsea = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=segment_fit)
+            thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
+                signal_at_segment,
+                global_fit=segment_fit,
+                step=3
+            )
             thresholds = interpolate_nan(thresholds)
             self.gp.logger.debug(f"{segment_name}: Signal thresholds approximated")
 
+            w_fit = WindowBackgroundFit(self.logger, self.config)
             fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
             success_fits = check_valid_fit(fit_res)
             need_global_fit = ~success_fits & fit_res.enough_bg_mask

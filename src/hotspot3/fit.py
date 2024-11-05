@@ -2,25 +2,52 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from scipy.special import betainc
-from hotspot3.models import NoContigPresentError, ProcessorConfig, GlobalFitResults, WindowedFitResults
+from hotspot3.models import NoContigPresentError, ProcessorConfig, GlobalFitResults, WindowedFitResults, WithLogger
 from hotspot3.utils import wrap_masked, correct_offset, rolling_view_with_nan_padding
-from hotspot3.logging import setup_logger
 from hotspot3.stats import calc_g_sq, calc_chisq, calc_rmsea
 import bottleneck as bn
 
 
-class BackgroundFit:
-    def __init__(self, config: ProcessorConfig=None, logger=None, name=None):
-        if config is None:
-            config = ProcessorConfig()
-        self.config = config
+class BottleneckRunning(WithLogger):
 
-        if logger is None:
-            logger = setup_logger()
-        self.logger = logger
-        if name is None:
-            name = self.__class__.__name__
-        self.name = name
+    @wrap_masked
+    @correct_offset
+    def centered_running_nansum(self, array: np.ndarray, window: int):
+        min_count = self.get_min_count(window)
+        return bn.move_sum(array, window, min_count=min_count).astype(np.float32)
+
+    @wrap_masked
+    @correct_offset
+    def centered_running_nanvar(self, array, window):
+        min_count = self.get_min_count(window)
+        return bn.move_var(array, window, ddof=1, min_count=min_count).astype(np.float32)
+
+    @wrap_masked
+    @correct_offset
+    def centered_running_nanmean(self, array, window):
+        min_count = self.get_min_count(window)
+        return bn.move_mean(array, window, min_count=min_count).astype(np.float32)
+    
+    @wrap_masked
+    def running_nanmedian(self, array, window):
+        return bn.move_median(array, window).astype(np.float32)
+
+    def get_min_count(self, window):
+        return max(1, round(window * self.config.min_mappable_bg_frac))
+    
+    @wrap_masked
+    def filter_by_tr_spatially(self, array: np.ndarray, tr: float, flanks: int=None):
+        if flanks is None:
+            flanks = self.config.window
+        assumed_signal_mask = (array >= tr).astype(np.float32)
+        assumed_signal_mask = self.centered_running_nansum(assumed_signal_mask, flanks) > 0
+        return assumed_signal_mask
+
+
+
+class BackgroundFit(BottleneckRunning):
+    def __init__(self, config: ProcessorConfig=None, logger=None, name=None):
+        super().__init__(logger=logger, config=config, name=name)
 
         self.min_mappable_bg = round(self.config.min_mappable_bg_frac * self.config.bg_window)
         self.sampling_step = self.config.signal_prop_sampling_step
@@ -50,18 +77,10 @@ class BackgroundFit:
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
     
-    def get_bg_tr(self, array: np.ndarray, quantile: float):
-        all_nan = np.all(np.isnan(array), axis=0)
-        if array.ndim == 1:
-            return np.nan if all_nan else np.nanquantile(array, quantile)
-        result = np.full(array.shape[1], np.nan, dtype=np.float32)
-        result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0)
-        return result
-    
     def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
         if min_bg_tr is None:
-            min_bg_tr = self.get_bg_tr(array, self.config.min_background_prop)
-        max_bg_tr = self.get_bg_tr(array, self.config.max_background_prop)
+            min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
+        max_bg_tr = self.quantile_ignore_all_na(array, self.config.max_background_prop)
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
         
@@ -71,65 +90,46 @@ class BackgroundFit:
             np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
         )
         return result, n_signal_bins
-        
-    def get_all_bins(self, array: np.ndarray):
-        min_bg_tr = self.get_bg_tr(array, self.config.min_background_prop)
-        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
-        n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
-        n_bg_bins = round(n_bg_bins)
 
-        bg_bins = np.full((n_bg_bins + 1, *min_bg_tr.shape), np.nan)
-        bg_bins[:, ~np.isnan(min_bg_tr)] = np.round(
-            np.linspace(
-                0,
-                min_bg_tr[~np.isnan(min_bg_tr)],
-                n_bg_bins + 1,
-            )
-        )
-        
-        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
-
-    def get_min_count(self, window):
-        return max(1, round(window * self.config.min_mappable_bg_frac))
+    def quantile_ignore_all_na(self, array: np.ndarray, quantile: float):
+        """
+        Wrapper of nan quantile to avoid runtime warnings when data is all nan.
+        """
+        all_nan = np.all(np.isnan(array), axis=0)
+        if array.ndim == 1:
+            return np.nan if all_nan else np.nanquantile(array, quantile)
+        result = np.full(array.shape[1], np.nan, dtype=np.float32)
+        result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0)
+        return result
 
 
 class GlobalBackgroundFit(BackgroundFit):
     """
-    Class to fit the background distribution globally (for chromosome)
+    Class to fit the background distribution globally (for chromosome/homogeneous regions)
     """
-    def fit(self, array: ma.MaskedArray, peak_flanks=None) -> GlobalFitResults:
-        agg_cutcounts = ma.masked_invalid(array).filled(np.nan)
-
+    def fit(self, agg_cutcounts: np.ndarray, peak_flanks=None, step=None) -> GlobalFitResults:
         result = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             try:
-                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, peak_flanks)
+                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, peak_flanks, step=step)
             except NoContigPresentError:
                 continue
             result.append((tr, rmsea, p, r))
-            # if rmsea <= self.config.rmsea_tr:
-            #     break
         
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
-        is_good_fit = rmsea <= self.config.rmsea_tr
-        if not is_good_fit:
+        if rmsea > self.config.rmsea_tr:
             self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {(self.config.max_background_prop * 100):.2f}% as threshold.")
             tr, rmsea, p, r = result[-1]
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
 
-    def fit_for_tr(self, agg_cutcounts, tr, peak_flanks):
-        # FIXME
-        w_fit = WindowBackgroundFit(config=self.config, logger=self.logger)
-
-        if peak_flanks is None:
-            peak_flanks = self.config.window
-
-        assumed_signal_mask = agg_cutcounts >= tr
-        assumed_signal_mask = w_fit.centered_running_nansum(assumed_signal_mask.astype(np.float32), peak_flanks) > 0
-        filtered_agg_cutcounts = agg_cutcounts[~assumed_signal_mask & ~np.isnan(agg_cutcounts)][::self.config.window]
+    def fit_for_tr(self, agg_cutcounts, tr, peak_flanks, step=None):
+        if step is None:
+            step = 1
+        assumed_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, tr, peak_flanks)
+        filtered_agg_cutcounts = agg_cutcounts[~assumed_signal_mask & ~np.isnan(agg_cutcounts)][::step]
 
         mean, var = self.estimate_global_mean_and_var(filtered_agg_cutcounts)
         p = self.p_from_mean_and_var(mean, var)
@@ -212,28 +212,6 @@ class WindowBackgroundFit(BackgroundFit):
         return mean, var
     
     @wrap_masked
-    @correct_offset
-    def centered_running_nansum(self, array: np.ndarray, window: int):
-        min_count = self.get_min_count(window)
-        return bn.move_sum(array, window, min_count=min_count).astype(np.float32)
-
-    @wrap_masked
-    @correct_offset
-    def centered_running_nanvar(self, array, window):
-        min_count = self.get_min_count(window)
-        return bn.move_var(array, window, ddof=1, min_count=min_count).astype(np.float32)
-
-    @wrap_masked
-    @correct_offset
-    def centered_running_nanmean(self, array, window):
-        min_count = self.get_min_count(window)
-        return bn.move_mean(array, window, min_count=min_count).astype(np.float32)
-    
-    @wrap_masked
-    def running_nanmedian(self, array, window):
-        return bn.move_median(array, window).astype(np.float32)
-    
-    @wrap_masked
     def find_heterogeneous_windows(self, array):
         median_left = self.running_nanmedian(
             array,
@@ -247,12 +225,6 @@ class WindowBackgroundFit(BackgroundFit):
         score = np.abs(median_right - median_left)
         outlier_score = np.nanquantile(score, self.config.outlier_detection_tr)
         return score > outlier_score
-    
-    @wrap_masked
-    def stratify(self, array, step):
-        res = np.full_like(array, np.nan)
-        res[::step] = array[::step]
-        return res
 
 
 class StridedBackgroundFit(BackgroundFit):
@@ -292,6 +264,23 @@ class StridedBackgroundFit(BackgroundFit):
         p = mean / (mean + r)
 
         return p, r, enough_bg_mask
+
+    def get_all_bins(self, array: np.ndarray):
+        min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
+        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
+        n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
+        n_bg_bins = round(n_bg_bins)
+
+        bg_bins = np.full((n_bg_bins + 1, *min_bg_tr.shape), np.nan)
+        bg_bins[:, ~np.isnan(min_bg_tr)] = np.round(
+            np.linspace(
+                0,
+                min_bg_tr[~np.isnan(min_bg_tr)],
+                n_bg_bins + 1,
+            )
+        )
+        
+        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
     
     def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, n_params=2):
         result = np.full_like(p, np.nan)
@@ -308,7 +297,7 @@ class StridedBackgroundFit(BackgroundFit):
         return result
         
     @wrap_masked
-    def fit_tr(self, array: ma.MaskedArray, global_fit: GlobalFitResults=None):
+    def fit_tr(self, array: ma.MaskedArray, global_fit: GlobalFitResults=None, step=None):
         original_shape = array.shape
         strided_agg_cutcounts = rolling_view_with_nan_padding(
             array[::self.sampling_step],
@@ -317,7 +306,8 @@ class StridedBackgroundFit(BackgroundFit):
         ) # shape (bg_window, n_points)
         best_tr, best_quantile, best_rmsea = self.find_per_window_tr(
             strided_agg_cutcounts,
-            global_fit=global_fit
+            global_fit=global_fit,
+            step=step
         )
     
         subsampled_indices = np.arange(
@@ -336,7 +326,9 @@ class StridedBackgroundFit(BackgroundFit):
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None):
+    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None, step=None):
+        if step is None:
+            step = 1
         bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
@@ -351,11 +343,9 @@ class StridedBackgroundFit(BackgroundFit):
             current_index = value_counts.shape[0] - i
             right_bin_index = current_index + 1
             mask = strided_agg_cutcounts < bin_edges[right_bin_index - 1, :]
-
-            mask[:-1, :] &= mask[1:, :]
-            mask[1:, :] &= mask[:-1, :] 
-            mask[:-2, :] &= mask[2:, :]
-            mask[2:, :] &= mask[:-2, :] 
+            for x in range((step - 1) // 2):
+                mask[:-x, :] &= mask[x:, :]
+                mask[x:, :] &= mask[:-x, :] 
 
             fit_will_change = value_counts[current_index - 1][remaing_fits_mask] != 0 # shape of remaining_fits
             
@@ -418,7 +408,7 @@ class StridedBackgroundFit(BackgroundFit):
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{n_signal_bins})")
         
         if global_fit is not None:
-            global_quantile_tr = self.get_bg_tr(strided_agg_cutcounts, global_fit.fit_quantile)
+            global_quantile_tr = self.quantile_ignore_all_na(strided_agg_cutcounts, global_fit.fit_quantile)
             best_tr = np.where(
                 best_rmsea <= self.config.rmsea_tr * 2,
                 best_tr, 
