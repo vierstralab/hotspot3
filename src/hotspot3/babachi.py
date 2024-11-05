@@ -1,5 +1,5 @@
 from hotspot3.models import GlobalFitResults, ProcessorConfig, WithLogger
-from hotspot3.fit import WindowBackgroundFit
+from hotspot3.fit import BottleneckRunningConnector
 from babachi.segmentation import GenomeSegmentator
 from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
 import numpy as np
@@ -11,12 +11,8 @@ class Segmentation(WithLogger):
     def run_babachi(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
         step = self.config.babachi_segmentation_step
 
-        w_fit = WindowBackgroundFit(self.config, logger=self.logger)
-        assumed_signal_mask = (agg_cutcounts >= per_window_trs).filled(False).astype(np.float32)
-        assumed_signal_mask = w_fit.centered_running_nansum(
-            assumed_signal_mask,
-            window=self.config.window
-        ) > 0
+        con = BottleneckRunningConnector(self.config, logger=self.logger)
+        assumed_signal_mask = con.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
         background = agg_cutcounts.filled(np.nan)[::step]
         background[assumed_signal_mask[::step]] = np.nan
         starts = np.arange(0, len(background), dtype=np.uint32) * step
@@ -53,6 +49,6 @@ class Segmentation(WithLogger):
             min_seg_snps=0
         )
         bad_segments = gs.estimate_BAD()
-        gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
+        gs.write_BAD(bad_segments, f"{chrom_name}.test.bed")
 
         return bad_segments

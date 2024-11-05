@@ -8,7 +8,7 @@ from hotspot3.stats import calc_g_sq, calc_chisq, calc_rmsea
 import bottleneck as bn
 
 
-class BottleneckRunning(WithLogger):
+class BottleneckRunningConnector(WithLogger):
 
     @wrap_masked
     @correct_offset
@@ -38,14 +38,14 @@ class BottleneckRunning(WithLogger):
     @wrap_masked
     def filter_by_tr_spatially(self, array: np.ndarray, tr: float, flanks: int=None):
         if flanks is None:
-            flanks = self.config.window
+            flanks = self.config.exclude_peak_flanks * 2 + 1
         assumed_signal_mask = (array >= tr).astype(np.float32)
         assumed_signal_mask = self.centered_running_nansum(assumed_signal_mask, flanks) > 0
         return assumed_signal_mask
 
 
 
-class BackgroundFit(BottleneckRunning):
+class BackgroundFit(BottleneckRunningConnector):
     def __init__(self, config: ProcessorConfig=None, logger=None, name=None):
         super().__init__(logger=logger, config=config, name=name)
 
@@ -298,7 +298,7 @@ class StridedBackgroundFit(BackgroundFit):
         return result
         
     @wrap_masked
-    def fit_tr(self, array: ma.MaskedArray, global_fit: GlobalFitResults=None, step=None):
+    def fit_tr(self, array: ma.MaskedArray, global_fit: GlobalFitResults=None):
         original_shape = array.shape
         strided_agg_cutcounts = rolling_view_with_nan_padding(
             array[::self.sampling_step],
@@ -308,7 +308,6 @@ class StridedBackgroundFit(BackgroundFit):
         best_tr, best_quantile, best_rmsea = self.find_per_window_tr(
             strided_agg_cutcounts,
             global_fit=global_fit,
-            step=step
         )
     
         subsampled_indices = np.arange(
@@ -327,9 +326,8 @@ class StridedBackgroundFit(BackgroundFit):
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None, step=None):
-        if step is None:
-            step = 1
+    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None):
+        step = self.config.exclude_peak_flanks // self.sampling_step
         bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
