@@ -107,8 +107,9 @@ class GlobalBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution globally (for chromosome/homogeneous regions)
     """
-    def fit(self, agg_cutcounts: np.ndarray, peak_flanks=None, step=None) -> GlobalFitResults:
+    def fit(self, agg_cutcounts: ma.MaskedArray, peak_flanks=None, step=None) -> GlobalFitResults:
         result = []
+        agg_cutcounts = agg_cutcounts.filled(np.nan)
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             try:
