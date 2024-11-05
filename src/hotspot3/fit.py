@@ -2,7 +2,8 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from scipy.special import betainc
-from hotspot3.models import NoContigPresentError, ProcessorConfig, GlobalFitResults, WindowedFitResults, WithLogger
+from hotspot3.models import NoContigPresentError, ProcessorConfig, GlobalFitResults, WindowedFitResults
+from hotspot3.logging import WithLogger
 from hotspot3.utils import wrap_masked, correct_offset, rolling_view_with_nan_padding
 from hotspot3.stats import calc_g_sq, calc_chisq, calc_rmsea
 import bottleneck as bn
@@ -36,13 +37,12 @@ class BottleneckRunningConnector(WithLogger):
         return max(1, round(window * self.config.min_mappable_bg_frac))
     
     @wrap_masked
-    def filter_by_tr_spatially(self, array: np.ndarray, tr: float, flanks: int=None):
-        if flanks is None:
-            flanks = self.config.exclude_peak_flanks * 2 + 1
-        assumed_signal_mask = (array >= tr).astype(np.float32)
-        assumed_signal_mask = self.centered_running_nansum(assumed_signal_mask, flanks) > 0
-        return assumed_signal_mask
+    def filter_by_tr_spatially(self, array: np.ndarray, tr: float):
+        flanks_window = self.config.exclude_peak_flank_length * 2 + 1
 
+        assumed_signal_mask = (array >= tr).astype(np.float32)
+        assumed_signal_mask = self.centered_running_nansum(assumed_signal_mask, flanks_window) > 0
+        return assumed_signal_mask
 
 
 class BackgroundFit(BottleneckRunningConnector):
@@ -126,10 +126,10 @@ class GlobalBackgroundFit(BackgroundFit):
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
 
-    def fit_for_tr(self, agg_cutcounts, tr, peak_flanks, step=None):
+    def fit_for_tr(self, agg_cutcounts, tr, step=None):
         if step is None:
             step = 1
-        assumed_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, tr, peak_flanks)
+        assumed_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, tr)
         filtered_agg_cutcounts = agg_cutcounts[~assumed_signal_mask & ~np.isnan(agg_cutcounts)][::step]
 
         mean, var = self.estimate_global_mean_and_var(filtered_agg_cutcounts)
@@ -246,9 +246,12 @@ class StridedBackgroundFit(BackgroundFit):
     def fit_for_bin(self, collapsed_agg_cutcounts, where=None, global_r=None):
         window = min(self.config.bg_window, collapsed_agg_cutcounts.shape[0])
         min_count = self.get_min_count(window / self.sampling_step)
-        enough_bg_mask = np.sum(~np.isnan(collapsed_agg_cutcounts, where=where), axis=0, where=where) > min_count
+        enough_bg_mask = np.sum(
+            ~np.isnan(collapsed_agg_cutcounts, where=where),
+            axis=0,
+            where=where
+        ) > min_count
 
-        
         mean = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         var = np.full(collapsed_agg_cutcounts.shape[1], np.nan, dtype=np.float32)
         mean[enough_bg_mask], var[enough_bg_mask]  = self.get_mean_and_var(
@@ -326,9 +329,10 @@ class StridedBackgroundFit(BackgroundFit):
 
 
     def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None):
-        step = self.config.exclude_peak_flanks // self.sampling_step
         bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
+
+        step = round(self.config.exclude_peak_flank_length / self.sampling_step)
 
         global_r = global_fit.r if global_fit is not None else None
 

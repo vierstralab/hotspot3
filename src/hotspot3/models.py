@@ -2,7 +2,6 @@ import dataclasses
 import pandas as pd
 import logging
 import numpy as np
-from hotspot3.logging import setup_logger
 
 @dataclasses.dataclass
 class ProcessorConfig:
@@ -36,7 +35,7 @@ class ProcessorConfig:
     min_background_prop: float = 0.6
 
     signal_prop_sampling_step: int = 75
-    exclude_peak_flanks: int = 0
+    exclude_peak_flank_length: int = 0
     signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
     babachi_segmentation_step: int = 500
     num_background_bins: int = 20
@@ -49,15 +48,6 @@ class ProcessorConfig:
     save_debug: bool = False
     modwt_level: int = 7
     logger_level: int = logging.INFO
-
-
-@dataclasses.dataclass
-class ProcessorOutputData:
-    """
-    Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
-    """
-    identificator: str
-    data_df: pd.DataFrame
 
 
 @dataclasses.dataclass
@@ -76,6 +66,15 @@ class WindowedFitResults:
     enough_bg_mask: np.ndarray
 
 
+@dataclasses.dataclass
+class ProcessorOutputData:
+    """
+    Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
+    """
+    identificator: str
+    data_df: pd.DataFrame
+
+
 class NoContigPresentError(Exception):
     """Exception raised when a required contig is not present."""
 
@@ -87,16 +86,4 @@ class NoContigPresentError(Exception):
         return f"{self.__class__.__name__}: {self.message}"
 
 
-class WithLogger:
-    def __init__(self, logger=None, config=None, name=None):
-        if logger is None:
-            logger = setup_logger()
-        self.logger = logger
 
-        if config is None:
-            config = ProcessorConfig()
-        self.config = config
-
-        if name is None:
-            name = self.__class__.__name__
-        self.name = name

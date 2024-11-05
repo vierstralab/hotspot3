@@ -1,5 +1,6 @@
 import logging
 import sys
+from hotspot3.models import ProcessorConfig
 
 
 def setup_logger(name='hotspot3', level=None, outstream=None) -> logging.Logger:
@@ -17,4 +18,18 @@ def setup_logger(name='hotspot3', level=None, outstream=None) -> logging.Logger:
             logger.addHandler(handler)
     return logger
 
+
+class WithLogger:
+    def __init__(self, logger=None, config=None, name=None):
+        if logger is None:
+            logger = setup_logger()
+        self.logger = logger
+
+        if config is None:
+            config = ProcessorConfig()
+        self.config = config
+
+        if name is None:
+            name = self.__class__.__name__
+        self.name = name
 

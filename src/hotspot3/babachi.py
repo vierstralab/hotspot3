@@ -1,4 +1,5 @@
-from hotspot3.models import GlobalFitResults, ProcessorConfig, WithLogger
+from hotspot3.models import GlobalFitResults
+from hotspot3.logging import WithLogger
 from hotspot3.fit import BottleneckRunningConnector
 from babachi.segmentation import GenomeSegmentator
 from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
