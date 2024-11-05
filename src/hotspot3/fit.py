@@ -107,13 +107,20 @@ class GlobalBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution globally (for chromosome/homogeneous regions)
     """
-    def fit(self, agg_cutcounts: ma.MaskedArray, peak_flanks=None, step=None) -> GlobalFitResults:
+    def fit(self, agg_cutcounts: ma.MaskedArray, step=None) -> GlobalFitResults:
+        """
+        Fit the global background distribution.
+
+        Parameters:
+            agg_cutcounts (np.ndarray): Array of aggregated cutcounts.
+            step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
+        """
         result = []
         agg_cutcounts = agg_cutcounts.filled(np.nan)
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             try:
-                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, peak_flanks, step=step)
+                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step)
             except NoContigPresentError:
                 continue
             result.append((tr, rmsea, p, r))
