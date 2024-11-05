@@ -333,7 +333,7 @@ class StridedBackgroundFit(BackgroundFit):
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
         step = round(self.config.exclude_peak_flank_length / self.sampling_step)
-
+        print(step)
         global_r = global_fit.r if global_fit is not None else None
 
         best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
