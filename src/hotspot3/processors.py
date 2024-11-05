@@ -357,7 +357,7 @@ class ChromosomeProcessor:
 
         signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
         per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)
-        good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
+        good_fits_n = np.sum(interpolate_nan(rmseas) <= self.config.rmsea_tr)
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{agg_cutcounts.count():,} bases have RMSEA <= {self.config.rmsea_tr:.2f}")
 
 
