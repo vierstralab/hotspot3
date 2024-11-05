@@ -366,7 +366,13 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
 
         seg = Segmentation(self.gp.logger, self.config)
-        bad_segments = seg.run_babachi(agg_cutcounts, per_window_trs_global, global_fit)
+        bad_segments = seg.run_babachi(
+            agg_cutcounts,
+            per_window_trs_global,
+            global_fit,
+            self.chrom_name,
+            self.chrom_size
+        )
         
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)

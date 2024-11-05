@@ -344,7 +344,7 @@ class StridedBackgroundFit(BackgroundFit):
             current_index = value_counts.shape[0] - i
             right_bin_index = current_index + 1
             mask = strided_agg_cutcounts < bin_edges[right_bin_index - 1, :]
-            for x in range(0, (step - 1) // 2):
+            for x in range(1, (step - 1) // 2):
                 mask[:-x, :] &= mask[x:, :]
                 mask[x:, :] &= mask[:-x, :] 
 

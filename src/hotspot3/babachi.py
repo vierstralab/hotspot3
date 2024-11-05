@@ -8,13 +8,13 @@ import numpy.ma as ma
 
 class Segmentation(WithLogger):
     
-    def run_babachi(self, agg_cutcounts: ma.MaskedArray, per_window_trs, global_fit: GlobalFitResults):
+    def run_babachi(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
         step = self.config.babachi_segmentation_step
 
         w_fit = WindowBackgroundFit(self.config, logger=self.logger)
-        assumed_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
+        assumed_signal_mask = (agg_cutcounts >= per_window_trs).filled(False).astype(np.float32)
         assumed_signal_mask = w_fit.centered_running_nansum(
-            assumed_signal_mask.astype(np.float32),
+            assumed_signal_mask,
             window=self.config.window
         ) > 0
         background = agg_cutcounts.filled(np.nan)[::step]
