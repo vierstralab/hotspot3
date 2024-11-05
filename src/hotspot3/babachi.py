@@ -48,7 +48,9 @@ class Segmentation(WithLogger):
             states=bads,
             logger=self.logger,
             allele_reads_tr=0,
-            b_penalty=5
+            b_penalty=5,
+            min_seg_bp=5000,
+            min_seg_snps=0
         )
         bad_segments = gs.estimate_BAD()
         gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
