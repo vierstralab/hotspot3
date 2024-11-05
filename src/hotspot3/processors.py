@@ -413,6 +413,7 @@ class ChromosomeProcessor:
             end = int(segment.end)
             segment_name = f"{self.chrom_name}:{start}-{end}"
             signal_at_segment = agg_cutcounts[start:end]
+            babachi_result[start:end] = segment.BAD
 
             fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
             segment_fit = GlobalBackgroundFit(self.config, name=segment_name).fit(signal_at_segment)
