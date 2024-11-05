@@ -28,7 +28,7 @@ class Segmentation(WithLogger):
         valid_counts = ~np.isnan(background)
 
         chrom_handler = ChromosomeSNPsHandler(
-            self.chrom_name,
+            chrom_name,
             positions=starts[valid_counts], 
             read_counts=np.stack(
                 [
@@ -41,7 +41,7 @@ class Segmentation(WithLogger):
 
         gs = GenomeSegmentator(
             snps_collection=snps_collection,
-            chrom_sizes={self.chrom_name: self.chrom_size},
+            chrom_sizes={chrom_name: chrom_size},
             jobs=1,
             logger_level=self.config.logger_level,
             segmentation_mode='binomial',
