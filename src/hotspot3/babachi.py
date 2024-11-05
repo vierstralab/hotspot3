@@ -11,7 +11,7 @@ class Segmentation(WithLogger):
     def run_babachi(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
         step = self.config.babachi_segmentation_step
 
-        con = BottleneckRunningConnector(self.config, logger=self.logger)
+        con = BottleneckRunningConnector(config=self.config, logger=self.logger)
         assumed_signal_mask = con.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
         background = agg_cutcounts.filled(np.nan)[::step]
         background[assumed_signal_mask[::step]] = np.nan
