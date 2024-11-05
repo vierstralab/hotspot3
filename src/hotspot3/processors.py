@@ -359,6 +359,7 @@ class ChromosomeProcessor:
             agg_cutcounts,
             global_fit=global_fit,
         )
+        per_window_trs_global = interpolate_nan(per_window_trs_global)
         good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
         n_rmsea = np.sum(~np.isnan(rmseas))
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
