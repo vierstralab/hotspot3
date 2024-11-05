@@ -359,7 +359,7 @@ class ChromosomeProcessor:
         per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(
             agg_cutcounts,
             global_fit=global_fit,
-            step=3
+            step=5
         )
         good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
         n_rmsea = np.sum(~np.isnan(rmseas))
