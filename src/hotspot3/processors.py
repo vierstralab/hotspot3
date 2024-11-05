@@ -354,18 +354,15 @@ class ChromosomeProcessor:
         # self.to_parquet(params_df, params_outpath)
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
-        step = self.config.signal_prop_interpolation_step
 
-        coarse_signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
-        per_window_trs = coarse_signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)[0]
+        signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
+        per_window_trs = signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)[0]
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
 
         # TODO wrap into a function
         step = self.config.babachi_segmentation_step
-        signal = agg_cutcounts.filled(np.nan)[::step]
-        
-        low_signal = signal.copy()
+        low_signal = agg_cutcounts.filled(np.nan)[::step]
         low_signal[low_signal >= interpolate_nan(per_window_trs)[::step]] = np.nan
         starts = np.arange(0, len(low_signal), dtype=np.uint32) * step
 
@@ -405,6 +402,7 @@ class ChromosomeProcessor:
         w_fit = WindowBackgroundFit(self.config)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
     
         self.gp.logger.debug(
@@ -419,7 +417,7 @@ class ChromosomeProcessor:
             fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
             segment_fit = GlobalBackgroundFit(self.config, name=segment_name).fit(signal_at_segment)
 
-            thresholds = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=segment_fit)[0]
+            thresholds, _, rmsea = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=segment_fit)
             thresholds = interpolate_nan(thresholds)
             self.gp.logger.debug(f"{segment_name}: Signal thresholds approximated")
 
@@ -440,6 +438,7 @@ class ChromosomeProcessor:
 
             final_r[start:end] = fit_res.r
             final_p[start:end] = fit_res.p
+            final_rmsea[start:end] = rmsea
             per_window_trs[start:end] = thresholds
             enough_bg[start:end] = fit_res.enough_bg_mask
             self.gp.logger.debug(f"{segment_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{signal_at_segment.count():,} bases")
@@ -453,9 +452,10 @@ class ChromosomeProcessor:
             'sliding_p': fit_res.p,
             'tr': per_window_trs,
             'bad': babachi_result,
+            'rmsea': final_rmsea
         })
         self.to_parquet(df, fit_res_path)
-        del df, per_window_trs
+        del df, per_window_trs, final_rmsea, babachi_result
         gc.collect()
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
