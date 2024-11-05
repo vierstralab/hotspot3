@@ -12,10 +12,10 @@ import subprocess
 import importlib.resources as pkg_resources
 import dataclasses
 from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig, FitResults
+from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig, WindowedFitResults
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
-from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedFit
+from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedBackgroundFit
 
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
@@ -332,9 +332,12 @@ class ChromosomeProcessor:
         if min_signal_quantile < 0.02:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% (<2%) of data have # of cutcounts more than 4.")
             raise NoContigPresentError
-        self.config = dataclasses.replace(self.config, min_background_prop=(1-min_signal_quantile))
+        self.config = dataclasses.replace(self.config, min_background_prop=(1 - min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
         global_fit = g_fit.fit(agg_cutcounts)
+        if global_fit.rmsea > self.config.rmsea_tr:
+            self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
+            raise NoContigPresentError
         global_p = global_fit.p
         global_r = global_fit.r
         # params_df = pd.DataFrame({
@@ -353,12 +356,13 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
         step = self.config.signal_prop_interpolation_step
         config = dataclasses.replace(self.config, signal_prop_interpolation_step=step*3) # delete this line after testing
-        coarse_signal_level_fit = StridedFit(config, name=self.chrom_name)
+        coarse_signal_level_fit = StridedBackgroundFit(config, name=self.chrom_name)
         per_window_trs = coarse_signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)[0]
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
 
         # TODO wrap into a function
+        step = self.config.babachi_segmentation_step
         signal = agg_cutcounts.filled(np.nan)[::step]
         
         low_signal = signal.copy()
@@ -392,60 +396,66 @@ class ChromosomeProcessor:
             states=bads,
             logger=self.gp.logger,
             allele_reads_tr=0,
-            b_penalty=4
+            b_penalty=5
         )
         bad_segments = gs.estimate_BAD()
         gs.write_BAD(bad_segments, f"{self.chrom_name}.test.bed")
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
 
         w_fit = WindowBackgroundFit(self.config)
-        fine_signal_level_fit = StridedFit(self.config, name=self.chrom_name)
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        per_window_q = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        per_window_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
-        self.gp.logger.debug(f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments')
+    
+        self.gp.logger.debug(
+            f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
+        )
         for segment in bad_segments:
             start = int(segment.start)
             end = int(segment.end)
+            segment_name = f"{self.chrom_name}:{start}-{end}"
             signal_at_segment = agg_cutcounts[start:end]
-            thresholds, q, rmsea = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=global_fit)
+
+            fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
+            segment_fit = GlobalBackgroundFit(self.config).fit(signal_at_segment)
+
+            thresholds = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=segment_fit)[0]
             thresholds = interpolate_nan(thresholds)
+            self.gp.logger.debug(f"{segment_name}: Signal thresholds approximated")
+
             fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
             success_fits = check_valid_fit(fit_res)
-            # FIXME, don't interpolate rmsea
-            good_fit = (interpolate_nan(rmsea) <= self.config.rmsea_tr) & success_fits 
-            need_global_fit = ~good_fit & fit_res.enough_bg_mask
-            fit_res.r[need_global_fit] = global_fit.r
-            fit_res.p[need_global_fit] = w_fit.fit(
-                signal_at_segment,
-                per_window_trs=thresholds,
-                global_fit=global_fit
-            ).p[need_global_fit]
+            need_global_fit = ~success_fits & fit_res.enough_bg_mask
+            
+            fit_res.r[need_global_fit] = segment_fit.r
+
+            if segment_fit.rmsea > self.config.rmsea_tr: 
+                fit_res.p[need_global_fit] = segment_fit.p
+            else:
+                fit_res.p[need_global_fit] = w_fit.fit(
+                    signal_at_segment,
+                    per_window_trs=thresholds,
+                    global_fit=segment_fit
+                ).p[need_global_fit]
 
             final_r[start:end] = fit_res.r
             final_p[start:end] = fit_res.p
-            per_window_q[start:end] = q
-            per_window_rmsea[start:end] = rmsea
             per_window_trs[start:end] = thresholds
             enough_bg[start:end] = fit_res.enough_bg_mask
-            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{signal_at_segment.count():,} bases")
-            self.gp.logger.debug(f"{self.chrom_name}:{start}-{end}: Enough data to fit negative-binomial model for {np.sum(good_fit):,}/{signal_at_segment.count():,} bases")
+            self.gp.logger.debug(f"{segment_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{signal_at_segment.count():,} bases")
+            self.gp.logger.debug(f"{segment_name}: Enough data to fit negative-binomial model for {np.sum(success_fits):,}/{signal_at_segment.count():,} bases")
 
-        fit_res = FitResults(final_p, final_r, per_window_rmsea, per_window_q, per_window_trs, enough_bg_mask=enough_bg)
+        fit_res = WindowedFitResults(final_p, final_r, enough_bg_mask=enough_bg)
 
         outdir = pvals_outpath.replace('.pvals.parquet', '.fit_results.parquet')
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
-            'rmsea': fit_res.rmsea,
-            'q': fit_res.fit_quantile,
-            'tr': fit_res.fit_threshold,
+            'tr': per_window_trs,
             'bad': babachi_result,
         })
         self.to_parquet(df, fit_res_path)
-        del df, per_window_q, per_window_rmsea, per_window_trs
+        del df, per_window_trs
         gc.collect()
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')

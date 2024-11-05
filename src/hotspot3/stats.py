@@ -2,8 +2,9 @@ import numpy as np
 import numpy.ma as ma
 import scipy.stats as st
 import gc
-from scipy.special import logsumexp, gammaln, betainc, hyp2f1, betaln
-from hotspot3.models import FitResults
+from scipy.special import logsumexp, betainc, hyp2f1, betaln
+from hotspot3.models import WindowedFitResults
+
 
 # Calculate p-values and FDR
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="betainc") -> np.ndarray:
@@ -79,68 +80,7 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
     return np.clip(log_pvals, a_min=None, a_max=0)
 
 
-# Find peaks
-
-
-
-def cast_to_original_shape(data, original_shape, original_mask, step):
-    res = np.full(original_shape, np.nan, dtype=data.dtype)
-    res[::step] = data
-    return ma.masked_where(original_mask, res)
-
-
-def calc_epsilon_and_epsilon_mu(r, p, tr, step=None): # Can rewrite for code clarity
-    if len(r.shape) == 0:
-        eps = betainc(tr, r, p)
-        eps_mu = eps * ((tr * (1 - p) / p + 1) / r - 1)
-        return eps, eps_mu
-    r = ma.masked_invalid(r)
-    p = ma.masked_invalid(p)
-    original_shape = r.shape
-    original_mask = r.mask
-
-    if step is not None:
-        r = r[::step]
-        p = p[::step]
-
-    valid_mask = ~r.mask & ~p.mask
-
-    eps = ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
-    eps[valid_mask] = betainc(tr, r[valid_mask], p[valid_mask])
-
-    eps_mu = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
-    eps_mu[valid_mask] = eps[valid_mask] * ((tr * (1 - p[valid_mask]) / p[valid_mask] + 1) / r[valid_mask] - 1)
-
-    return (
-        cast_to_original_shape(eps, original_shape, original_mask, step),
-        cast_to_original_shape(eps_mu, original_shape, original_mask, step)
-    )
-
-
-
-def fast_nb_pmf(k, r, pmf_coef, pmf_const):
-    return np.exp(gammaln(k + r) - gammaln(k + 1) + k * pmf_coef + pmf_const)
-
-
-def calc_pmf_coefs(r, p, tr):
-    r = np.ma.masked_invalid(r)
-    p = np.ma.masked_invalid(p)
-    
-    valid_mask = ~r.mask & ~p.mask
-    
-    pmf_coef = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
-    pmf_const = np.ma.masked_array(np.zeros(r.shape), mask=~valid_mask)
-    
-    pmf_coef[valid_mask] = np.log(p[valid_mask])
-    pmf_const[valid_mask] = (
-        np.log(1 - p[valid_mask]) * r[valid_mask]
-        - gammaln(r[valid_mask])
-        - np.log1p(-betainc(tr, r[valid_mask], p[valid_mask]))
-    )
-    
-    return pmf_coef, pmf_const
-
-def fix_inf_pvals(neglog_pvals, fname):
+def fix_inf_pvals(neglog_pvals, fname): # TODO move somewhere else
     infs = np.isinf(neglog_pvals)
     n_infs = np.sum(infs) 
     if n_infs > 0:
@@ -156,9 +96,17 @@ def calc_g_sq(obs, exp):
     ratio = np.where(valid, ratio, 1)
     return obs * np.log(ratio) * 2
 
+
 def calc_chisq(obs, exp):
     return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
 
 
-def check_valid_fit(fit: FitResults):
+def calc_rmsea(G_sq, N, df, min_df=7):
+    G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df >= min_df)
+    rmsea = np.sqrt(np.maximum(G_sq - 1, 0) / (N - 1))
+    rmsea = np.where(df >= min_df, rmsea, np.inf)
+    return rmsea
+
+
+def check_valid_fit(fit: WindowedFitResults):
     return (fit.r >= 0.) & (fit.p >= 0.) & (fit.p <= 1.) & fit.enough_bg_mask

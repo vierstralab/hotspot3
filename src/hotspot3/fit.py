@@ -2,10 +2,10 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from scipy.special import betainc
-from hotspot3.models import NoContigPresentError, ProcessorConfig, FitResults
+from hotspot3.models import NoContigPresentError, ProcessorConfig, GlobalFitResults, WindowedFitResults
 from hotspot3.utils import wrap_masked, correct_offset, rolling_view_with_nan_padding
 from hotspot3.logging import setup_logger
-from hotspot3.stats import calc_g_sq, calc_chisq
+from hotspot3.stats import calc_g_sq, calc_chisq, calc_rmsea
 import bottleneck as bn
 
 
@@ -29,7 +29,7 @@ class BackgroundFit:
         if self.points_in_bg_window % 2 == 0:
             self.points_in_bg_window += 1
 
-    def fit(self) -> FitResults:
+    def fit(self):
         raise NotImplementedError
     
     @wrap_masked
@@ -97,22 +97,27 @@ class GlobalBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution globally (for chromosome)
     """
-    def fit(self, array: ma.MaskedArray) -> FitResults:
+    def fit(self, array: ma.MaskedArray) -> GlobalFitResults:
         agg_cutcounts = ma.masked_invalid(array)[::self.config.window].compressed()
         unique, counts = self.hist_data_for_tr(agg_cutcounts)
 
-        res = []
+        result = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             p, r = self.fit_for_tr(agg_cutcounts, tr)
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
-            res.append((tr, rmsea, p, r))
+            result.append((tr, rmsea, p, r))
             # if rmsea <= self.config.rmsea_tr:
             #     break
-        else:
-            tr, rmsea, p, r = min(res, key=lambda x: x[1])
+        
+        tr, rmsea, p, r = min(result, key=lambda x: x[1])
+        is_good_fit = rmsea <= self.config.rmsea_tr
+        if not is_good_fit:
+            self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {self.config.max_background_prop * 100:2f}% as threshold.")
+            tr, rmsea, p, r = result[-1]
         quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
-        return FitResults(p.squeeze(), r.squeeze(), rmsea.squeeze(), quantile, tr)
+
+        return GlobalFitResults(p, r, rmsea, quantile, tr)
 
     def fit_for_tr(self, agg_cutcounts, tr):
         agg_cutcounts = agg_cutcounts[agg_cutcounts < tr]
@@ -155,14 +160,14 @@ class GlobalBackgroundFit(BackgroundFit):
             G_sq = np.sum(calc_chisq(obs, exp))
 
         df = len(obs) - 2 - 1
-        return np.sqrt(np.maximum(G_sq / df - 1, 0) / (N - 1))
+        return calc_rmsea(G_sq, N, df)
 
 
 class WindowBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution in a running window fashion
     """
-    def fit(self, array: ma.MaskedArray, per_window_trs, global_fit: FitResults=None) -> FitResults:
+    def fit(self, array: ma.MaskedArray, per_window_trs, global_fit: GlobalFitResults=None) -> WindowedFitResults:
         agg_cutcounts = array.copy()
 
         high_signal_mask = (agg_cutcounts >= per_window_trs).filled(False)
@@ -175,14 +180,7 @@ class WindowBackgroundFit(BackgroundFit):
             global_r=global_r
         )
 
-        rmsea = np.full_like(p, np.nan, dtype=np.float16)
-        per_window_quantiles = np.full_like(p, np.nan, dtype=np.float16)
-        return FitResults(
-            p, r, rmsea,
-            fit_quantile=per_window_quantiles,
-            fit_threshold=per_window_trs,
-            enough_bg_mask=enough_bg_mask,
-        )
+        return WindowedFitResults(p, r, enough_bg_mask=enough_bg_mask)
     
     def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, global_r=None):
         mean, var = self.sliding_mean_and_variance(agg_cutcounts)
@@ -251,7 +249,7 @@ class WindowBackgroundFit(BackgroundFit):
         return res
 
 
-class StridedFit(BackgroundFit):
+class StridedBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution using a strided approach.
     Extemely computationally taxing, use large stride values to compensate.
@@ -304,7 +302,7 @@ class StridedFit(BackgroundFit):
         return result
         
     @wrap_masked
-    def fit_tr(self, array: ma.MaskedArray, global_fit: FitResults=None):
+    def fit_tr(self, array: ma.MaskedArray, global_fit: GlobalFitResults=None):
         original_shape = array.shape
         strided_agg_cutcounts = rolling_view_with_nan_padding(
             array[::self.sampling_step],
@@ -332,7 +330,7 @@ class StridedFit(BackgroundFit):
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
 
-    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: FitResults=None):
+    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None):
         bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
         value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
 
@@ -411,13 +409,14 @@ class StridedFit(BackgroundFit):
         if global_fit is not None:
             global_quantile_tr = self.get_bg_tr(strided_agg_cutcounts, global_fit.fit_quantile)
             best_tr = np.where(
-                best_rmsea <= 0.1,
-                best_tr,
+                remaing_fits_mask,
                 np.maximum(global_quantile_tr, global_fit.fit_threshold),
+                best_tr,
             )
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea
+
 
     @wrap_masked
     def calc_rmsea_all_windows(
@@ -447,10 +446,4 @@ class StridedFit(BackgroundFit):
             (value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0),
             axis=0
         ) - n_params - 1
-
-        G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df >= 7)
-
-        rmsea = np.sqrt(np.maximum(G_sq - 1, 0) / (bg_sum_mappable - 1))
-        rmsea = np.where(df >= 7, rmsea, np.inf)
-        assert np.sum(np.isnan(rmsea)) == 0, "RMSEA should not contain NaNs"
-        return rmsea
+        return calc_rmsea(G_sq, bg_sum_mappable, df)

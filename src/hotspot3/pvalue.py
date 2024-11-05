@@ -1,7 +1,6 @@
 import numpy as np
-import scipy.stats as st
 from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorConfig, FitResults
+from hotspot3.models import ProcessorConfig, GlobalFitResults
 from hotspot3.stats import logpval_for_dtype
 import itertools
 
@@ -20,7 +19,8 @@ class PvalueEstimator:
             logger = setup_logger()
         self.logger = logger
 
-    def estimate_pvalues(self, agg_cutcounts: np.ndarray, fit_results: FitResults) -> np.ndarray:
+
+    def estimate_pvalues(self, agg_cutcounts: np.ndarray, fit_results: GlobalFitResults) -> np.ndarray:
         result = np.full_like(agg_cutcounts, np.nan, dtype=np.float16)
         r = fit_results.r
         p = fit_results.p

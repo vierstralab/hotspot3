@@ -36,7 +36,8 @@ class ProcessorConfig:
     min_background_prop: float = 0.6
 
     signal_prop_sampling_step: int = 75
-    signal_prop_interpolation_step: int = 500 # shouldn't be less than signal_prop_n_samples!!!!!
+    signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
+    babachi_segmentation_step: int = 500
     num_background_bins: int = 20
     num_signal_bins: int = 100
     rmsea_tr: float = 0.05
@@ -59,13 +60,19 @@ class ProcessorOutputData:
 
 
 @dataclasses.dataclass
-class FitResults:
+class GlobalFitResults:
     p: np.ndarray
     r: np.ndarray
     rmsea: np.ndarray
     fit_quantile: np.ndarray
     fit_threshold: np.ndarray
-    enough_bg_mask: np.ndarray = None
+
+
+@dataclasses.dataclass
+class WindowedFitResults:
+    p: np.ndarray
+    r: np.ndarray
+    enough_bg_mask: np.ndarray
 
 
 class NoContigPresentError(Exception):
