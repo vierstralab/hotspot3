@@ -35,7 +35,7 @@ class ProcessorConfig:
     min_background_prop: float = 0.6
 
     signal_prop_sampling_step: int = 75
-    exclude_peak_flank_length: int = 0
+    exclude_peak_flank_length: int = 150 # half window
     signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
     babachi_segmentation_step: int = 500
     num_background_bins: int = 20
