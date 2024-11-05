@@ -417,7 +417,7 @@ class ChromosomeProcessor:
             signal_at_segment = agg_cutcounts[start:end]
 
             fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
-            segment_fit = GlobalBackgroundFit(self.config).fit(signal_at_segment)
+            segment_fit = GlobalBackgroundFit(self.config, name=segment_name).fit(signal_at_segment)
 
             thresholds = fine_signal_level_fit.fit_tr(signal_at_segment, global_fit=segment_fit)[0]
             thresholds = interpolate_nan(thresholds)
