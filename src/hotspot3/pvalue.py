@@ -30,7 +30,7 @@ class PvalueEstimator:
         if invalid is not None:
             ids = np.arange(result.shape[0])[mask][invalid]
             self.logger.critical(f"{self.name}: {len(ids)} p-values are NaN for betainc method, {ids}")
-            raise ValueError
+            raise ValueError(f"{self.name}: {len(ids)} p-values are NaN for betainc method, {ids}")
         return result
 
 
