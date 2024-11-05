@@ -420,9 +420,9 @@ class StridedBackgroundFit(BackgroundFit):
         if global_fit is not None:
             global_quantile_tr = self.get_bg_tr(strided_agg_cutcounts, global_fit.fit_quantile)
             best_tr = np.where(
-                remaing_fits_mask,
+                best_rmsea <= self.config.rmsea_tr * 2,
+                best_tr, 
                 np.maximum(global_quantile_tr, global_fit.fit_threshold),
-                best_tr,
             )
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
