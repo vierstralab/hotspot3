@@ -98,13 +98,16 @@ class GlobalBackgroundFit(BackgroundFit):
     Class to fit the background distribution globally (for chromosome)
     """
     def fit(self, array: ma.MaskedArray) -> GlobalFitResults:
-        agg_cutcounts = ma.masked_invalid(array)[::self.config.window].compressed()
+        agg_cutcounts = ma.masked_invalid(array).compressed()
         unique, counts = self.hist_data_for_tr(agg_cutcounts)
 
         result = []
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
-            p, r = self.fit_for_tr(agg_cutcounts, tr)
+            try:
+                p, r = self.fit_for_tr(agg_cutcounts, tr)
+            except NoContigPresentError:
+                continue
             rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
             result.append((tr, rmsea, p, r))
             # if rmsea <= self.config.rmsea_tr:
@@ -113,7 +116,7 @@ class GlobalBackgroundFit(BackgroundFit):
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
         is_good_fit = rmsea <= self.config.rmsea_tr
         if not is_good_fit:
-            self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {self.config.max_background_prop * 100:2f}% as threshold.")
+            self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {(self.config.max_background_prop * 100):.2f}% as threshold.")
             tr, rmsea, p, r = result[-1]
         quantile = np.sum(agg_cutcounts < tr) / agg_cutcounts.shape[0]
 

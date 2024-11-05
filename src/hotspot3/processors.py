@@ -334,7 +334,7 @@ class ChromosomeProcessor:
             raise NoContigPresentError
         self.config = dataclasses.replace(self.config, min_background_prop=(1 - min_signal_quantile))
         g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(agg_cutcounts)
+        global_fit = g_fit.fit(agg_cutcounts[::self.config.window])
         if global_fit.rmsea > self.config.rmsea_tr:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
             raise NoContigPresentError
@@ -355,8 +355,8 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
         self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
         step = self.config.signal_prop_interpolation_step
-        config = dataclasses.replace(self.config, signal_prop_interpolation_step=step*3) # delete this line after testing
-        coarse_signal_level_fit = StridedBackgroundFit(config, name=self.chrom_name)
+
+        coarse_signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
         per_window_trs = coarse_signal_level_fit.fit_tr(agg_cutcounts, global_fit=global_fit)[0]
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated")
 
