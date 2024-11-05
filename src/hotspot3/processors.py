@@ -401,7 +401,7 @@ class ChromosomeProcessor:
             thresholds = interpolate_nan(thresholds)
             self.gp.logger.debug(f"{segment_name}: Signal thresholds approximated")
 
-            w_fit = WindowBackgroundFit(self.logger, self.config)
+            w_fit = WindowBackgroundFit(self.config)
             fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
             success_fits = check_valid_fit(fit_res)
             need_global_fit = ~success_fits & fit_res.enough_bg_mask
