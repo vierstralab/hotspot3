@@ -87,6 +87,6 @@ class SegmentFit(WithLogger):
                 per_window_trs=thresholds,
                 global_fit=global_fit
             ).p[need_global_fit]
-        self.logger.debug(f"{self.genomic_interval}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
+        self.logger.debug(f"{self.name}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
 

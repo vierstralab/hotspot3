@@ -10,7 +10,7 @@ from babachi.models import BADSegment
 
 
 class BabachiWrapper(WithLogger):
-    
+
     def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
         step = self.config.babachi_segmentation_step
 
@@ -22,7 +22,7 @@ class BabachiWrapper(WithLogger):
 
         bad = (1 - global_fit.p) / global_fit.p
         mult = np.linspace(1, 10, 20)
-        bads = [*(mult * bad), *(1/mult[1:] * bad)]
+        bads = [*(mult * bad), *(1 / mult[1:] * bad)]
 
         valid_counts = ~np.isnan(background)
 
