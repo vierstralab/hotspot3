@@ -317,8 +317,6 @@ class ChromosomeProcessor:
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath, fit_res_path) -> ProcessorOutputData:
-        self.gp.logger.debug(f'{self.chrom_name}: Aggregating cutcounts')
-        
         agg_cutcounts = self.extractor.extract_mappable_agg_cutcounts(
             cutcounts_file,
             self.gp.mappable_bases_file
@@ -334,7 +332,7 @@ class ChromosomeProcessor:
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
         per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(
             agg_cutcounts,
-            step=self.config.window
+            step=self.config.signal_prop_sampling_step
         )
         
         # Various checks

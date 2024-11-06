@@ -59,7 +59,7 @@ class SegmentFit(WithLogger):
 
         segment_fit = g_fit.fit(signal_at_segment, step=step)
         valid_segment = check_valid_fit(segment_fit)
-        if not valid_segment:
+        if not valid_segment and global_fit is not None:
             segment_fit = g_fit.fit(signal_at_segment, global_fit=global_fit, step=step)
 
         fine_signal_level_fit = StridedBackgroundFit(self.config, name=self.name)
