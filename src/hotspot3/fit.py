@@ -213,6 +213,7 @@ class WindowBackgroundFit(BackgroundFit):
             window = self.config.bg_window
 
         mean = self.centered_running_nanmean(array, window)
+        print(array[11974250], array[11974251], mean[11974250])
         var = self.centered_running_nanvar(array, window)
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
