@@ -5,19 +5,19 @@ from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.models import NoContigPresentError, ProcessorConfig
-from hotspot3.fit import WindowBackgroundFit
+from hotspot3.connectors.bottleneck import BottleneckWrapper
+from hotspot3.logging import WithLogger
 
 counts_dtype = np.int32
 
 
-class ChromosomeExtractor:
-    def __init__(self, chrom_name: str, chrom_size: int, config: ProcessorConfig=None):
-        self.chrom_name = chrom_name
-        self.chrom_size = chrom_size
-        self.genomic_interval = GenomicInterval(chrom_name, 0, chrom_size)
-        if config is None:
-            config = ProcessorConfig()
-        self.fit_model = WindowBackgroundFit(config)
+class ChromosomeExtractor(WithLogger):
+    def __init__(self, genomic_interval: GenomicInterval, config: ProcessorConfig=None, logger=None):
+        self.chrom_name = genomic_interval.chrom
+        self.chrom_size = genomic_interval.end
+        self.genomic_interval = genomic_interval
+        super().__init__(name=self.chrom_name, config=config, logger=logger)
+        self.bottleneck_model = BottleneckWrapper(config)
 
     def extract_mappable_bases(self, mappable_file) -> np.ndarray:
         """
@@ -52,9 +52,9 @@ class ChromosomeExtractor:
     
     def extract_aggregated_cutcounts(self, cutcounts_file):
         cutcounts = self.extract_cutcounts(cutcounts_file).astype(np.float32)
-        window = self.fit_model.config.window
+        window = self.bottleneck_model.config.window
         
-        agg_cutcounts = self.fit_model.centered_running_nansum(cutcounts, window)
+        agg_cutcounts = self.bottleneck_model.centered_running_nansum(cutcounts, window)
         return agg_cutcounts
     
 

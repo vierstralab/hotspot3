@@ -10,18 +10,19 @@ import shutil
 import os
 import subprocess
 import importlib.resources as pkg_resources
-import dataclasses
+from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.logging import setup_logger
 from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig, WindowedFitResults
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
-from hotspot3.fit import GlobalBackgroundFit, WindowBackgroundFit, StridedBackgroundFit
-from hotspot3.babachi import Segmentation
+from hotspot3.connectors.bottleneck import BottleneckWrapper
+from hotspot3.connectors.babachi import BabachiWrapper
+from hotspot3.segment_fit import SegmentFit
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals, check_valid_fit
-from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists, interpolate_nan
+from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
+from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
 
 
 def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
@@ -311,7 +312,8 @@ class ChromosomeProcessor:
         self.gp = genome_processor
         self.config = self.gp.config
         self.chrom_size = int(self.gp.chrom_sizes[chrom_name])
-        self.extractor = ChromosomeExtractor(chrom_name, self.chrom_size, config=self.config)
+        self.genomic_interval = GenomicInterval(chrom_name, 0, self.chrom_size)
+        self.extractor = ChromosomeExtractor(self.genomic_interval, config=self.config)
 
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, pvals_outpath, fit_res_path) -> ProcessorOutputData:
@@ -331,14 +333,19 @@ class ChromosomeProcessor:
         if min_signal_quantile < 0.02:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% (<2%) of data have # of cutcounts more than 4.")
             raise NoContigPresentError
-        self.config = dataclasses.replace(self.config, min_background_prop=(1 - min_signal_quantile))
-        g_fit = GlobalBackgroundFit(self.config)
-        global_fit = g_fit.fit(agg_cutcounts, step=self.config.window)
+        
+        s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
+        per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(agg_cutcounts)
         if global_fit.rmsea > self.config.rmsea_tr:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
             raise NoContigPresentError
-        global_p = global_fit.p
-        global_r = global_fit.r
+
+        self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
+
+        good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
+        n_rmsea = np.sum(~np.isnan(rmseas))
+        self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
+
         # params_df = pd.DataFrame({
         #     'unique_cutcounts': unique_cutcounts,
         #     'count': n_obs,
@@ -351,26 +358,18 @@ class ChromosomeProcessor:
         # })
         # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
         # self.to_parquet(params_df, params_outpath)
-        self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
-        self.gp.logger.debug(f"{self.chrom_name}: Approximating per-window signal thresholds")
 
-        signal_level_fit = StridedBackgroundFit(self.config, name=self.chrom_name)
-        per_window_trs_global, qs, rmseas = signal_level_fit.fit_tr(
-            agg_cutcounts,
-            global_fit=global_fit,
-        )
-        per_window_trs_global = interpolate_nan(per_window_trs_global)
-        good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
-        n_rmsea = np.sum(~np.isnan(rmseas))
-        self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
-
-        seg = Segmentation(self.gp.logger, self.config)
-        bad_segments = seg.run_babachi(
+        seg = BabachiWrapper(self.gp.logger, self.config)
+        bad_segments = seg.run_segmentation(
             agg_cutcounts,
             per_window_trs_global,
             global_fit,
             self.chrom_name,
             self.chrom_size
+        )
+
+        self.gp.logger.debug(
+            f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
         )
         
         babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
@@ -380,53 +379,27 @@ class ChromosomeProcessor:
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
     
-        self.gp.logger.debug(
-            f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
-        )
         for segment in bad_segments:
             start = int(segment.start)
             end = int(segment.end)
-            segment_name = f"{self.chrom_name}:{start}-{end}"
-            signal_at_segment = agg_cutcounts[start:end]
-            babachi_result[start:end] = segment.BAD
-
-            s_fit = GlobalBackgroundFit(self.config, name=segment_name)
-            segment_fit = s_fit.fit(signal_at_segment)
-            valid_segment = check_valid_fit(segment_fit)
-            if not valid_segment:
-                segment_fit = s_fit.fit(signal_at_segment, global_fit=global_fit)
-
-            fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
-            thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
-                signal_at_segment,
-                global_fit=segment_fit,
+            segment_interval = GenomicInterval(self.chrom_name, start, end)
+            s_fit = SegmentFit(segment_interval, self.config, logger=self.gp.logger)
+            thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
+                agg_cutcounts,
+                global_fit=global_fit
             )
-            thresholds = interpolate_nan(thresholds)
-            self.gp.logger.debug(f"{segment_name}: Signal thresholds approximated")
 
-            w_fit = WindowBackgroundFit(self.config)
-            fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
-            success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
-            need_global_fit = ~success_fits & fit_res.enough_bg_mask
-            
-            fit_res.r[need_global_fit] = segment_fit.r
+            fit_res = s_fit.fit_segment_params(agg_cutcounts, thresholds, global_fit=global_seg_fit)
 
-            if segment_fit.rmsea > self.config.rmsea_tr: 
-                fit_res.p[need_global_fit] = segment_fit.p
-            else:
-                fit_res.p[need_global_fit] = w_fit.fit(
-                    signal_at_segment,
-                    per_window_trs=thresholds,
-                    global_fit=segment_fit
-                ).p[need_global_fit]
-
+            babachi_result[start:end] = segment.BAD
             final_r[start:end] = fit_res.r
             final_p[start:end] = fit_res.p
             final_rmsea[start:end] = rmsea
             per_window_trs[start:end] = thresholds
             enough_bg[start:end] = fit_res.enough_bg_mask
-            self.gp.logger.debug(f"{segment_name}: Parameters estimated for {np.sum(fit_res.enough_bg_mask):,}/{signal_at_segment.count():,} bases")
-            self.gp.logger.debug(f"{segment_name}: Enough data to fit negative-binomial model for {np.sum(success_fits):,}/{signal_at_segment.count():,} bases")
+
+            del thresholds, rmsea, global_seg_fit, fit_res
+            gc.collect()
 
         fit_res = WindowedFitResults(final_p, final_r, enough_bg_mask=enough_bg)
 
@@ -438,10 +411,10 @@ class ChromosomeProcessor:
             'inital_tr': per_window_trs_global,
             'bad': babachi_result,
             'rmsea': final_rmsea,
-            'enoough_bg': enough_bg
+            'enough_bg': enough_bg
         })
         self.to_parquet(df, fit_res_path)
-        del df, per_window_trs, final_rmsea, babachi_result
+        del df, per_window_trs, final_rmsea, babachi_result, enough_bg
         gc.collect()
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
@@ -451,17 +424,11 @@ class ChromosomeProcessor:
         # Strip masks to free up some memory
         agg_cutcounts = np.floor(agg_cutcounts.filled(np.nan))
         neglog_pvals = pval_estimator.estimate_pvalues(agg_cutcounts, fit_res)
-        del agg_cutcounts
-        gc.collect()
-
         self.gp.logger.debug(f"Saving p-values for {self.chrom_name}")
         fname = f"{outdir}.{self.chrom_name}.inf_pvals.parquet"
         neglog_pvals = pd.DataFrame.from_dict({'log10_pval': fix_inf_pvals(neglog_pvals, fname)})
         self.to_parquet(neglog_pvals, pvals_outpath)
-        del neglog_pvals
-        gc.collect()
-
-        # epsilon_global, epsilon_mu_global = calc_epsilon_and_epsilon_mu(global_r, global_p, tr=outliers_tr)
+    
 
     @ensure_contig_exists
     def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path):
@@ -484,8 +451,8 @@ class ChromosomeProcessor:
         log10_fdrs = self.extractor.extract_fdr_track(fdr_path)
         self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
         signif_fdrs = (log10_fdrs >= -np.log10(fdr_threshold)).astype(np.float32)
-        window_fit = WindowBackgroundFit(self.config)
-        smoothed_signif = window_fit.centered_running_nansum(
+        bn_wrapper = BottleneckWrapper(self.config)
+        smoothed_signif = bn_wrapper.centered_running_nansum(
             signif_fdrs,
             window=self.config.window,
         ) > 0

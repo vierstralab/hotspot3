@@ -1,24 +1,11 @@
 import numpy as np
-from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorConfig, WindowedFitResults
+from hotspot3.logging import WithLogger
+from hotspot3.models import WindowedFitResults
 from hotspot3.stats import logpval_for_dtype
 import itertools
 
 
-class PvalueEstimator:
-    def __init__(self, config=None, logger=None, name=None):
-        if config is None:
-            config = ProcessorConfig()
-        self.config = config
-
-        if name is None:
-            name = self.__class__.__name__
-        self.name = name
-
-        if logger is None:
-            logger = setup_logger()
-        self.logger = logger
-
+class PvalueEstimator(WithLogger):
 
     def estimate_pvalues(self, agg_cutcounts: np.ndarray, fit_results: WindowedFitResults) -> np.ndarray:
         result = np.full_like(agg_cutcounts, np.nan, dtype=np.float16)

@@ -1,19 +1,19 @@
 from hotspot3.models import GlobalFitResults
 from hotspot3.logging import WithLogger
-from hotspot3.fit import BottleneckRunningConnector
+from hotspot3.connectors.bottleneck import BottleneckWrapper
 from babachi.segmentation import GenomeSegmentator
 from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
 import numpy as np
 import numpy.ma as ma
 
 
-class Segmentation(WithLogger):
+class BabachiWrapper(WithLogger):
     
-    def run_babachi(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
+    def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
         step = self.config.babachi_segmentation_step
 
-        con = BottleneckRunningConnector(config=self.config, logger=self.logger)
-        assumed_signal_mask = con.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
+        bn_wrapper = BottleneckWrapper(config=self.config, logger=self.logger)
+        assumed_signal_mask = bn_wrapper.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
         background = agg_cutcounts.filled(np.nan)[::step]
         background[assumed_signal_mask[::step]] = np.nan
         starts = np.arange(0, len(background), dtype=np.uint32) * step
