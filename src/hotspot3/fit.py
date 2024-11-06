@@ -90,8 +90,19 @@ class GlobalBackgroundFit(BackgroundFit):
         
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
         if rmsea > self.config.rmsea_tr and global_fit is not None:
-            self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {(self.config.max_background_prop * 100):.2f}% as threshold.")
-            tr, rmsea, p, r = result[-1]
+
+            chrom_quantile_tr = np.nanquantile(agg_cutcounts, global_fit.fit_quantile)
+            if chrom_quantile_tr < global_fit.fit_threshold:
+                tr = global_fit.fit_threshold
+                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step, global_fit=global_fit)
+                self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). Low signal region ({chrom_quantile_tr}<{global_fit.fit_threshold}). Fitting with global {global_fit.fit_threshold}")
+            else:
+                if tr < chrom_quantile_tr:
+                    self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{global_fit.fit_threshold}). Best tr {tr} < chromosome quantile {chrom_quantile_tr}. Fitting with best {tr}")
+                else:
+                    tr, rmsea, p, r = result[-1]
+                    self.logger.warning(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{global_fit.fit_threshold}). Fitting with last {tr}")
+            
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
