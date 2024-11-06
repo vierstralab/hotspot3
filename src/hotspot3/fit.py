@@ -66,9 +66,9 @@ class BackgroundFit(BottleneckRunningConnector):
         return mean, var
 
     @wrap_masked
-    def p_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray, where=None):
+    def p_from_mean_and_r(self, mean: np.ndarray, r: np.ndarray, where=None):
         with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
-            p = np.array(1 - mean / var, dtype=np.float32)
+            p = np.array(mean / (mean + r), dtype=np.float32)
         return p
     
     @wrap_masked
@@ -107,7 +107,7 @@ class GlobalBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution globally (for chromosome/homogeneous regions)
     """
-    def fit(self, agg_cutcounts: ma.MaskedArray, step=None) -> GlobalFitResults:
+    def fit(self, agg_cutcounts: ma.MaskedArray, step=None, global_fit: GlobalFitResults = None) -> GlobalFitResults:
         """
         Fit the global background distribution.
 
@@ -120,7 +120,7 @@ class GlobalBackgroundFit(BackgroundFit):
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             try:
-                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step)
+                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step, global_fit=global_fit)
             except NoContigPresentError:
                 continue
             result.append((tr, rmsea, p, r))
@@ -133,15 +133,19 @@ class GlobalBackgroundFit(BackgroundFit):
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
 
-    def fit_for_tr(self, agg_cutcounts, tr, step=None):
+    def fit_for_tr(self, agg_cutcounts, tr, step=None, global_fit: GlobalFitResults=None):
         if step is None:
             step = 1
         assumed_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, tr)
         filtered_agg_cutcounts = agg_cutcounts[~assumed_signal_mask & ~np.isnan(agg_cutcounts)][::step]
 
         mean, var = self.estimate_global_mean_and_var(filtered_agg_cutcounts)
-        p = self.p_from_mean_and_var(mean, var)
-        r = self.r_from_mean_and_var(mean, var)
+        if global_fit is not None:
+            r = global_fit.r
+        else:
+            r = self.r_from_mean_and_var(mean, var)
+        p = self.p_from_mean_and_r(mean, var)
+
 
         unique, counts = np.unique(filtered_agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
@@ -152,7 +156,7 @@ class GlobalBackgroundFit(BackgroundFit):
         nonzero_count = np.count_nonzero(agg_cutcounts)
         has_enough_background = (agg_cutcounts.size > 0) and (nonzero_count / agg_cutcounts.size > self.config.nonzero_windows_to_fit)
         if not has_enough_background:
-            self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}. Skipping.")
+            self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}")
             raise NoContigPresentError
         
         mean, variance = self.get_mean_and_var(agg_cutcounts)
@@ -201,11 +205,10 @@ class WindowBackgroundFit(BackgroundFit):
 
         if global_r is not None:
             r = np.full_like(mean, global_r, dtype=np.float32)
-            p = (mean / (mean + r)).filled(np.nan)
         else:
-            p = self.p_from_mean_and_var(mean, var).filled(np.nan)
             r = self.r_from_mean_and_var(mean, var).filled(np.nan)
-        
+
+        p = self.p_from_mean_and_r(mean, r).filled(np.nan)
         return p, r, enough_bg_mask
 
     def sliding_mean_and_variance(self, array: ma.MaskedArray, window=None):
@@ -271,7 +274,7 @@ class StridedBackgroundFit(BackgroundFit):
         else:
             r = self.r_from_mean_and_var(mean, var)
 
-        p = mean / (mean + r)
+        p = self.p_from_mean_and_r(mean, r)
 
         return p, r, enough_bg_mask
 

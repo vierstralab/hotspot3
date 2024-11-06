@@ -390,8 +390,11 @@ class ChromosomeProcessor:
             signal_at_segment = agg_cutcounts[start:end]
             babachi_result[start:end] = segment.BAD
 
-            segment_fit = GlobalBackgroundFit(self.config, name=segment_name).fit(signal_at_segment)
-
+            s_fit = GlobalBackgroundFit(self.config, name=segment_name)
+            segment_fit = s_fit.fit(signal_at_segment)
+            valid_segment = check_valid_fit(segment_fit)
+            if not valid_segment:
+                segment_fit = s_fit.fit(signal_at_segment, global_fit=global_fit)
 
             fine_signal_level_fit = StridedBackgroundFit(self.config, name=segment_name)
             thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
@@ -403,7 +406,7 @@ class ChromosomeProcessor:
 
             w_fit = WindowBackgroundFit(self.config)
             fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
-            success_fits = check_valid_fit(fit_res)
+            success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
             need_global_fit = ~success_fits & fit_res.enough_bg_mask
             
             fit_res.r[need_global_fit] = segment_fit.r

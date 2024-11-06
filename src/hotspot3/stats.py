@@ -3,8 +3,8 @@ import numpy.ma as ma
 import scipy.stats as st
 import gc
 from scipy.special import logsumexp, betainc, hyp2f1, betaln
-from hotspot3.models import WindowedFitResults
-
+from hotspot3.models import WindowedFitResults, GlobalFitResults
+from typing import Union
 
 # Calculate p-values and FDR
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="betainc") -> np.ndarray:
@@ -108,5 +108,5 @@ def calc_rmsea(G_sq, N, df, min_df=7):
     return rmsea
 
 
-def check_valid_fit(fit: WindowedFitResults):
-    return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) & fit.enough_bg_mask
+def check_valid_fit(fit: Union[WindowedFitResults, GlobalFitResults]):
+    return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 
