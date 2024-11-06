@@ -117,7 +117,7 @@ class GlobalBackgroundFit(BackgroundFit):
             r = global_fit.r
         else:
             r = self.r_from_mean_and_var(mean, var)
-        p = self.p_from_mean_and_r(mean, var)
+        p = self.p_from_mean_and_r(mean, r)
 
         unique, counts = np.unique(filtered_agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
