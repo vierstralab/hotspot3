@@ -377,7 +377,7 @@ class ChromosomeProcessor:
             'rmsea': final_rmsea,
             'enough_bg': fit_res.enough_bg_mask
         })
-        self.to_parquet(df, fit_res_path)
+        self.to_parquet(df, fit_res_path, compression_level=0)
         del df, per_window_trs, final_rmsea, babachi_result
         gc.collect()
   
@@ -479,7 +479,7 @@ class ChromosomeProcessor:
 
     
     @ensure_contig_exists
-    def to_parquet(self, data_df, path):
+    def to_parquet(self, data_df, path, compression_level=22):
         """
         Workaround for writing parquet files for chromosomes in parallel.
         """
@@ -494,7 +494,7 @@ class ChromosomeProcessor:
         os.makedirs(path, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=self.gp.tmp_dir) as temp_dir:
             temp_path = os.path.join(temp_dir, f'{self.chrom_name}.temp.parquet')
-            to_parquet_high_compression(data_df, temp_path)
+            to_parquet_high_compression(data_df, temp_path, compression_level=compression_level)
             res_path = os.path.join(path, f'chrom={self.chrom_name}')
             if os.path.exists(res_path):
                 shutil.rmtree(res_path)

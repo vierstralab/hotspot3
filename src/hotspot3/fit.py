@@ -90,7 +90,6 @@ class GlobalBackgroundFit(BackgroundFit):
         
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
         if rmsea > self.config.rmsea_tr and global_fit is not None:
-
             chrom_quantile_tr = np.nanquantile(agg_cutcounts, global_fit.fit_quantile)
             if chrom_quantile_tr < global_fit.fit_threshold:
                 tr = global_fit.fit_threshold
