@@ -399,9 +399,9 @@ class ChromosomeProcessor:
         """
         Run MODWT smoothing on cutcounts.
         """
+        self.gp.logger.debug(f"{self.chrom_name}: Running modwt signal smoothing (filter={filters}, level={self.config.modwt_level})")
         agg_cutcounts = self.extractor.extract_aggregated_cutcounts(cutcounts_path)
         filters = 'haar'
-        self.gp.logger.debug(f"Running modwt smoothing (filter={filters}, level={self.config.modwt_level}) for {self.chrom_name}")
         smoothed = modwt_smooth(agg_cutcounts, filters, level=self.config.modwt_level)
         data = pd.DataFrame({
             'smoothed': smoothed,
@@ -413,7 +413,7 @@ class ChromosomeProcessor:
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
         log10_fdrs = self.extractor.extract_fdr_track(fdr_path)
-        self.gp.logger.debug(f"Calling hotspots for {self.chrom_name}")
+        self.gp.logger.debug(f"{self.chrom_name}: Calling hotspots")
         signif_fdrs = (log10_fdrs >= -np.log10(fdr_threshold)).astype(np.float32)
         bn_wrapper = BottleneckWrapper(self.config)
         smoothed_signif = bn_wrapper.centered_running_nansum(
@@ -433,7 +433,7 @@ class ChromosomeProcessor:
         
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
         
-        self.gp.logger.debug(f"{len(region_starts)} hotspots called for {self.chrom_name}")
+        self.gp.logger.debug(f"{self.chrom_name}: {len(region_starts)} hotspots called")
 
         data = pd.DataFrame({
             'start': region_starts,
@@ -453,11 +453,11 @@ class ChromosomeProcessor:
         signif_fdrs = self.extractor.extract_fdr_track(fdr_path) >= -np.log10(fdr_threshold)
         starts, ends = find_stretches(signif_fdrs)
         if len(starts) == 0:
-            self.gp.logger.warning(f"No peaks found for {self.chrom_name}. Skipping...")
+            self.gp.logger.warning(f"{self.chrom_name}: No peaks found. Skipping...")
             raise NoContigPresentError
 
         normalized_density = signal_df['normalized_density'].values
-        self.gp.logger.debug(f"Calling peaks for {self.chrom_name}")
+        self.gp.logger.debug(f"{self.chrom_name}: Calling peaks")
         peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
             signal_df['smoothed'].values,
             starts,
@@ -473,7 +473,7 @@ class ChromosomeProcessor:
             np.max(normalized_density[start:end])
             for start, end in zip(peaks_df['start'], peaks_df['end'])
         ]
-        self.gp.logger.debug(f"{len(peaks_df)} peaks called for {self.chrom_name}")
+        self.gp.logger.debug(f"{self.chrom_name}: {len(peaks_df)} peaks called")
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
 
@@ -503,7 +503,7 @@ class ChromosomeProcessor:
     
     @ensure_contig_exists
     def total_cutcounts(self, cutcounts):
-        self.gp.logger.debug(f"Calculating total cutcounts for {self.chrom_name}")
+        self.gp.logger.debug(f"{self.chrom_name}: Calculating total cutcounts")
         return self.extractor.extract_cutcounts(cutcounts).sum()
 
 
