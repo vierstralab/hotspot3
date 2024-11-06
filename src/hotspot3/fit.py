@@ -89,7 +89,7 @@ class GlobalBackgroundFit(BackgroundFit):
             result.append((tr, rmsea, p, r))
         
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
-        if rmsea > self.config.rmsea_tr:
+        if rmsea > self.config.rmsea_tr and global_fit is not None:
             self.logger.warning(f"{self.name}: RMSEA ({rmsea}) is too high for the best fit. Using {(self.config.max_background_prop * 100):.2f}% as threshold.")
             tr, rmsea, p, r = result[-1]
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
