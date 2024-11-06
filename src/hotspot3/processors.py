@@ -339,8 +339,7 @@ class ChromosomeProcessor:
         
         # Various checks
         if global_fit.rmsea > self.config.rmsea_tr:
-            self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
-            self.gp.logger.warning(f"{self.chrom_name}: Using {global_fit.fit_threshold:.0f} ({global_fit.fit_quantile:.3f}) as signal threshold.")
+            self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}. Chromosome fit might be poorly approximated.")
 
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
 
