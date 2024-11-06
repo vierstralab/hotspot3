@@ -109,4 +109,4 @@ def calc_rmsea(G_sq, N, df, min_df=7):
 
 
 def check_valid_fit(fit: WindowedFitResults):
-    return (fit.r >= 0.) & (fit.p >= 0.) & (fit.p <= 1.) & fit.enough_bg_mask
+    return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) & fit.enough_bg_mask
