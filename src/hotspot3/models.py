@@ -29,7 +29,7 @@ class ProcessorConfig:
     """
     window: int = 151
     bg_window: int = 50001
-    min_mappable_bg_frac: float = 0.2
+    min_mappable_bg_frac: float = 0.05
     density_step: int = 20
     max_background_prop: float = 0.99
     min_background_prop: float = 0.6
