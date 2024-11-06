@@ -434,7 +434,8 @@ class ChromosomeProcessor:
             'tr': per_window_trs,
             'inital_tr': per_window_trs_global,
             'bad': babachi_result,
-            'rmsea': final_rmsea
+            'rmsea': final_rmsea,
+            'enoough_bg': enough_bg
         })
         self.to_parquet(df, fit_res_path)
         del df, per_window_trs, final_rmsea, babachi_result
