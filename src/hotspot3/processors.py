@@ -512,7 +512,7 @@ class ChromosomeProcessor:
         data_df = self.extractor.extract_from_parquet(
             smoothed_signal, 
             columns=['chrom', 'normalized_density']
-        )
+        )[::self.config.density_step]
         
         data_df['start'] = np.arange(len(data_df)) * self.config.density_step
         data_df.query('normalized_density > 0', inplace=True)
