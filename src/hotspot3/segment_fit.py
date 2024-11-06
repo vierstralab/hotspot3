@@ -67,7 +67,7 @@ class SegmentFit(WithLogger):
             global_fit=segment_fit,
         )
         thresholds = interpolate_nan(thresholds)
-        self.logger.debug(f"{self.genomic_interval}: Signal thresholds approximated")
+        self.logger.debug(f"{self.name}: Signal thresholds approximated")
         return thresholds, rmsea, segment_fit
     
     def fit_segment_params(self, agg_cutcounts: ma.MaskedArray, thresholds: np.ndarray, global_fit: GlobalFitResults=None) -> WindowedFitResults:

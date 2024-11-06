@@ -13,7 +13,7 @@ import importlib.resources as pkg_resources
 from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig, WindowedFitResults
+from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
 from hotspot3.connectors.bottleneck import BottleneckWrapper
