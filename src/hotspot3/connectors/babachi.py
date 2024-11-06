@@ -5,6 +5,8 @@ from babachi.segmentation import GenomeSegmentator
 from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
 import numpy as np
 import numpy.ma as ma
+from typing import List
+from babachi.models import BADSegment
 
 
 class BabachiWrapper(WithLogger):
@@ -54,3 +56,11 @@ class BabachiWrapper(WithLogger):
         gs.write_BAD(bad_segments, f"{chrom_name}.test.bed")
 
         return bad_segments
+    
+    def annotate_with_segments(self, shape, bad_segments: List[BADSegment]):
+        babachi_result = np.zeros(shape, dtype=np.float16)
+        for segment in bad_segments:
+            start = int(segment.start)
+            end = int(segment.end)
+            babachi_result[start:end] = segment.BAD
+        return babachi_result

@@ -8,6 +8,43 @@ import numpy as np
 from genome_tools.genomic_interval import GenomicInterval
 
 
+class ChromosomeFit(WithLogger):
+    def __init__(self, genomic_interval: GenomicInterval, config=None, logger=None):
+        super().__init__(logger=logger, config=config, name=genomic_interval.chrom)
+        self.genomic_interval = genomic_interval
+
+    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments, global_fit: GlobalFitResults=None):
+        final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
+        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
+        enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
+
+        for segment in bad_segments:
+            start = int(segment.start)
+            end = int(segment.end)
+            segment_interval = GenomicInterval(self.genomic_interval.chrom, start, end)
+            s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)
+            thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
+                agg_cutcounts,
+                global_fit=global_fit
+            )
+
+            fit_res = s_fit.fit_segment_params(agg_cutcounts, thresholds, global_fit=global_seg_fit)
+
+            final_r[start:end] = fit_res.r
+            final_p[start:end] = fit_res.p
+            final_rmsea[start:end] = rmsea
+            per_window_trs[start:end] = thresholds
+            enough_bg[start:end] = fit_res.enough_bg_mask
+
+        return WindowedFitResults(
+            p=final_p,
+            r=final_r,
+            enough_bg_mask=enough_bg
+        ), per_window_trs, final_rmsea
+
+
 class SegmentFit(WithLogger):
     def __init__(self, genomic_interval: GenomicInterval, config=None, logger=None):
         name = self.genomic_interval
@@ -53,3 +90,4 @@ class SegmentFit(WithLogger):
             ).p[need_global_fit]
         self.logger.debug(f"{self.genomic_interval}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
+

@@ -18,7 +18,7 @@ from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.connectors.babachi import BabachiWrapper
-from hotspot3.segment_fit import SegmentFit
+from hotspot3.segment_fit import SegmentFit, ChromosomeFit
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
@@ -324,10 +324,6 @@ class ChromosomeProcessor:
             self.gp.mappable_bases_file
         )
 
-        self.gp.logger.debug(
-            f"{self.chrom_name}: Cutcounts aggregated, {agg_cutcounts.count():,}/{agg_cutcounts.shape[0]:,} bases are mappable"
-        )
-
         self.gp.logger.debug(f'{self.chrom_name}: Estimating proportion of background signal')
         min_signal_quantile = (agg_cutcounts > 4).sum() / agg_cutcounts.count()
         if min_signal_quantile < 0.02:
@@ -336,6 +332,8 @@ class ChromosomeProcessor:
         
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
         per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(agg_cutcounts)
+        
+        # Various checks
         if global_fit.rmsea > self.config.rmsea_tr:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
             raise NoContigPresentError
@@ -346,19 +344,7 @@ class ChromosomeProcessor:
         n_rmsea = np.sum(~np.isnan(rmseas))
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
 
-        # params_df = pd.DataFrame({
-        #     'unique_cutcounts': unique_cutcounts,
-        #     'count': n_obs,
-        #     'outliers_tr': [outliers_tr] * len(unique_cutcounts),
-        #     'mean': [global_fit.mean] * len(unique_cutcounts),
-        #     'variance': [global_fit.var] * len(unique_cutcounts),
-        #     'rmsea': [global_fit.rmsea] * len(unique_cutcounts),
-        #     'epsilon': [epsilon_global] * len(unique_cutcounts),
-        #     'epsilon_mu': [epsilon_mu_global] * len(unique_cutcounts),
-        # })
-        # self.gp.logger.debug(f"Writing pvals for {self.chrom_name}")
-        # self.to_parquet(params_df, params_outpath)
-
+        # Segmentation
         seg = BabachiWrapper(self.gp.logger, self.config)
         bad_segments = seg.run_segmentation(
             agg_cutcounts,
@@ -367,41 +353,18 @@ class ChromosomeProcessor:
             self.chrom_name,
             self.chrom_size
         )
+        babachi_result = seg.annotate_with_segments(agg_cutcounts.shape, bad_segments)
 
         self.gp.logger.debug(
             f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
         )
-        
-        babachi_result = np.zeros(agg_cutcounts.shape[0], dtype=np.float16)
-        final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
-        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
-        enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
-    
-        for segment in bad_segments:
-            start = int(segment.start)
-            end = int(segment.end)
-            segment_interval = GenomicInterval(self.chrom_name, start, end)
-            s_fit = SegmentFit(segment_interval, self.config, logger=self.gp.logger)
-            thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
-                agg_cutcounts,
-                global_fit=global_fit
-            )
 
-            fit_res = s_fit.fit_segment_params(agg_cutcounts, thresholds, global_fit=global_seg_fit)
-
-            babachi_result[start:end] = segment.BAD
-            final_r[start:end] = fit_res.r
-            final_p[start:end] = fit_res.p
-            final_rmsea[start:end] = rmsea
-            per_window_trs[start:end] = thresholds
-            enough_bg[start:end] = fit_res.enough_bg_mask
-
-            del thresholds, rmsea, global_seg_fit, fit_res
-            gc.collect()
-
-        fit_res = WindowedFitResults(final_p, final_r, enough_bg_mask=enough_bg)
+        chrom_fit = ChromosomeFit(self.genomic_interval, self.config, logger=self.gp.logger)
+        fit_res, per_window_trs, final_rmsea = chrom_fit.fit_params(
+            agg_cutcounts=agg_cutcounts,
+            bad_segments=bad_segments,
+            global_fit=global_fit
+        )
 
         outdir = pvals_outpath.replace('.pvals.parquet', '.fit_results.parquet')
         df = pd.DataFrame({
@@ -411,10 +374,10 @@ class ChromosomeProcessor:
             'inital_tr': per_window_trs_global,
             'bad': babachi_result,
             'rmsea': final_rmsea,
-            'enough_bg': enough_bg
+            'enough_bg': fit_res.enough_bg_mask
         })
         self.to_parquet(df, fit_res_path)
-        del df, per_window_trs, final_rmsea, babachi_result, enough_bg
+        del df, per_window_trs, final_rmsea, babachi_result
         gc.collect()
   
         self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
