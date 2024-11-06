@@ -332,12 +332,15 @@ class ChromosomeProcessor:
         
         # Step with window to speed it up
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
-        per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(agg_cutcounts, step=self.config.window)
+        per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(
+            agg_cutcounts,
+            step=self.config.window
+        )
         
         # Various checks
         if global_fit.rmsea > self.config.rmsea_tr:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}")
-            raise NoContigPresentError
+            self.gp.logger.warning(f"{self.chrom_name}: Using {global_fit.fit_threshold:.0f} ({global_fit.fit_quantile:.3f}) as signal threshold.")
 
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
 
@@ -381,7 +384,7 @@ class ChromosomeProcessor:
         del df, per_window_trs, final_rmsea, babachi_result
         gc.collect()
   
-        self.gp.logger.debug(f'Calculating p-values for {self.chrom_name}')
+        self.gp.logger.debug(f'{self.chrom_name}: Calculating p-values')
 
         pval_estimator = PvalueEstimator(self.config, self.gp.logger, name=self.chrom_name)
 
