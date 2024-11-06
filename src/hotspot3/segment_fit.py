@@ -47,9 +47,8 @@ class ChromosomeFit(WithLogger):
 
 class SegmentFit(WithLogger):
     def __init__(self, genomic_interval: GenomicInterval, config=None, logger=None):
-        name = self.genomic_interval
-        super().__init__(logger=logger, config=config, name=name)
         self.genomic_interval = genomic_interval
+        super().__init__(logger=logger, config=config, name=genomic_interval)
     
     def filter_signal_to_segment(self, agg_cutcounts: np.ndarray) -> np.ndarray:
         return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
