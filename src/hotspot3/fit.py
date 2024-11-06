@@ -382,15 +382,26 @@ class StridedBackgroundFit(BackgroundFit):
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{n_signal_bins})")
         
         if global_fit is not None:
-            global_quantile_tr = self.quantile_ignore_all_na(strided_agg_cutcounts, global_fit.fit_quantile)
             best_tr = np.where(
-                best_rmsea <= self.config.rmsea_tr * 2,
+                best_rmsea <= self.config.rmsea_tr,
                 best_tr, 
-                np.maximum(global_quantile_tr, global_fit.fit_threshold),
+                self.fallback_tr(strided_agg_cutcounts, global_fit, best_tr)
             )
         with np.errstate(invalid='ignore'):
             best_quantile = np.sum(strided_agg_cutcounts < best_tr, axis=0) / np.sum(~np.isnan(strided_agg_cutcounts), axis=0)
         return best_tr, best_quantile, best_rmsea
+
+    def fallback_tr(self, strided_agg_cutcounts, global_fit: GlobalFitResults, best_tr: np.ndarray):
+        global_quantile_tr = self.quantile_ignore_all_na(strided_agg_cutcounts, global_fit.fit_quantile)
+        return np.where(
+            global_quantile_tr < global_fit.fit_threshold,
+            global_fit.fit_threshold,
+            np.where(
+                best_tr < global_quantile_tr,
+                best_tr,
+                self.quantile_ignore_all_na(strided_agg_cutcounts, self.config.min_background_prop) # FIXME, already calc in bin_edges
+            )
+        )
 
 
     @wrap_masked
