@@ -31,7 +31,7 @@ class BackgroundFit(BottleneckWrapper):
     @wrap_masked
     def p_from_mean_and_r(self, mean: np.ndarray, r: np.ndarray, where=None):
         with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
-            p = np.array(mean / (mean + r), dtype=np.float32)
+            p = np.array(mean / (mean + r), dtype=np.float32) # check if we return p or 1-p
         return p
     
     @wrap_masked
@@ -110,7 +110,7 @@ class GlobalBackgroundFit(BackgroundFit):
         if step is None:
             step = 1
         assumed_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, tr)
-        filtered_agg_cutcounts = agg_cutcounts[~assumed_signal_mask & ~np.isnan(agg_cutcounts)][::step]
+        filtered_agg_cutcounts = agg_cutcounts[::step][(~assumed_signal_mask & ~np.isnan(agg_cutcounts))[::step]]
 
         mean, var = self.estimate_global_mean_and_var(filtered_agg_cutcounts)
         if global_fit is not None:
@@ -118,7 +118,6 @@ class GlobalBackgroundFit(BackgroundFit):
         else:
             r = self.r_from_mean_and_var(mean, var)
         p = self.p_from_mean_and_r(mean, var)
-
 
         unique, counts = np.unique(filtered_agg_cutcounts, return_counts=True)
         rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
