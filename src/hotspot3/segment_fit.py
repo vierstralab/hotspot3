@@ -53,13 +53,14 @@ class SegmentFit(WithLogger):
     def filter_signal_to_segment(self, agg_cutcounts: np.ndarray) -> np.ndarray:
         return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
     
-    def fit_segment_thresholds(self, agg_cutcounts: ma.MaskedArray, global_fit: GlobalFitResults=None):
+    def fit_segment_thresholds(self, agg_cutcounts: ma.MaskedArray, global_fit: GlobalFitResults=None, step=None):
         signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
-        s_fit = GlobalBackgroundFit(self.config, name=self.name)
-        segment_fit = s_fit.fit(signal_at_segment)
+        g_fit = GlobalBackgroundFit(self.config, name=self.name)
+
+        segment_fit = g_fit.fit(signal_at_segment, step=step)
         valid_segment = check_valid_fit(segment_fit)
         if not valid_segment:
-            segment_fit = s_fit.fit(signal_at_segment, global_fit=global_fit)
+            segment_fit = g_fit.fit(signal_at_segment, global_fit=global_fit, step=step)
 
         fine_signal_level_fit = StridedBackgroundFit(self.config, name=self.name)
         thresholds, _, rmsea = fine_signal_level_fit.fit_tr(

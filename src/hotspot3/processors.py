@@ -330,8 +330,9 @@ class ChromosomeProcessor:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% (<2%) of data have # of cutcounts more than 4.")
             raise NoContigPresentError
         
+        # Step with window to speed it up
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
-        per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(agg_cutcounts)
+        per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(agg_cutcounts, step=self.config.window)
         
         # Various checks
         if global_fit.rmsea > self.config.rmsea_tr:
