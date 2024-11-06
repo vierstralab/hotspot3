@@ -399,10 +399,10 @@ class ChromosomeProcessor:
         """
         Run MODWT smoothing on cutcounts.
         """
-        self.gp.logger.debug(f"{self.chrom_name}: Running modwt signal smoothing (filter={filters}, level={self.config.modwt_level})")
+        filter = 'haar'
+        self.gp.logger.debug(f"{self.chrom_name}: Running modwt signal smoothing (filter={filter}, level={self.config.modwt_level})")
         agg_cutcounts = self.extractor.extract_aggregated_cutcounts(cutcounts_path)
-        filters = 'haar'
-        smoothed = modwt_smooth(agg_cutcounts, filters, level=self.config.modwt_level)
+        smoothed = modwt_smooth(agg_cutcounts, filter, level=self.config.modwt_level)
         data = pd.DataFrame({
             'smoothed': smoothed,
             'normalized_density': normalize_density(agg_cutcounts, total_cutcounts) 
