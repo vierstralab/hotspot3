@@ -28,7 +28,8 @@ class ChromosomeFit(WithLogger):
             s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)
             thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
                 agg_cutcounts,
-                global_fit=global_fit
+                global_fit=global_fit,
+                step=self.config.signal_prop_sampling_step
             )
             segment_fits.append(global_seg_fit)
 

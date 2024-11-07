@@ -323,7 +323,7 @@ class ChromosomeProcessor:
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
         per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(
             agg_cutcounts,
-            step=self.config.window
+            step=self.config.signal_prop_sampling_step
         )
         
         # Various checks
