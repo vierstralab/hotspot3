@@ -56,7 +56,7 @@ def main() -> None:
                 precomp_pvals,
                 fit_params_path
             ).data_df
-            per_region_stats.to_csv(f"{outdir_pref}.fit_stats.tsv", sep='\t', index=False)
+            per_region_stats.to_csv(f"{outdir_pref}.fit_stats.tsv.gz", sep='\t', index=False)
     
     precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
     genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
