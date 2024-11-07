@@ -337,17 +337,24 @@ class StridedBackgroundFit(BackgroundFit):
 
         return best_tr_with_nan, best_quantile_with_nan, best_rmsea_with_nan
 
-
-    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None):
-        bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
-        value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
-
-        step = round(self.config.exclude_peak_flank_length / self.sampling_step)
+    def tr_for_remaining_fits(
+            self, 
+            strided_agg_cutcounts: np.ndarray,
+            bin_edges: np.ndarray,
+            value_counts: np.ndarray,
+            n_signal_bins: int,
+            to_fit: np.ndarray = None,
+            global_fit: GlobalFitResults=None,
+        ):
         global_r = global_fit.r if global_fit is not None else None
-
+        step = round(self.config.exclude_peak_flank_length / self.sampling_step)
         best_tr = np.asarray(bin_edges[-1], dtype=np.float32)
-        remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
         best_rmsea = np.full_like(best_tr, np.inf, dtype=np.float32)
+        if to_fit is None:
+            remaing_fits_mask = np.ones_like(best_tr, dtype=bool)
+        else:
+            remaing_fits_mask = to_fit.copy()
+    
         for i in np.arange(0, n_signal_bins, 1)[::-1]:
             if remaing_fits_mask.sum() == 0:
                 break
@@ -417,6 +424,47 @@ class StridedBackgroundFit(BackgroundFit):
             idx = n_signal_bins - i
             if idx % (n_signal_bins // 5) == 0:
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{n_signal_bins})")
+        return best_tr, best_rmsea, remaing_fits_mask
+        
+    def find_per_window_tr(self, strided_agg_cutcounts: np.ndarray, global_fit: GlobalFitResults=None):
+        bin_edges, n_signal_bins = self.get_all_bins(strided_agg_cutcounts)
+        value_counts = self.value_counts_per_bin(strided_agg_cutcounts, bin_edges)
+
+        best_tr, best_rmsea, remaing_fits_mask = self.tr_for_remaining_fits(
+            strided_agg_cutcounts,
+            bin_edges,
+            value_counts,
+            n_signal_bins,
+            global_fit=global_fit
+        )
+
+        if global_fit is not None and remaing_fits_mask.sum() > 0:
+            best_tr_step2, best_rmsea_step2, remaing_fits_step2 = self.tr_for_remaining_fits(
+                strided_agg_cutcounts,
+                bin_edges,
+                value_counts,
+                n_signal_bins,
+                remaing_fits_mask,
+            )
+            best_tr = np.where(
+                best_rmsea <= self.config.rmsea_tr,
+                best_tr,
+                np.where(
+                    best_rmsea_step2 < self.config.rmsea_tr,
+                    best_tr_step2,
+                    np.minimum(best_tr, best_tr_step2)
+                )
+            )
+            best_rmsea = np.where(
+                best_rmsea <= self.config.rmsea_tr,
+                best_rmsea,
+                np.where(
+                    best_rmsea_step2 < self.config.rmsea_tr,
+                    best_rmsea_step2,
+                    np.minimum(best_rmsea, best_rmsea_step2)
+                )
+            )
+
         
         if global_fit is not None:
             best_tr = np.where(
@@ -432,7 +480,7 @@ class StridedBackgroundFit(BackgroundFit):
         global_quantile_tr = self.quantile_ignore_all_na(strided_agg_cutcounts, global_fit.fit_quantile)
         return np.where(
             global_quantile_tr < global_fit.fit_threshold,
-            np.minimum(global_fit.fit_threshold, best_tr),
+            global_fit.fit_threshold,
             np.where(
                 best_tr < global_quantile_tr,
                 best_tr,
@@ -446,8 +494,8 @@ class StridedBackgroundFit(BackgroundFit):
         p: np.ndarray,
         r: np.ndarray,
         n_params: int,
-        bin_edges, # edges of the bins, right edge not inclusive
-        value_counts_per_bin, # number of observed cutcounts in each bin for each window
+        bin_edges: np.ndarray, # edges of the bins, right edge not inclusive
+        value_counts_per_bin: np.ndarray, # number of observed cutcounts in each bin for each window
     ):
         """
         Calculate RMSEA for all sliding windows.
