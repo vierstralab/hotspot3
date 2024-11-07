@@ -123,7 +123,7 @@ def calc_chisq(obs, exp):
     return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
 
 
-def calc_rmsea(obs, exp, N, df, min_df=7, stat='G_sq'):
+def calc_rmsea(obs, exp, N, df, min_df=3, stat='G_sq'):
     assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
     if stat == 'G_sq':
         G_sq = calc_g_sq(obs, exp)
