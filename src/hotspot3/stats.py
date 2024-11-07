@@ -120,7 +120,8 @@ def calc_g_sq(obs, exp):
 
 
 def calc_chisq(obs, exp):
-    return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
+    with np.errstate(over='ignore'):
+        return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
 
 
 def calc_rmsea(obs, exp, N, df, min_df=3, stat='G_sq'):
