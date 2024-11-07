@@ -4,6 +4,8 @@ import gc
 from scipy.special import logsumexp, betainc, hyp2f1, betaln
 from hotspot3.models import WindowedFitResults, GlobalFitResults
 from typing import Union
+import pandas as pd
+
 
 # Calculate p-values and FDR
 def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, calc_type="betainc") -> np.ndarray:
@@ -42,6 +44,27 @@ def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.n
             - np.log(x)
             - betaln(x, r, dtype=r.dtype)
         )
+
+
+def fast_logfdr_below_threshold(pvals_path: str, max_fdr: float, fdr_method):
+    log_pval = pd.read_parquet(
+        pvals_path,
+        engine='pyarrow', 
+        columns=['log10_pval']
+    )['log10_pval'].values
+
+    result = np.full_like(log_pval, np.nan)
+    mask = ~np.isnan(log_pval)
+    not_nan_shape = np.sum(mask)
+    mask = mask & (log_pval >= -np.log10(max_fdr))
+
+    log_pval = log_pval[mask]
+    log_pval *= -np.log(10)
+
+    result[mask] = logfdr_from_logpvals(log_pval, method=fdr_method, m=not_nan_shape)
+    result /= -np.log(10)
+    return result
+
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
     """

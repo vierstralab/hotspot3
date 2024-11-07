@@ -42,11 +42,20 @@ def main() -> None:
             smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
             total_cutcounts = genome_processor.total_cutcounts(cutcounts_path)
             np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
-            genome_processor.modwt_smooth_signal(cutcounts_path, total_cutcounts=total_cutcounts, save_path=smoothed_signal_path)
+            genome_processor.modwt_smooth_signal(
+                cutcounts_path,
+                total_cutcounts=total_cutcounts,
+                save_path=smoothed_signal_path
+            )
 
         if precomp_pvals is None:
             precomp_pvals = f"{outdir_pref}.pvals.parquet"
-            per_region_stats = genome_processor.calc_pval(cutcounts_path, precomp_pvals).data_df
+            fit_params_path = f"{outdir_pref}.fit_params.parquet"
+            per_region_stats = genome_processor.calc_pval(
+                cutcounts_path,
+                precomp_pvals,
+                fit_params_path
+            ).data_df
             per_region_stats.to_csv(f"{outdir_pref}.fit_stats.tsv", sep='\t', index=False)
     
     precomp_fdrs = f"{outdir_pref}.fdrs.parquet"

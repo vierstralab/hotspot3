@@ -10,7 +10,7 @@ import shutil
 import os
 import subprocess
 import importlib.resources as pkg_resources
-from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
+from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.logging import setup_logger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig, ProcessorConfig
@@ -21,7 +21,7 @@ from hotspot3.connectors.babachi import BabachiWrapper
 from hotspot3.segment_fit import SegmentFit, ChromosomeFit
 from hotspot3.signal_smoothing import modwt_smooth
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-from hotspot3.stats import logfdr_from_logpvals, fix_inf_pvals
+from hotspot3.stats import fast_logfdr_below_threshold, fix_inf_pvals
 from hotspot3.utils import normalize_density, is_iterable, to_parquet_high_compression, delete_path, df_to_bigwig, ensure_contig_exists
 
 
@@ -40,7 +40,7 @@ def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
 
 class GenomeProcessor:
     """
-    Main class to run hotspot2-related functions and store parameters.
+    Main class to run hotspot3-related functions and store parameters.
 
     Parameters:
         - chrom_sizes: Dictionary containing chromosome sizes.
@@ -157,6 +157,7 @@ class GenomeProcessor:
 
     # Processing functions
     def write_cutcounts(self, bam_path, outpath) -> None:
+        # TODO: rewrite with pysam
         self.logger.info('Extracting cutcounts from bam file')
         run_bam2_bed(bam_path, outpath, self.chrom_sizes.keys())
     
@@ -181,16 +182,15 @@ class GenomeProcessor:
             save_path
         )
 
-    def calc_pval(self, cutcounts_file, pvals_path: str) -> ProcessorOutputData:
+    def calc_pval(self, cutcounts_file, pvals_path: str, fit_params_path: str) -> ProcessorOutputData:
         self.logger.info('Calculating per-bp p-values')
         delete_path(pvals_path)
-        fit_res_path = pvals_path.replace('.pvals.parquet', '.fit_results.parquet')
-        delete_path(fit_res_path)
+        delete_path(fit_params_path)
         per_region_params = self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
             pvals_path,
-            fit_res_path
+            fit_params_path
         )
         per_region_params = self.merge_and_add_chromosome(per_region_params)
         return per_region_params
@@ -198,31 +198,19 @@ class GenomeProcessor:
     
     def calc_fdr(self, pvals_path, fdrs_path, max_fdr=1):
         self.logger.info('Calculating per-bp FDRs')
-        log_pval = pd.read_parquet(
+        chrom_pos_mapping = pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
-            columns=['chrom', 'log10_pval']
-        ) 
-        # file is always sorted within chromosomes
-        chrom_pos_mapping = log_pval['chrom'].drop_duplicates()
+            columns=['chrom']
+        )['chrom']
+
+        total_len = chrom_pos_mapping.shape[0]
+        chrom_pos_mapping = chrom_pos_mapping.drop_duplicates()
         starts = chrom_pos_mapping.index
-        ends = [*starts[1:], log_pval.shape[0]]
-        log_pval = log_pval['log10_pval'].values
+        # file is always sorted within chromosomes
+        ends = [*starts[1:], total_len]
 
-        result = np.full_like(log_pval, np.nan)
-        mask = ~np.isnan(log_pval)
-        not_nan_shape = np.sum(mask)
-        mask = mask & (log_pval >= -np.log10(max_fdr))
-
-        # Cast to natural log
-        log_pval = log_pval[mask]
-        log_pval *= -np.log(10).astype(log_pval.dtype)
-
-        result[mask] = logfdr_from_logpvals(log_pval, method=self.config.fdr_method, m=not_nan_shape)
-        del log_pval
-        gc.collect()
-        # Cast to neglog10
-        result /= -np.log(10).astype(result.dtype)
+        result = fast_logfdr_below_threshold(pvals_path, max_fdr, self.config.fdr_method)
 
         result = [
             ProcessorOutputData(
@@ -232,7 +220,6 @@ class GenomeProcessor:
             for chrom, start, end
             in zip(chrom_pos_mapping, starts, ends)
         ]
-        gc.collect()
         delete_path(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(
@@ -430,10 +417,6 @@ class ChromosomeProcessor:
         for i in range(len(region_starts)):
             start = region_starts[i]
             end = region_ends[i]
-            if np.sum(~np.isnan(log10_fdrs[start:end])) == 0:
-                print(log10_fdrs[start:end])
-                print(start, end)
-                print(smoothed_signif[start:end])
         
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
         
