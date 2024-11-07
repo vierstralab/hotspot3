@@ -226,7 +226,7 @@ class GenomeProcessor:
             ChromosomeProcessor.to_parquet,
             result,
             fdrs_path,
-            0
+            0 # compression level
         )
         return fdrs_path
 

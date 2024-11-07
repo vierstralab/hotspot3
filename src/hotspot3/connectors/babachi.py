@@ -15,7 +15,7 @@ class BabachiWrapper(WithLogger):
         step = self.config.babachi_segmentation_step
 
         bn_wrapper = BottleneckWrapper(config=self.config, logger=self.logger)
-        assumed_signal_mask = bn_wrapper.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
+        assumed_signal_mask = bn_wrapper.get_signal_mask_for_tr(agg_cutcounts, per_window_trs)
         background = agg_cutcounts.filled(np.nan)[::step]
         background[assumed_signal_mask[::step]] = np.nan
         starts = np.arange(0, len(background), dtype=np.uint32) * step
@@ -53,7 +53,9 @@ class BabachiWrapper(WithLogger):
             subchr_filter=0
         )
         bad_segments = gs.estimate_BAD()
-        return [GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments]
+        return [
+            GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments
+        ]
     
     def annotate_with_segments(self, shape, bad_segments: List[GenomicInterval]):
         babachi_result = np.zeros(shape, dtype=np.float16)

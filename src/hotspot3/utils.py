@@ -50,7 +50,7 @@ def read_chrom_sizes(chrom_sizes):
     ).set_index('chrom')['size'].to_dict()
 
 
-def to_parquet_high_compression(df: pd.DataFrame, outpath, **kwargs):
+def to_parquet_high_compression(df: pd.DataFrame, outpath, compression_level=22, **kwargs):
     df.to_parquet(
         outpath,
         engine='pyarrow',

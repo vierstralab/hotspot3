@@ -80,10 +80,18 @@ class GlobalBackgroundFit(BackgroundFit):
         """
         result = []
         agg_cutcounts = agg_cutcounts.filled(np.nan)
+        max_counts = self.get_max_count_with_flanks(agg_cutcounts)
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
             try:
-                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step, global_fit=global_fit)
+                assumed_signal_mask = max_counts >= tr
+                p, r, rmsea = self.fit_for_tr(
+                    agg_cutcounts,
+                    tr,
+                    assumed_signal_mask=assumed_signal_mask,
+                    step=step,
+                    global_fit=global_fit
+                )
             except NotEnoughDataForContig:
                 continue
             result.append((tr, rmsea, p, r))
@@ -108,32 +116,38 @@ class GlobalBackgroundFit(BackgroundFit):
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
 
-    def fit_for_tr(self, agg_cutcounts, tr, step=None, global_fit: GlobalFitResults=None):
+    def fit_for_tr(self, agg_cutcounts, tr, assumed_signal_mask=None, step=None, global_fit: GlobalFitResults=None):
         if step is None:
             step = 1
-        assumed_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, tr)
-        filtered_agg_cutcounts = agg_cutcounts[::step][(~assumed_signal_mask & ~np.isnan(agg_cutcounts))[::step]]
+        
+        if assumed_signal_mask is None:
+            assumed_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, tr)
 
-        mean, var = self.estimate_global_mean_and_var(filtered_agg_cutcounts)
+        mean, var = self.estimate_global_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
         if global_fit is not None:
             r = global_fit.r
         else:
             r = self.r_from_mean_and_var(mean, var)
         p = self.p_from_mean_and_r(mean, r)
 
-        unique, counts = np.unique(filtered_agg_cutcounts, return_counts=True)
+        unique, counts = np.unique(agg_cutcounts[~assumed_signal_mask], return_counts=True)
+        m = np.isnan(unique)
+        if np.any(m):
+            unique = unique[~m]
+            counts = counts[~m]
         rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
     
         return p, r, rmsea
 
-    def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray):
-        nonzero_count = np.count_nonzero(agg_cutcounts)
-        has_enough_background = (agg_cutcounts.size > 0) and (nonzero_count / agg_cutcounts.size > self.config.nonzero_windows_to_fit)
+    def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray, where=None):
+        total_count = np.sum(where)
+        nonzero_count = np.sum(where & (agg_cutcounts != 0))
+        has_enough_background = (total_count > 0) and (nonzero_count / total_count > self.config.nonzero_windows_to_fit)
         if not has_enough_background:
             self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}")
             raise NotEnoughDataForContig
         
-        mean, variance = self.get_mean_and_var(agg_cutcounts)
+        mean, variance = self.get_mean_and_var(agg_cutcounts, where=where)
         return mean, variance
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
@@ -161,7 +175,7 @@ class WindowBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray, per_window_trs, global_fit: GlobalFitResults=None) -> WindowedFitResults:
         agg_cutcounts = array.copy()
 
-        high_signal_mask = self.filter_by_tr_spatially(agg_cutcounts, per_window_trs)
+        high_signal_mask = self.get_max_count_with_flanks(agg_cutcounts) >= per_window_trs
         agg_cutcounts[high_signal_mask] = np.nan
 
         global_r = global_fit.r if global_fit is not None else None
@@ -328,7 +342,7 @@ class StridedBackgroundFit(BackgroundFit):
             current_index = value_counts.shape[0] - i
             right_bin_index = current_index + 1
             mask = strided_agg_cutcounts < bin_edges[right_bin_index - 1, :]
-            for x in range(1, (step - 1) // 2):
+            for x in range(1, step + 1):
                 mask[:-x, :] &= mask[x:, :]
                 mask[x:, :] &= mask[:-x, :] 
 
@@ -413,7 +427,6 @@ class StridedBackgroundFit(BackgroundFit):
                 self.quantile_ignore_all_na(strided_agg_cutcounts, self.config.min_background_prop) # FIXME, already calc in bin_edges
             )
         )
-
 
     @wrap_masked
     def calc_rmsea_all_windows(

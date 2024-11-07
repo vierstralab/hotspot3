@@ -32,7 +32,11 @@ class ChromosomeFit(WithLogger):
             )
             segment_fits.append(global_seg_fit)
 
-            fit_res = s_fit.fit_segment_params(agg_cutcounts, thresholds, global_fit=global_seg_fit)
+            fit_res = s_fit.fit_segment_params(
+                agg_cutcounts,
+                thresholds,
+                global_fit=global_seg_fit
+            )
 
             final_r[start:end] = fit_res.r
             final_p[start:end] = fit_res.p
@@ -40,17 +44,17 @@ class ChromosomeFit(WithLogger):
             per_window_trs[start:end] = thresholds
             enough_bg[start:end] = fit_res.enough_bg_mask
         
-        intervals = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
-        intervals['r'] = [x.r for x in segment_fits]
-        intervals['p'] = [x.p for x in segment_fits]
-        intervals['rmsea'] = [x.rmsea for x in segment_fits]
-        intervals['signal_tr'] = [x.fit_threshold for x in segment_fits]
+        intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
+        intervals_stats['r'] = [x.r for x in segment_fits]
+        intervals_stats['p'] = [x.p for x in segment_fits]
+        intervals_stats['rmsea'] = [x.rmsea for x in segment_fits]
+        intervals_stats['signal_tr'] = [x.fit_threshold for x in segment_fits]
 
         return WindowedFitResults(
             p=final_p,
             r=final_r,
             enough_bg_mask=enough_bg
-        ), per_window_trs, final_rmsea, intervals
+        ), per_window_trs, final_rmsea, intervals_stats
 
 
 class SegmentFit(WithLogger):
