@@ -165,8 +165,7 @@ class GlobalBackgroundFit(BackgroundFit):
         assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
         if p <= 0 or p >= 1 or r <= 0:
             return np.inf
-        if np.max(unique_cutcounts) >= tr:
-            raise ValueError(f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}")
+        assert np.max(unique_cutcounts) < tr, f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}"
         obs = obs.astype(np.float32)
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
