@@ -162,20 +162,15 @@ class GlobalBackgroundFit(BackgroundFit):
         return mean, variance
 
     def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
-        assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
         if p <= 0 or p >= 1 or r <= 0:
             return np.inf
         assert np.max(unique_cutcounts) < tr, f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}"
         obs = obs.astype(np.float32)
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
-        if stat == 'G_sq':
-            G_sq = np.sum(calc_g_sq(obs, exp))
-        else:
-            G_sq = np.sum(calc_chisq(obs, exp))
 
         df = len(obs) - 2 - 1
-        return calc_rmsea(G_sq, N, df)
+        return calc_rmsea(obs, exp, N, df, stat='G_sq')
 
 
 class WindowBackgroundFit(BackgroundFit):
@@ -507,12 +502,8 @@ class StridedBackgroundFit(BackgroundFit):
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
         expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
-        G_sq = np.sum(
-            calc_g_sq(value_counts_per_bin, expected_counts), 
-            axis=0
-        )
         df = np.sum(
             (value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0),
             axis=0
         ) - n_params - 1
-        return calc_rmsea(G_sq, bg_sum_mappable, df)
+        return calc_rmsea(value_counts_per_bin, expected_counts, bg_sum_mappable, df)

@@ -123,10 +123,17 @@ def calc_chisq(obs, exp):
     return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
 
 
-def calc_rmsea(G_sq, N, df, min_df=7):
+def calc_rmsea(obs, exp, N, df, min_df=7, stat='G_sq'):
+    assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
+    if stat == 'G_sq':
+        G_sq = calc_g_sq(obs, exp)
+    else:
+        G_sq = calc_chisq(obs, exp)
+
+    G_sq = np.sum(G_sq, axis=0)
     G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df>=min_df)
     rmsea = np.sqrt(np.maximum(G_sq - 1, 0) / (N - 1))
-    rmsea = np.where(df>=min_df, rmsea, np.inf)
+    rmsea = np.where(df >= min_df, rmsea, np.inf)
     return rmsea
 
 
