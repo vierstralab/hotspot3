@@ -420,7 +420,7 @@ class StridedBackgroundFit(BackgroundFit):
         
         if global_fit is not None:
             best_tr = np.where(
-                best_rmsea <= self.config.rmsea_tr * 2,
+                best_rmsea <= self.config.rmsea_tr,
                 best_tr, 
                 self.fallback_tr(strided_agg_cutcounts, global_fit, best_tr)
             )
@@ -432,7 +432,7 @@ class StridedBackgroundFit(BackgroundFit):
         global_quantile_tr = self.quantile_ignore_all_na(strided_agg_cutcounts, global_fit.fit_quantile)
         return np.where(
             global_quantile_tr < global_fit.fit_threshold,
-            global_fit.fit_threshold,
+            np.minimum(global_fit.fit_threshold, best_tr),
             np.where(
                 best_tr < global_quantile_tr,
                 best_tr,

@@ -331,7 +331,7 @@ class ChromosomeProcessor:
 
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
 
-        good_fits_n = np.sum(rmseas <= self.config.rmsea_tr * 2)
+        good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
         n_rmsea = np.sum(~np.isnan(rmseas))
         self.gp.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
 
