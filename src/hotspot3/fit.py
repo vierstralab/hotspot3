@@ -1,3 +1,10 @@
+"""
+Low level classes to fit background.
+GlobalBackgroundFit: Fit the whole array.
+WindowBackgroundFit: Fit the array in a windowed fashion.
+StridedBackgroundFit: Fit the array using a strided approach (takes a lot of memory though).
+"""
+
 import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
@@ -84,7 +91,7 @@ class GlobalBackgroundFit(BackgroundFit):
         trs, _ = self.get_signal_bins(agg_cutcounts)
         agg_cutcounts = agg_cutcounts[::step]
         for tr in trs:
-            self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
+            #self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
             try:
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(
