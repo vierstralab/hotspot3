@@ -113,7 +113,7 @@ def fix_inf_pvals(neglog_pvals, fname): # TODO move somewhere else
 
 def calc_g_sq(obs, exp):
     valid = (exp != 0) & (obs != 0)
-    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+    with np.errstate(over='ignore'):
         ratio = np.divide(obs, exp, out=np.zeros_like(obs), where=valid)
     ratio = np.where(valid, ratio, 1)
     return obs * np.log(ratio) * 2
@@ -124,9 +124,9 @@ def calc_chisq(obs, exp):
 
 
 def calc_rmsea(G_sq, N, df, min_df=7):
-    G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df >= min_df)
+    G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df>=min_df)
     rmsea = np.sqrt(np.maximum(G_sq - 1, 0) / (N - 1))
-    rmsea = np.where(df >= min_df, rmsea, np.inf)
+    rmsea = np.where(df>=min_df, rmsea, np.inf)
     return rmsea
 
 

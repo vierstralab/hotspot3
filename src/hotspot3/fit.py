@@ -128,7 +128,7 @@ class GlobalBackgroundFit(BackgroundFit):
             
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
-        return GlobalFitResults(p, r, rmsea, quantile, tr)
+        return GlobalFitResults(p, r, rmsea, quantile, tr), result
 
     def fit_for_tr(self, agg_cutcounts, tr, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
         
@@ -148,7 +148,6 @@ class GlobalBackgroundFit(BackgroundFit):
             unique = unique[~m]
             counts = counts[~m]
         rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
-    
         return p, r, rmsea
 
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray, where=None):
@@ -166,9 +165,9 @@ class GlobalBackgroundFit(BackgroundFit):
         assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
         if p <= 0 or p >= 1 or r <= 0:
             return np.inf
-        mask = unique_cutcounts < tr
-        unique_cutcounts = unique_cutcounts[mask]
-        obs = obs[mask].astype(np.float32)
+        if np.max(unique_cutcounts) >= tr:
+            raise ValueError(f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}")
+        obs = obs.astype(np.float32)
         N = sum(obs)
         exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
         if stat == 'G_sq':
