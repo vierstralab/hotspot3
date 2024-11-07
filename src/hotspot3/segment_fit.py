@@ -22,20 +22,25 @@ class ChromosomeFit(WithLogger):
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
         
         segment_fits: List[GlobalFitResults] = []
+        segments = bad_segments
+        if global_fit is not None:
+            segment_fits.append(global_fit)
+            self.genomic_interval.BAD = None
+            segments = [self.genomic_interval, *segments]
         for segment_interval in bad_segments:
             start = int(segment_interval.start)
             end = int(segment_interval.end)
             s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)
-            thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
+            thresholds, rmsea, segment_fit_results = s_fit.fit_segment_thresholds(
                 agg_cutcounts,
                 global_fit=global_fit,
             )
-            segment_fits.append(global_seg_fit)
+            segment_fits.append(segment_fit_results)
 
             fit_res = s_fit.fit_segment_params(
                 agg_cutcounts,
                 thresholds,
-                global_fit=global_seg_fit
+                global_fit=segment_fit_results
             )
 
             final_r[start:end] = fit_res.r
@@ -44,7 +49,7 @@ class ChromosomeFit(WithLogger):
             per_window_trs[start:end] = thresholds
             enough_bg[start:end] = fit_res.enough_bg_mask
         
-        intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
+        intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
         intervals_stats['r'] = [x.r for x in segment_fits]
         intervals_stats['p'] = [x.p for x in segment_fits]
         intervals_stats['rmsea'] = [x.rmsea for x in segment_fits]
