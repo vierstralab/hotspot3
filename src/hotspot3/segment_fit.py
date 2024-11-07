@@ -29,7 +29,6 @@ class ChromosomeFit(WithLogger):
             thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
                 agg_cutcounts,
                 global_fit=global_fit,
-                step=self.config.signal_prop_sampling_step
             )
             segment_fits.append(global_seg_fit)
 
@@ -67,6 +66,9 @@ class SegmentFit(WithLogger):
         return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
     
     def fit_segment_thresholds(self, agg_cutcounts: ma.MaskedArray, global_fit: GlobalFitResults=None, step=None):
+        if step is None:
+            step = self.config.window
+
         signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
         g_fit = GlobalBackgroundFit(self.config, name=self.name)
 
