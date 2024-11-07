@@ -128,7 +128,7 @@ class GlobalBackgroundFit(BackgroundFit):
             
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
-        return GlobalFitResults(p, r, rmsea, quantile, tr), result
+        return GlobalFitResults(p, r, rmsea, quantile, tr)#, result
 
     def fit_for_tr(self, agg_cutcounts, tr, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
         
