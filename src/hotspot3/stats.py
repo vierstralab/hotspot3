@@ -113,7 +113,7 @@ def fix_inf_pvals(neglog_pvals, fname): # TODO move somewhere else
 
 def calc_g_sq(obs, exp):
     valid = (exp != 0) & (obs != 0)
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
         ratio = np.divide(obs, exp, out=np.zeros_like(obs), where=valid)
     ratio = np.where(valid, ratio, 1)
     return obs * np.log(ratio) * 2
