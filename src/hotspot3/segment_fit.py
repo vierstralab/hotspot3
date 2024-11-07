@@ -5,7 +5,7 @@ from hotspot3.utils import interpolate_nan
 from hotspot3.stats import check_valid_fit
 import numpy.ma as ma
 import numpy as np
-from genome_tools.genomic_interval import GenomicInterval
+from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
 from typing import List
 
 
@@ -20,7 +20,8 @@ class ChromosomeFit(WithLogger):
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
-
+        
+        segment_fits: List[GlobalFitResults] = []
         for segment_interval in bad_segments:
             start = int(segment_interval.start)
             end = int(segment_interval.end)
@@ -29,6 +30,7 @@ class ChromosomeFit(WithLogger):
                 agg_cutcounts,
                 global_fit=global_fit
             )
+            segment_fits.append(global_seg_fit)
 
             fit_res = s_fit.fit_segment_params(agg_cutcounts, thresholds, global_fit=global_seg_fit)
 
@@ -37,12 +39,18 @@ class ChromosomeFit(WithLogger):
             final_rmsea[start:end] = rmsea
             per_window_trs[start:end] = thresholds
             enough_bg[start:end] = fit_res.enough_bg_mask
+        
+        intervals = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
+        intervals['r'] = [x.r for x in segment_fits]
+        intervals['p'] = [x.p for x in segment_fits]
+        intervals['rmsea'] = [x.rmsea for x in segment_fits]
+        intervals['signal_tr'] = [x.fit_threshold for x in segment_fits]
 
         return WindowedFitResults(
             p=final_p,
             r=final_r,
             enough_bg_mask=enough_bg
-        ), per_window_trs, final_rmsea
+        ), per_window_trs, final_rmsea, intervals
 
 
 class SegmentFit(WithLogger):

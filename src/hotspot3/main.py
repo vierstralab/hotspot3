@@ -46,9 +46,9 @@ def main() -> None:
 
         if precomp_pvals is None:
             precomp_pvals = f"{outdir_pref}.pvals.parquet"
-            genome_processor.calc_pval(cutcounts_path, precomp_pvals)
+            per_region_stats = genome_processor.calc_pval(cutcounts_path, precomp_pvals).data_df
+            per_region_stats.to_csv(f"{outdir_pref}.fit_stats.tsv", sep='\t', index=False)
     
-
     precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
     genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
 

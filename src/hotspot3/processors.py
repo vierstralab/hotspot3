@@ -181,17 +181,20 @@ class GenomeProcessor:
             save_path
         )
 
-    def calc_pval(self, cutcounts_file, pvals_path: str):
+    def calc_pval(self, cutcounts_file, pvals_path: str) -> ProcessorOutputData:
         self.logger.info('Calculating per-bp p-values')
         delete_path(pvals_path)
         fit_res_path = pvals_path.replace('.pvals.parquet', '.fit_results.parquet')
         delete_path(fit_res_path)
-        self.parallel_by_chromosome(
+        per_region_params = self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
             pvals_path,
             fit_res_path
         )
+        per_region_params = self.merge_and_add_chromosome(per_region_params)
+        return per_region_params
+
     
     def calc_fdr(self, pvals_path, fdrs_path, max_fdr=1):
         self.logger.info('Calculating per-bp FDRs')
@@ -236,6 +239,7 @@ class GenomeProcessor:
             ChromosomeProcessor.to_parquet,
             result,
             fdrs_path,
+            0
         )
         return fdrs_path
 
@@ -360,7 +364,7 @@ class ChromosomeProcessor:
         )
 
         chrom_fit = ChromosomeFit(self.genomic_interval, self.config, logger=self.gp.logger)
-        fit_res, per_window_trs, final_rmsea = chrom_fit.fit_params(
+        fit_res, per_window_trs, final_rmsea, per_interval_params = chrom_fit.fit_params(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,
             global_fit=global_fit
@@ -377,7 +381,7 @@ class ChromosomeProcessor:
             'enough_bg': fit_res.enough_bg_mask
         })
         self.to_parquet(df, fit_res_path, compression_level=0)
-        del df, per_window_trs, final_rmsea
+        del df, per_window_trs, final_rmsea, bad_segments
         gc.collect()
   
         self.gp.logger.debug(f'{self.chrom_name}: Calculating p-values')
@@ -392,9 +396,7 @@ class ChromosomeProcessor:
         neglog_pvals = pd.DataFrame.from_dict({'log10_pval': fix_inf_pvals(neglog_pvals, fname)})
         self.to_parquet(neglog_pvals, pvals_outpath)
 
-       # per_interval_df = genomic_intervals_to_df(bad_segments)
-
-        #return ProcessorOutputData(self.chrom_name, )
+        return ProcessorOutputData(self.chrom_name, per_interval_params)
 
     @ensure_contig_exists
     def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path):
