@@ -361,7 +361,7 @@ class ChromosomeProcessor:
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
             'tr': per_window_trs,
-            'inital_tr': per_window_trs_global,
+            'initial_tr': per_window_trs_global,
             'bad': seg.annotate_with_segments(agg_cutcounts.shape, bad_segments),
             'rmsea': final_rmsea,
             'enough_bg': fit_res.enough_bg_mask
