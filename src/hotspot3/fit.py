@@ -420,7 +420,7 @@ class StridedBackgroundFit(BackgroundFit):
         
         if global_fit is not None:
             best_tr = np.where(
-                best_rmsea <= self.config.rmsea_tr,
+                best_rmsea <= self.config.rmsea_tr * 2,
                 best_tr, 
                 self.fallback_tr(strided_agg_cutcounts, global_fit, best_tr)
             )
