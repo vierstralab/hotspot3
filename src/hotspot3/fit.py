@@ -80,8 +80,9 @@ class GlobalBackgroundFit(BackgroundFit):
         """
         result = []
         agg_cutcounts = agg_cutcounts.filled(np.nan)
-        max_counts = self.get_max_count_with_flanks(agg_cutcounts)
+        max_counts = self.get_max_count_with_flanks(agg_cutcounts)[::step]
         trs, _ = self.get_signal_bins(agg_cutcounts)
+        agg_cutcounts = agg_cutcounts[::step]
         for tr in trs:
             self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
             try:
@@ -90,7 +91,6 @@ class GlobalBackgroundFit(BackgroundFit):
                     agg_cutcounts,
                     tr,
                     assumed_signal_mask=assumed_signal_mask,
-                    step=step,
                     global_fit=global_fit
                 )
             except NotEnoughDataForContig:
@@ -104,7 +104,13 @@ class GlobalBackgroundFit(BackgroundFit):
             chrom_quantile_tr = np.nanquantile(agg_cutcounts, global_fit.fit_quantile)
             if chrom_quantile_tr < global_fit.fit_threshold:
                 tr = global_fit.fit_threshold
-                p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step, global_fit=global_fit)
+                assumed_signal_mask = max_counts >= tr
+                p, r, rmsea = self.fit_for_tr(
+                    agg_cutcounts,
+                    tr,
+                    assumed_signal_mask,
+                    global_fit=global_fit
+                )
                 self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). Low signal region ({chrom_quantile_tr}<{global_fit.fit_threshold}). Fitting with global {global_fit.fit_threshold}")
             else:
                 if tr < chrom_quantile_tr:
@@ -117,9 +123,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)
 
-    def fit_for_tr(self, agg_cutcounts, tr, assumed_signal_mask=None, step=None, global_fit: GlobalFitResults=None):
-        if step is None:
-            step = 1
+    def fit_for_tr(self, agg_cutcounts, tr, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
         
         if assumed_signal_mask is None:
             assumed_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, tr)
