@@ -83,6 +83,7 @@ class GlobalBackgroundFit(BackgroundFit):
         max_counts = self.get_max_count_with_flanks(agg_cutcounts)
         trs, _ = self.get_signal_bins(agg_cutcounts)
         for tr in trs:
+            self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
             try:
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(

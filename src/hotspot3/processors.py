@@ -133,7 +133,7 @@ class GenomeProcessor:
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
-        self.logger.debug(f'Using {cpus} CPUs for {func.__name__}')
+        self.logger.debug(f'Using {cpus} CPUs to {func.__name__}')
         results = []
         if self.cpus == 1:
             for func_args in zip(*args):
@@ -161,22 +161,22 @@ class GenomeProcessor:
         self.logger.info('Extracting cutcounts from bam file')
         run_bam2_bed(bam_path, outpath, self.chrom_sizes.keys())
     
-    def total_cutcounts(self, cutcounts_path) -> int:
+    def get_total_cutcounts(self, cutcounts_path) -> int:
         total_cutcounts = sum(
             self.parallel_by_chromosome(
-                ChromosomeProcessor.total_cutcounts,
+                ChromosomeProcessor.get_total_cutcounts,
                 cutcounts_path
             )
         )
         self.logger.info('Total cutcounts = %d', total_cutcounts)
         return total_cutcounts
 
-    def modwt_smooth_signal(self, cutcounts_path, total_cutcounts, save_path):
+    def smooth_signal_modwt(self, cutcounts_path, total_cutcounts, save_path):
         self.logger.info('Smoothing signal using MODWT')
     
         delete_path(save_path)
         self.parallel_by_chromosome(
-            ChromosomeProcessor.modwt_smooth_density,
+            ChromosomeProcessor.smooth_density_modwt,
             cutcounts_path,
             total_cutcounts,
             save_path
@@ -223,7 +223,7 @@ class GenomeProcessor:
         delete_path(fdrs_path)
         self.logger.debug('Saving per-bp FDRs')
         self.parallel_by_chromosome(
-            ChromosomeProcessor.to_parquet,
+            ChromosomeProcessor.write_to_parquet,
             result,
             fdrs_path,
             0 # compression level
@@ -284,7 +284,7 @@ class GenomeProcessor:
 
     def extract_density(self, smoothed_signal, density_path):
         density_data = self.parallel_by_chromosome(
-            ChromosomeProcessor.extract_density,
+            ChromosomeProcessor.extract_normalized_density,
             smoothed_signal
         )
         density_data = self.merge_and_add_chromosome(density_data).data_df
@@ -367,7 +367,7 @@ class ChromosomeProcessor:
             'rmsea': final_rmsea,
             'enough_bg': fit_res.enough_bg_mask
         })
-        self.to_parquet(df, fit_res_path, compression_level=0)
+        self.write_to_parquet(df, fit_res_path, compression_level=0)
         del df, per_window_trs, final_rmsea, bad_segments
         gc.collect()
   
@@ -381,12 +381,12 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f"Saving p-values for {self.chrom_name}")
         fname = f"{outdir}.{self.chrom_name}.inf_pvals.parquet"
         neglog_pvals = pd.DataFrame.from_dict({'log10_pval': fix_inf_pvals(neglog_pvals, fname)})
-        self.to_parquet(neglog_pvals, pvals_outpath)
+        self.write_to_parquet(neglog_pvals, pvals_outpath)
 
         return ProcessorOutputData(self.chrom_name, per_interval_params)
 
     @ensure_contig_exists
-    def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path):
+    def smooth_density_modwt(self, cutcounts_path, total_cutcounts, save_path):
         """
         Run MODWT smoothing on cutcounts.
         """
@@ -398,7 +398,7 @@ class ChromosomeProcessor:
             'smoothed': smoothed,
             'normalized_density': normalize_density(agg_cutcounts, total_cutcounts) 
         })
-        self.to_parquet(data, save_path)
+        self.write_to_parquet(data, save_path)
 
 
     @ensure_contig_exists
@@ -466,7 +466,7 @@ class ChromosomeProcessor:
 
     
     @ensure_contig_exists
-    def to_parquet(self, data_df, path, compression_level=22):
+    def write_to_parquet(self, data_df, path, compression_level=22):
         """
         Workaround for writing parquet files for chromosomes in parallel.
         """
@@ -489,13 +489,13 @@ class ChromosomeProcessor:
         
     
     @ensure_contig_exists
-    def total_cutcounts(self, cutcounts):
+    def get_total_cutcounts(self, cutcounts):
         self.gp.logger.debug(f"{self.chrom_name}: Calculating total cutcounts")
         return self.extractor.extract_cutcounts(cutcounts).sum()
 
 
     @ensure_contig_exists
-    def extract_density(self, smoothed_signal) -> ProcessorOutputData:
+    def extract_normalized_density(self, smoothed_signal) -> ProcessorOutputData:
         data_df = self.extractor.extract_from_parquet(
             smoothed_signal, 
             columns=['chrom', 'normalized_density']

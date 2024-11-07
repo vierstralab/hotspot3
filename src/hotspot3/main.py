@@ -40,9 +40,9 @@ def main() -> None:
         
         if smoothed_signal_path is None:
             smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-            total_cutcounts = genome_processor.total_cutcounts(cutcounts_path)
+            total_cutcounts = genome_processor.get_total_cutcounts(cutcounts_path)
             np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
-            genome_processor.modwt_smooth_signal(
+            genome_processor.smooth_signal_modwt(
                 cutcounts_path,
                 total_cutcounts=total_cutcounts,
                 save_path=smoothed_signal_path
