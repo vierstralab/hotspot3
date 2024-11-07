@@ -438,37 +438,38 @@ class StridedBackgroundFit(BackgroundFit):
             global_fit=global_fit
         )
 
-        if global_fit is not None and remaing_fits_mask.sum() > 0:
-            best_tr_step2, best_rmsea_step2, remaing_fits_step2 = self.tr_for_remaining_fits(
-                strided_agg_cutcounts,
-                bin_edges,
-                value_counts,
-                n_signal_bins,
-                remaing_fits_mask,
-            )
-            best_tr = np.where(
-                best_rmsea <= self.config.rmsea_tr,
-                best_tr,
-                np.where(
-                    best_rmsea_step2 < self.config.rmsea_tr,
-                    best_tr_step2,
-                    np.minimum(best_tr, best_tr_step2)
-                )
-            )
-            best_rmsea = np.where(
-                best_rmsea <= self.config.rmsea_tr,
-                best_rmsea,
-                np.where(
-                    best_rmsea_step2 < self.config.rmsea_tr,
-                    best_rmsea_step2,
-                    np.minimum(best_rmsea, best_rmsea_step2)
-                )
-            )
+        # if global_fit is not None and remaing_fits_mask.sum() > 0:
+        #     best_tr_step2, best_rmsea_step2, remaing_fits_step2 = self.tr_for_remaining_fits(
+        #         strided_agg_cutcounts,
+        #         bin_edges,
+        #         value_counts,
+        #         n_signal_bins,
+        #         remaing_fits_mask,
+        #     )
 
+        #     best_tr = np.where(
+        #         remaing_fits_mask & ~remaing_fits_step2,
+        #         best_tr,
+        #         np.where(
+        #             ~remaing_fits_step2,
+        #             best_tr_step2,
+        #             np.minimum(best_tr, best_tr_step2)
+        #         )
+        #     )
+
+        #     best_rmsea = np.where(
+        #         ~remaing_fits_mask,
+        #         best_rmsea,
+        #         np.where(
+        #             ~remaing_fits_step2,
+        #             best_rmsea_step2,
+        #             np.minimum(best_rmsea, best_rmsea_step2)
+        #         )
+        #     )
         
         if global_fit is not None:
             best_tr = np.where(
-                best_rmsea <= self.config.rmsea_tr,
+                best_rmsea <= self.config.rmsea_tr * 2,
                 best_tr, 
                 self.fallback_tr(strided_agg_cutcounts, global_fit, best_tr)
             )
