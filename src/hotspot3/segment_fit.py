@@ -6,6 +6,7 @@ from hotspot3.stats import check_valid_fit
 import numpy.ma as ma
 import numpy as np
 from genome_tools.genomic_interval import GenomicInterval
+from typing import List
 
 
 class ChromosomeFit(WithLogger):
@@ -13,17 +14,16 @@ class ChromosomeFit(WithLogger):
         super().__init__(logger=logger, config=config, name=genomic_interval.chrom)
         self.genomic_interval = genomic_interval
 
-    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments, global_fit: GlobalFitResults=None):
+    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: GlobalFitResults=None):
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
 
-        for segment in bad_segments:
-            start = int(segment.start)
-            end = int(segment.end)
-            segment_interval = GenomicInterval(self.genomic_interval.chrom, start, end)
+        for segment_interval in bad_segments:
+            start = int(segment_interval.start)
+            end = int(segment_interval.end)
             s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)
             thresholds, rmsea, global_seg_fit = s_fit.fit_segment_thresholds(
                 agg_cutcounts,

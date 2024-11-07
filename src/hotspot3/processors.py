@@ -10,7 +10,7 @@ import shutil
 import os
 import subprocess
 import importlib.resources as pkg_resources
-from genome_tools.genomic_interval import GenomicInterval
+from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
 
 from hotspot3.logging import setup_logger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig, ProcessorConfig
@@ -354,7 +354,6 @@ class ChromosomeProcessor:
             self.chrom_name,
             self.chrom_size
         )
-        babachi_result = seg.annotate_with_segments(agg_cutcounts.shape, bad_segments)
 
         self.gp.logger.debug(
             f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
@@ -373,12 +372,12 @@ class ChromosomeProcessor:
             'sliding_p': fit_res.p,
             'tr': per_window_trs,
             'inital_tr': per_window_trs_global,
-            'bad': babachi_result,
+            'bad': seg.annotate_with_segments(agg_cutcounts.shape, bad_segments),
             'rmsea': final_rmsea,
             'enough_bg': fit_res.enough_bg_mask
         })
         self.to_parquet(df, fit_res_path, compression_level=0)
-        del df, per_window_trs, final_rmsea, babachi_result
+        del df, per_window_trs, final_rmsea
         gc.collect()
   
         self.gp.logger.debug(f'{self.chrom_name}: Calculating p-values')
@@ -392,7 +391,10 @@ class ChromosomeProcessor:
         fname = f"{outdir}.{self.chrom_name}.inf_pvals.parquet"
         neglog_pvals = pd.DataFrame.from_dict({'log10_pval': fix_inf_pvals(neglog_pvals, fname)})
         self.to_parquet(neglog_pvals, pvals_outpath)
-    
+
+       # per_interval_df = genomic_intervals_to_df(bad_segments)
+
+        #return ProcessorOutputData(self.chrom_name, )
 
     @ensure_contig_exists
     def modwt_smooth_density(self, cutcounts_path, total_cutcounts, save_path):

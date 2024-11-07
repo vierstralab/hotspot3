@@ -6,7 +6,7 @@ from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
 import numpy as np
 import numpy.ma as ma
 from typing import List
-from babachi.models import BADSegment
+from genome_tools.genomic_interval import GenomicInterval
 
 
 class BabachiWrapper(WithLogger):
@@ -20,9 +20,9 @@ class BabachiWrapper(WithLogger):
         background[assumed_signal_mask[::step]] = np.nan
         starts = np.arange(0, len(background), dtype=np.uint32) * step
 
-        bad = (1 - global_fit.p) / global_fit.p
+        chrom_bad = (1 - global_fit.p) / global_fit.p
         mult = np.linspace(1, 10, 20)
-        bads = [*(mult * bad), *(1 / mult[1:] * bad)]
+        bads = [*(mult * chrom_bad), *(1 / mult[1:] * chrom_bad)]
 
         valid_counts = ~np.isnan(background)
 
@@ -53,14 +53,10 @@ class BabachiWrapper(WithLogger):
             subchr_filter=0
         )
         bad_segments = gs.estimate_BAD()
-        gs.write_BAD(bad_segments, f"{chrom_name}.test.bed")
-
-        return bad_segments
+        return [GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments]
     
-    def annotate_with_segments(self, shape, bad_segments: List[BADSegment]):
+    def annotate_with_segments(self, shape, bad_segments: List[GenomicInterval]):
         babachi_result = np.zeros(shape, dtype=np.float16)
         for segment in bad_segments:
-            start = int(segment.start)
-            end = int(segment.end)
-            babachi_result[start:end] = segment.BAD
+            babachi_result[segment.start:segment.end] = segment.BAD
         return babachi_result

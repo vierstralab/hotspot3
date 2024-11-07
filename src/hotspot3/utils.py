@@ -8,6 +8,7 @@ import numpy.ma as ma
 from hotspot3.models import NotEnoughDataForContig
 
 
+
 def ensure_contig_exists(func):
     """
     Decorator for functions that require a contig to be present in the input data.
