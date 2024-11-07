@@ -23,10 +23,12 @@ class ChromosomeFit(WithLogger):
         
         segment_fits: List[GlobalFitResults] = []
         segments = bad_segments
+        types = []
         if global_fit is not None:
             segment_fits.append(global_fit)
             self.genomic_interval.BAD = None
             segments = [self.genomic_interval, *segments]
+            types.append('global')
         for segment_interval in bad_segments:
             start = int(segment_interval.start)
             end = int(segment_interval.end)
@@ -36,6 +38,7 @@ class ChromosomeFit(WithLogger):
                 global_fit=global_fit,
             )
             segment_fits.append(segment_fit_results)
+            types.append('segment')
 
             fit_res = s_fit.fit_segment_params(
                 agg_cutcounts,
@@ -54,6 +57,7 @@ class ChromosomeFit(WithLogger):
         intervals_stats['p'] = [x.p for x in segment_fits]
         intervals_stats['rmsea'] = [x.rmsea for x in segment_fits]
         intervals_stats['signal_tr'] = [x.fit_threshold for x in segment_fits]
+        intervals_stats['type'] = types
 
         return WindowedFitResults(
             p=final_p,
