@@ -5,7 +5,7 @@ import shutil
 import pyBigWig
 import functools
 import numpy.ma as ma
-from hotspot3.models import NoContigPresentError
+from hotspot3.models import NotEnoughDataForContig
 
 
 def ensure_contig_exists(func):
@@ -19,7 +19,7 @@ def ensure_contig_exists(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except NoContigPresentError:
+        except NotEnoughDataForContig:
             return None
     return wrapper
 

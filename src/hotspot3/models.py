@@ -75,7 +75,7 @@ class ProcessorOutputData:
     data_df: pd.DataFrame
 
 
-class NoContigPresentError(Exception):
+class NotEnoughDataForContig(Exception):
     """Exception raised when a required contig is not present."""
 
     def __init__(self, message="No contig is present in the provided data."):

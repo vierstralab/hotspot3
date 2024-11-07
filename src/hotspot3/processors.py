@@ -13,7 +13,7 @@ import importlib.resources as pkg_resources
 from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.logging import setup_logger
-from hotspot3.models import ProcessorOutputData, NoContigPresentError, ProcessorConfig
+from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig, ProcessorConfig
 from hotspot3.file_extractors import ChromosomeExtractor
 from hotspot3.pvalue import PvalueEstimator
 from hotspot3.connectors.bottleneck import BottleneckWrapper
@@ -326,7 +326,7 @@ class ChromosomeProcessor:
         min_signal_quantile = (agg_cutcounts > 4).sum() / agg_cutcounts.count()
         if min_signal_quantile < 0.02:
             self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% (<2%) of data have # of cutcounts more than 4.")
-            raise NoContigPresentError
+            raise NotEnoughDataForContig
         
         # Step with window to speed it up
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
@@ -454,7 +454,7 @@ class ChromosomeProcessor:
         starts, ends = find_stretches(signif_fdrs)
         if len(starts) == 0:
             self.gp.logger.warning(f"{self.chrom_name}: No peaks found. Skipping...")
-            raise NoContigPresentError
+            raise NotEnoughDataForContig
 
         normalized_density = signal_df['normalized_density'].values
         self.gp.logger.debug(f"{self.chrom_name}: Calling peaks")
@@ -484,7 +484,7 @@ class ChromosomeProcessor:
         Workaround for writing parquet files for chromosomes in parallel.
         """
         if data_df is None:
-            raise NoContigPresentError
+            raise NotEnoughDataForContig
         if isinstance(data_df, ProcessorOutputData):
             data_df = data_df.data_df
         data_df['chrom'] = pd.Categorical(

@@ -4,7 +4,7 @@ import pandas as pd
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 from genome_tools.genomic_interval import GenomicInterval
 
-from hotspot3.models import NoContigPresentError, ProcessorConfig
+from hotspot3.models import NotEnoughDataForContig, ProcessorConfig
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.logging import WithLogger
 
@@ -34,7 +34,7 @@ class ChromosomeExtractor(WithLogger):
                             raise ValueError(f"Mappable bases file does not match chromosome sizes! Check input parameters. {row['end']} > {self.genomic_interval.end} for {self.chrom_name}")
                         mappable[row['start']:row['end']] = True
             except ValueError:
-                raise NoContigPresentError
+                raise NotEnoughDataForContig
     
         return mappable
     
@@ -46,7 +46,7 @@ class ChromosomeExtractor(WithLogger):
                 assert data.eval('end - start == 1').all(), "Cutcounts are expected to be at basepair resolution"
                 cutcounts[data['start']] = data['count'].to_numpy()
         except ValueError:
-            raise NoContigPresentError
+            raise NotEnoughDataForContig
 
         return cutcounts
     
@@ -71,7 +71,7 @@ class ChromosomeExtractor(WithLogger):
         ) as smoothed_signal_loader:
             signal_df = smoothed_signal_loader[self.genomic_interval]
         if signal_df.empty:
-            raise NoContigPresentError
+            raise NotEnoughDataForContig
         return signal_df
 
     def extract_fdr_track(self, fdr_path):

@@ -2,7 +2,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy import stats as st
 from scipy.special import betainc
-from hotspot3.models import NoContigPresentError, ProcessorConfig, GlobalFitResults, WindowedFitResults
+from hotspot3.models import NotEnoughDataForContig, ProcessorConfig, GlobalFitResults, WindowedFitResults
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.utils import wrap_masked, rolling_view_with_nan_padding
 from hotspot3.stats import calc_g_sq, calc_chisq, calc_rmsea
@@ -84,10 +84,12 @@ class GlobalBackgroundFit(BackgroundFit):
         for tr in trs:
             try:
                 p, r, rmsea = self.fit_for_tr(agg_cutcounts, tr, step=step, global_fit=global_fit)
-            except NoContigPresentError:
+            except NotEnoughDataForContig:
                 continue
             result.append((tr, rmsea, p, r))
-        
+        if len(result) == 0:
+            raise NotEnoughDataForContig
+
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
         if rmsea > self.config.rmsea_tr and global_fit is not None:
             chrom_quantile_tr = np.nanquantile(agg_cutcounts, global_fit.fit_quantile)
@@ -129,7 +131,7 @@ class GlobalBackgroundFit(BackgroundFit):
         has_enough_background = (agg_cutcounts.size > 0) and (nonzero_count / agg_cutcounts.size > self.config.nonzero_windows_to_fit)
         if not has_enough_background:
             self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}")
-            raise NoContigPresentError
+            raise NotEnoughDataForContig
         
         mean, variance = self.get_mean_and_var(agg_cutcounts)
         return mean, variance
