@@ -7,12 +7,11 @@ StridedBackgroundFit: Fit the array using a strided approach (takes a lot of mem
 
 import numpy.ma as ma
 import numpy as np
-from scipy import stats as st
 from scipy.special import betainc
 from hotspot3.models import NotEnoughDataForContig, ProcessorConfig, GlobalFitResults, WindowedFitResults
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.utils import wrap_masked, rolling_view_with_nan_padding
-from hotspot3.stats import calc_g_sq, calc_chisq, calc_rmsea
+from hotspot3.stats import calc_rmsea, check_valid_fit
 
 
 class BackgroundFit(BottleneckWrapper):
@@ -171,8 +170,6 @@ class GlobalBackgroundFit(BackgroundFit):
                     assumed_signal_mask=assumed_signal_mask,
                     global_fit=global_fit
                 )
-                if np.isnan(rmsea):
-                    continue
             except NotEnoughDataForContig:
                 continue
             result.append((tr[0], rmsea, p, r))
@@ -217,6 +214,9 @@ class GlobalBackgroundFit(BackgroundFit):
             r = self.r_from_mean_and_var(mean, var)
             n_params = 2
         p = self.p_from_mean_and_r(mean, r)
+
+        if not check_valid_fit(GlobalFitResults(p, r, 0)):
+            raise NotEnoughDataForContig
 
         value_counts = self.value_counts_per_bin(agg_cutcounts[~assumed_signal_mask, None], bin_edges)
         rmsea = self.calc_rmsea_all_windows(
