@@ -215,7 +215,7 @@ class GlobalBackgroundFit(BackgroundFit):
             n_params = 2
         p = self.p_from_mean_and_r(mean, r)
 
-        if not check_valid_fit(GlobalFitResults(p, r, 0)):
+        if not check_valid_fit(GlobalFitResults(p, r, 0, 0, 0)):
             raise NotEnoughDataForContig
 
         value_counts = self.value_counts_per_bin(agg_cutcounts[~assumed_signal_mask, None], bin_edges)
