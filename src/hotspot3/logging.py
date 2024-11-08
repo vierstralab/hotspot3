@@ -5,7 +5,7 @@ from hotspot3.models import ProcessorConfig
 
 def setup_logger(name='hotspot3', level=None, outstream=None) -> logging.Logger:
     if outstream is None:
-        outstream = sys.stderr
+        outstream = sys.stdout
 
     logger = logging.getLogger(name)
     if level is not None:
