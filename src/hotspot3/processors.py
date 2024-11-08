@@ -314,10 +314,6 @@ class ChromosomeProcessor:
         )
 
         self.gp.logger.debug(f'{self.chrom_name}: Estimating proportion of background vs signal')
-        min_signal_quantile = (agg_cutcounts > 4).sum() / agg_cutcounts.count()
-        if min_signal_quantile < 0.02:
-            self.gp.logger.warning(f"{self.chrom_name}: Not enough signal to fit the background model. {min_signal_quantile*100:.2f}% (<2%) of data have # of cutcounts more than 4.")
-            raise NotEnoughDataForContig
         
         # Step with window to speed it up
         s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
@@ -327,7 +323,7 @@ class ChromosomeProcessor:
         
         # Various checks
         if global_fit.rmsea > self.config.rmsea_tr:
-            self.gp.logger.warning(f"{self.chrom_name}: Not enough data to fit the background model. Best RMSEA: {global_fit.rmsea:.3f}. Chromosome fit might be poorly approximated.")
+            self.gp.logger.warning(f"{self.chrom_name}: Best RMSEA: {global_fit.rmsea:.3f}. Chromosome fit might be poorly approximated.")
 
         self.gp.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit.fit_quantile:.3f}. signal threshold: {global_fit.fit_threshold:.0f}. Best RMSEA: {global_fit.rmsea:.3f}")
 

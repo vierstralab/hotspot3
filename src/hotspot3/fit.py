@@ -47,6 +47,34 @@ class BackgroundFit(BottleneckWrapper):
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
     
+    def value_counts_per_bin(self, array, bin_edges):
+        left_edges = bin_edges[0]
+        right_edges = bin_edges[1:]
+        value_counts = np.full_like(right_edges, 0, dtype=np.float32)
+        for i in range(right_edges.shape[0]):
+            bin_membership = (array >= left_edges[None, :]) & (array < right_edges[i][None, :])
+            value_counts[i] = np.sum(bin_membership, axis=0)
+            left_edges = right_edges[i]
+        
+        return value_counts
+    
+    def get_all_bins(self, array: np.ndarray):
+        min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
+        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
+        n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
+        n_bg_bins = round(n_bg_bins)
+
+        bg_bins = np.full((n_bg_bins + 1, *min_bg_tr.shape), np.nan)
+        bg_bins[:, ~np.isnan(min_bg_tr)] = np.round(
+            np.linspace(
+                0,
+                min_bg_tr[~np.isnan(min_bg_tr)],
+                n_bg_bins + 1,
+            )
+        )
+        
+        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
+
     def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
         if min_bg_tr is None:
             min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
@@ -54,12 +82,22 @@ class BackgroundFit(BottleneckWrapper):
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
         
-        result = np.full((n_signal_bins + 1, *min_bg_tr.shape), np.nan, dtype=np.float32)
+        bin_edges = np.full((n_signal_bins + 1, *min_bg_tr.shape), np.nan, dtype=np.float32)
         nan_tr = np.isnan(min_bg_tr) | np.isnan(max_bg_tr)
-        result[:, ~nan_tr] = np.round(
+        bin_edges[:, ~nan_tr] = np.round(
             np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
         )
-        return result, n_signal_bins
+
+        return bin_edges, n_signal_bins
+    
+    def merge_signal_bins_inplace(self, value_counts, bin_edges, n_signal_bins):
+        assert bin_edges.shape[0] == value_counts.shape[0] + 1, f"Bin edges shape should be one more than value counts shape. Got {bin_edges.shape} and {value_counts.shape}"
+        for j in np.arange(n_signal_bins):
+            i = value_counts.shape[0] - j - 1
+            if value_counts[i] < self.config.min_obs_rmsea:
+                value_counts[i - 1] += value_counts[i]
+                value_counts[i] = 0
+                bin_edges[i] = bin_edges[i + 1]
 
     def quantile_ignore_all_na(self, array: np.ndarray, quantile: float):
         """
@@ -71,6 +109,34 @@ class BackgroundFit(BottleneckWrapper):
         result = np.full(array.shape[1], np.nan, dtype=np.float32)
         result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0)
         return result
+    
+    @wrap_masked
+    def calc_rmsea_all_windows(
+        self,
+        p: np.ndarray,
+        r: np.ndarray,
+        n_params: int,
+        bin_edges: np.ndarray, # edges of the bins, right edge not inclusive
+        value_counts_per_bin: np.ndarray, # number of observed cutcounts in each bin for each window
+    ):
+        """
+        Calculate RMSEA for all sliding windows.
+        """
+        valid_bins = value_counts_per_bin >= self.config.min_obs_rmsea
+        bg_sum_mappable = np.sum(value_counts_per_bin, axis=0, where=valid_bins)
+        # print(bin_edges)
+        #sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
+        sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
+        sf_diffs = -np.diff(sf_values, axis=0)
+        assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
+        norm_coef = 1 - sf_values[-1]
+        expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
+        df = np.sum(
+            np.diff(bin_edges, axis=0) != 0,
+            axis=0,
+            where=valid_bins
+        ) - n_params - 1
+        return calc_rmsea(value_counts_per_bin, expected_counts, bg_sum_mappable, df, where=valid_bins)
 
 
 class GlobalBackgroundFit(BackgroundFit):
@@ -88,21 +154,26 @@ class GlobalBackgroundFit(BackgroundFit):
         result = []
         agg_cutcounts = agg_cutcounts.filled(np.nan)
         max_counts = self.get_max_count_with_flanks(agg_cutcounts)[::step]
-        trs, _ = self.get_signal_bins(agg_cutcounts)
         agg_cutcounts = agg_cutcounts[::step]
-        for tr in trs:
+        trs, n_signal_bins = self.get_all_bins(agg_cutcounts)
+        trs = trs[:, None]
+        value_counts = self.value_counts_per_bin(agg_cutcounts[:, None], trs)
+        self.merge_signal_bins_inplace(value_counts, trs, n_signal_bins)
+        for i in np.arange(n_signal_bins)[::-1]:
+            tr = trs[len(trs) - i - 1]
             #self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
             try:
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(
                     agg_cutcounts,
-                    tr,
+                    bin_edges=trs,
+                    tr=tr,
                     assumed_signal_mask=assumed_signal_mask,
                     global_fit=global_fit
                 )
             except NotEnoughDataForContig:
                 continue
-            result.append((tr, rmsea, p, r))
+            result.append((tr[0], rmsea, p, r))
         if len(result) == 0:
             raise NotEnoughDataForContig
 
@@ -114,8 +185,9 @@ class GlobalBackgroundFit(BackgroundFit):
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(
                     agg_cutcounts,
-                    tr,
-                    assumed_signal_mask,
+                    bin_edges=trs,
+                    tr=tr,
+                    assumed_signal_mask=assumed_signal_mask,
                     global_fit=global_fit
                 )
                 self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). Low signal region ({chrom_quantile_tr}<{global_fit.fit_threshold}). Fitting with global {global_fit.fit_threshold}")
@@ -128,9 +200,11 @@ class GlobalBackgroundFit(BackgroundFit):
             
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
+        print(GlobalFitResults(p, r, rmsea, quantile, tr))
+
         return GlobalFitResults(p, r, rmsea, quantile, tr)#, result
 
-    def fit_for_tr(self, agg_cutcounts, tr, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
+    def fit_for_tr(self, agg_cutcounts, bin_edges, tr, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
         
         if assumed_signal_mask is None:
             assumed_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, tr)
@@ -138,16 +212,20 @@ class GlobalBackgroundFit(BackgroundFit):
         mean, var = self.estimate_global_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
         if global_fit is not None:
             r = global_fit.r
+            n_params = 1
         else:
             r = self.r_from_mean_and_var(mean, var)
+            n_params = 2
         p = self.p_from_mean_and_r(mean, r)
 
-        unique, counts = np.unique(agg_cutcounts[~assumed_signal_mask], return_counts=True)
-        m = np.isnan(unique)
-        if np.any(m):
-            unique = unique[~m]
-            counts = counts[~m]
-        rmsea = self.calc_rmsea_for_tr(counts, unique, p, r, tr)
+        value_counts = self.value_counts_per_bin(agg_cutcounts[~assumed_signal_mask, None], bin_edges)
+        rmsea = self.calc_rmsea_all_windows(
+            p,
+            r,
+            n_params,
+            bin_edges,
+            value_counts,
+        )[0]
         return p, r, rmsea
 
     def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray, where=None):
@@ -161,16 +239,16 @@ class GlobalBackgroundFit(BackgroundFit):
         mean, variance = self.get_mean_and_var(agg_cutcounts, where=where)
         return mean, variance
 
-    def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
-        if p <= 0 or p >= 1 or r <= 0:
-            return np.inf
-        assert np.max(unique_cutcounts) < tr, f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}"
-        obs = obs.astype(np.float32)
-        N = sum(obs)
-        exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
+    # def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
+    #     if p <= 0 or p >= 1 or r <= 0:
+    #         return np.inf
+    #     assert np.max(unique_cutcounts) < tr, f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}"
+    #     obs = obs.astype(np.float32)
+    #     N = sum(obs)
+    #     exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
 
-        df = len(obs) - 2 - 1
-        return calc_rmsea(obs, exp, N, df, stat='G_sq')
+    #     df = len(obs) - 2 - 1
+    #     return calc_rmsea(obs, exp, N, df, stat='G_sq')
 
 
 class WindowBackgroundFit(BackgroundFit):
@@ -235,17 +313,6 @@ class StridedBackgroundFit(BackgroundFit):
     Class to fit the background distribution using a strided approach.
     Extemely computationally taxing, use large stride values to compensate.
     """
-    def value_counts_per_bin(self, strided_cutcounts, bin_edges):
-        left_edges = bin_edges[0]
-        right_edges = bin_edges[1:]
-        value_counts = np.full_like(right_edges, 0, dtype=np.float32)
-        for i in range(right_edges.shape[0]):
-            bin_membership = (strided_cutcounts >= left_edges[None, :]) & (strided_cutcounts < right_edges[i][None, :])
-            value_counts[i] = np.sum(bin_membership, axis=0)
-            left_edges = right_edges[i]
-        
-        return value_counts
-
     def fit_for_bin(self, collapsed_agg_cutcounts, where=None, global_r=None):
         window = min(self.config.bg_window, collapsed_agg_cutcounts.shape[0])
         min_count = self.get_min_count(window / self.sampling_step)
@@ -270,23 +337,6 @@ class StridedBackgroundFit(BackgroundFit):
         p = self.p_from_mean_and_r(mean, r)
 
         return p, r, enough_bg_mask
-
-    def get_all_bins(self, array: np.ndarray):
-        min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
-        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
-        n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
-        n_bg_bins = round(n_bg_bins)
-
-        bg_bins = np.full((n_bg_bins + 1, *min_bg_tr.shape), np.nan)
-        bg_bins[:, ~np.isnan(min_bg_tr)] = np.round(
-            np.linspace(
-                0,
-                min_bg_tr[~np.isnan(min_bg_tr)],
-                n_bg_bins + 1,
-            )
-        )
-        
-        return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
     
     def wrap_rmsea_valid_fits(self, p, r, bin_edges, value_counts, enough_bg_mask=None, n_params=2):
         result = np.full_like(p, np.nan)
@@ -481,29 +531,3 @@ class StridedBackgroundFit(BackgroundFit):
                 self.quantile_ignore_all_na(strided_agg_cutcounts, self.config.min_background_prop) # FIXME, already calc in bin_edges
             )
         )
-
-    @wrap_masked
-    def calc_rmsea_all_windows(
-        self,
-        p: np.ndarray,
-        r: np.ndarray,
-        n_params: int,
-        bin_edges: np.ndarray, # edges of the bins, right edge not inclusive
-        value_counts_per_bin: np.ndarray, # number of observed cutcounts in each bin for each window
-    ):
-        """
-        Calculate RMSEA for all sliding windows.
-        """
-        bg_sum_mappable = np.sum(value_counts_per_bin, axis=0)
-        # print(bin_edges)
-        #sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
-        sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
-        sf_diffs = -np.diff(sf_values, axis=0)
-        assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
-        norm_coef = 1 - sf_values[-1]
-        expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
-        df = np.sum(
-            (value_counts_per_bin > 0) & (np.diff(bin_edges, axis=0) != 0),
-            axis=0
-        ) - n_params - 1
-        return calc_rmsea(value_counts_per_bin, expected_counts, bg_sum_mappable, df)

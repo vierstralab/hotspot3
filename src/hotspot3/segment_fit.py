@@ -57,6 +57,7 @@ class ChromosomeFit(WithLogger):
         intervals_stats['p'] = [x.p for x in segment_fits]
         intervals_stats['rmsea'] = [x.rmsea for x in segment_fits]
         intervals_stats['signal_tr'] = [x.fit_threshold for x in segment_fits]
+        intervals_stats['quantile_tr'] = [x.fit_quantile for x in segment_fits]
         intervals_stats['type'] = types
 
         return WindowedFitResults(
