@@ -171,6 +171,8 @@ class GlobalBackgroundFit(BackgroundFit):
                     assumed_signal_mask=assumed_signal_mask,
                     global_fit=global_fit
                 )
+                if np.isnan(rmsea):
+                    continue
             except NotEnoughDataForContig:
                 continue
             result.append((tr[0], rmsea, p, r))
@@ -199,8 +201,6 @@ class GlobalBackgroundFit(BackgroundFit):
                     self.logger.warning(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{global_fit.fit_threshold}). Fitting with last {tr}")
             
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
-
-        print(GlobalFitResults(p, r, rmsea, quantile, tr))
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)#, result
 
