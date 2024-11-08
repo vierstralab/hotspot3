@@ -316,7 +316,7 @@ class ChromosomeProcessor:
         self.gp.logger.debug(f'{self.chrom_name}: Estimating proportion of background vs signal')
         
         # Step with window to speed it up
-        s_fit = SegmentFit(self.genomic_interval, self.config, logger=self.gp.logger)
+        s_fit = SegmentFit(self.genomic_interval, config=self.config, logger=self.gp.logger)
         per_window_trs_global, rmseas, global_fit = s_fit.fit_segment_thresholds(
             agg_cutcounts,
         )
@@ -368,7 +368,7 @@ class ChromosomeProcessor:
   
         self.gp.logger.debug(f'{self.chrom_name}: Calculating p-values')
 
-        pval_estimator = PvalueEstimator(self.config, self.gp.logger, name=self.chrom_name)
+        pval_estimator = PvalueEstimator(config=self.config, logger=self.gp.logger, name=self.chrom_name)
 
         # Strip masks to free up some memory
         agg_cutcounts = np.floor(agg_cutcounts.filled(np.nan))

@@ -90,7 +90,7 @@ class SegmentFit(WithLogger):
         fine_signal_level_fit = StridedBackgroundFit(self.config, name=self.name)
         thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
             signal_at_segment,
-            global_fit=segment_fit,
+           # global_fit=segment_fit,
         )
         thresholds = interpolate_nan(thresholds)
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
