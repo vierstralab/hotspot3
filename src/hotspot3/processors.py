@@ -344,7 +344,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
 
         # Segmentation
-        seg = BabachiWrapper(self.logger, self.config)
+        seg = BabachiWrapper(self.genomic_interval, config=self.config, logger=self.logger)
         bad_segments = seg.run_segmentation(
             agg_cutcounts,
             per_window_trs_global,
@@ -393,7 +393,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
  
         neglog_pvals = pd.DataFrame({'log10_pval': pval_estimator.fix_inf_pvals(neglog_pvals)})
         self.write_to_parquet(neglog_pvals, pvals_outpath)
-
 
     @ensure_contig_exists
     def smooth_density_modwt(self, cutcounts_path, total_cutcounts, save_path):
