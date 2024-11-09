@@ -356,7 +356,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
         )
 
-        chrom_fit = ChromosomeFit(self.genomic_interval, self.config, logger=self.logger)
+        chrom_fit = ChromosomeFit(self.genomic_interval, config=self.config, logger=self.logger)
         fit_res, per_window_trs, final_rmsea, per_interval_params = chrom_fit.fit_params(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,
