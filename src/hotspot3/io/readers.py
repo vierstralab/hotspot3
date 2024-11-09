@@ -14,7 +14,7 @@ counts_dtype = np.int32
 
 class ChromReader(WithLoggerAndInterval):
     def __init__(self, genomic_interval: GenomicInterval, config: ProcessorConfig=None, logger=None):
-        super().__init__(genomic_interval=self.genomic_interval, config=config, logger=logger)
+        super().__init__(genomic_interval=genomic_interval, config=config, logger=logger)
 
         self.chrom_name = genomic_interval.chrom
         self.chrom_size = genomic_interval.end
