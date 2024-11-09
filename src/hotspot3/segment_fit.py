@@ -1,6 +1,6 @@
 from hotspot3.logging import WithLogger
 from hotspot3.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
-from hotspot3.models import GlobalFitResults, WindowedFitResults
+from hotspot3.models import GlobalFitResults, WindowedFitResults, NotEnoughDataForContig
 from hotspot3.utils import interpolate_nan
 from hotspot3.stats import check_valid_fit
 import numpy.ma as ma
@@ -32,13 +32,18 @@ class ChromosomeFit(WithLogger):
         for segment_interval in bad_segments:
             start = int(segment_interval.start)
             end = int(segment_interval.end)
-            s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)
-            thresholds, rmsea, segment_fit_results = s_fit.fit_segment_thresholds(
-                agg_cutcounts,
-                global_fit=global_fit,
-            )
-            segment_fits.append(segment_fit_results)
+            s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)            
             types.append('segment')
+            try:
+                thresholds, rmsea, segment_fit_results = s_fit.fit_segment_thresholds(
+                    agg_cutcounts,
+                    global_fit=global_fit,
+                )
+                segment_fits.append(segment_fit_results)
+            except NotEnoughDataForContig:
+                segment_fits.append(None)
+                continue
+
 
             fit_res = s_fit.fit_segment_params(
                 agg_cutcounts,
