@@ -51,7 +51,7 @@ class ChromosomeFit(WithLoggerAndInterval):
             
             segment_fits.append(segment_fit_results)
 
-            thresholds = np.full_like(agg_cutcounts, segment_fit_results.fit_threshold)
+            #thresholds = np.full_like(thresholds, segment_fit_results.fit_threshold)
 
             fit_res = s_fit.fit_segment_params(
                 agg_cutcounts,
