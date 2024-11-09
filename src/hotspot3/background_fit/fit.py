@@ -20,7 +20,7 @@ class BackgroundFit(BottleneckWrapper):
     def __init__(self, config: ProcessorConfig=None, logger=None, name=None):
         super().__init__(logger=logger, config=config, name=name)
 
-        self.min_mappable_bg = round(self.config.min_mappable_bg_frac * self.config.bg_window)
+        self.min_mappable_bg = round(self.config.min_mappable_bases_proportion * self.config.bg_window)
         self.sampling_step = self.config.signal_prop_sampling_step
         self.interpolation_step = self.config.signal_prop_interpolation_step // self.sampling_step
         self.points_in_bg_window = (self.config.bg_window - 1) // self.sampling_step
@@ -91,7 +91,7 @@ class BackgroundFit(BottleneckWrapper):
 
         return bin_edges, n_signal_bins
     
-    def merge_signal_bins_inplace(self, value_counts, bin_edges, n_signal_bins):
+    def merge_signal_bins_for_rmsea_inplace(self, value_counts, bin_edges, n_signal_bins):
         assert bin_edges.shape[0] == value_counts.shape[0] + 1, f"Bin edges shape should be one more than value counts shape. Got {bin_edges.shape} and {value_counts.shape}"
         for j in np.arange(n_signal_bins):
             i = value_counts.shape[0] - j - 1
@@ -159,7 +159,7 @@ class GlobalBackgroundFit(BackgroundFit):
         trs, n_signal_bins = self.get_all_bins(agg_cutcounts)
         trs = trs[:, None]
         value_counts = self.value_counts_per_bin(agg_cutcounts[:, None], trs)
-        self.merge_signal_bins_inplace(value_counts, trs, n_signal_bins)
+        self.merge_signal_bins_for_rmsea_inplace(value_counts, trs, n_signal_bins)
         for i in np.arange(n_signal_bins)[::-1]:
             tr = trs[len(trs) - i - 1]
             #self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
@@ -212,7 +212,7 @@ class GlobalBackgroundFit(BackgroundFit):
         if assumed_signal_mask is None:
             assumed_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, tr)
 
-        mean, var = self.estimate_global_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
+        mean, var = self.get_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
         if global_fit is not None:
             r = global_fit.r
             n_params = 1
@@ -233,28 +233,6 @@ class GlobalBackgroundFit(BackgroundFit):
             value_counts,
         )[0]
         return p, r, rmsea
-
-    def estimate_global_mean_and_var(self, agg_cutcounts: np.ndarray, where=None):
-        total_count = np.sum(where)
-        nonzero_count = np.sum(where & (agg_cutcounts != 0))
-        has_enough_background = (total_count > 0) and (nonzero_count / total_count > self.config.nonzero_windows_to_fit)
-        if not has_enough_background:
-            self.logger.warning(f"{self.name}: Not enough background to fit the global mean. {nonzero_count}/{agg_cutcounts.shape}")
-            raise NotEnoughDataForContig
-        
-        mean, variance = self.get_mean_and_var(agg_cutcounts, where=where)
-        return mean, variance
-
-    # def calc_rmsea_for_tr(self, obs, unique_cutcounts, p, r, tr, stat='G_sq'):
-    #     if p <= 0 or p >= 1 or r <= 0:
-    #         return np.inf
-    #     assert np.max(unique_cutcounts) < tr, f"Unique cutcounts contain values greater than tr. tr={tr}, max={np.max(unique_cutcounts)}"
-    #     obs = obs.astype(np.float32)
-    #     N = sum(obs)
-    #     exp = st.nbinom.pmf(unique_cutcounts, r, 1 - p) / st.nbinom.cdf(tr - 1, r, 1 - p) * N
-
-    #     df = len(obs) - 2 - 1
-    #     return calc_rmsea(obs, exp, N, df, stat='G_sq')
 
 
 class WindowBackgroundFit(BackgroundFit):

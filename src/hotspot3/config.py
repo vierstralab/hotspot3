@@ -27,30 +27,36 @@ class ProcessorConfig:
         - logger_level: Logging level.
     """
     window: int = 151
-    bg_window: int = 50001
-    min_mappable_bg_frac: float = 0.05
-    nonzero_windows_to_fit: float = 0.01
+    min_mappable_bases_proportion: float = 0.05
+    
+    # Signal smoothing
+    filter:str = 'haar'
+    modwt_level: int = 7
 
-    max_background_prop: float = 0.99
+    # Background model
+    bg_window: int = 50001
+    exclude_peak_flank_length: int = 0 # half window
     min_background_prop: float = 0.6
+    max_background_prop: float = 0.99
 
     signal_prop_sampling_step: int = 75
     signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
-    exclude_peak_flank_length: int = 0 # half window
 
+    # RMSEA calculation
     num_background_bins: int = 20
     num_signal_bins: int = 100
-
     rmsea_tr: float = 0.05
     min_obs_rmsea: int = 5
 
+    # Segmentation
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 9
     babachi_min_segment_size: int = 5000
 
-    density_step: int = 20
     fdr_method: str = 'by'
+    density_step: int = 20
+
     cpus: int = 1
+    tmp_dir: str = None
     save_debug: bool = False
-    modwt_level: int = 7
     logger_level: int = logging.INFO

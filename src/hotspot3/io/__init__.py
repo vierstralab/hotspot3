@@ -1,9 +1,7 @@
 import pandas as pd
-import os
-import shutil
-import pyBigWig
+import subprocess
+import importlib.resources as pkg_resources
 
-# Move to writers/readers
 
 def read_chrom_sizes(chrom_sizes):
     if chrom_sizes is None:
@@ -13,7 +11,6 @@ def read_chrom_sizes(chrom_sizes):
         header=None,
         names=['chrom', 'size']
     ).set_index('chrom')['size'].to_dict()
-
 
 def to_parquet_high_compression(df: pd.DataFrame, outpath, compression_level=22, **kwargs):
     df.to_parquet(
@@ -27,20 +24,14 @@ def to_parquet_high_compression(df: pd.DataFrame, outpath, compression_level=22,
         **kwargs
     )
 
-
-def df_to_bigwig(df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
-    with pyBigWig.open(outpath, 'w') as bw:
-        bw.addHeader(list(chrom_sizes.items()))
-        chroms = df['chrom'].to_list()
-        starts = df['start'].to_list()
-        ends = df['end'].to_list()
-        values = df[col].to_list()
-        bw.addEntries(chroms, starts, ends=ends, values=values)
-
-
-def delete_path(path):
-    if os.path.exists(path):
-        if os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.remove(path)
+def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
+    """
+    Run bam2bed conversion script.
+    """
+    with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
+        chroms = ','.join(chromosomes) if chromosomes else ""
+        subprocess.run(
+            ['bash', script, bam_path, tabix_bed_path, chroms],
+            check=True,
+            text=True
+        )

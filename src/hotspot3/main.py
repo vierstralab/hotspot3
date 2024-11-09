@@ -21,11 +21,11 @@ def main() -> None:
         save_debug=args.debug,
         cpus=args.cpus,
         logger_level=logger_level,
+        tmp_dir=args.tempdir,
     )
     genome_processor = GenomeProcessor(
         chrom_sizes=chrom_sizes,
         mappable_bases_file=args.mappable_bases,
-        tmp_dir=args.tempdir,
         chromosomes=args.chromosomes,
         config=config,
     )
@@ -51,14 +51,22 @@ def main() -> None:
             )
 
         if precomp_pvals is None:
-            precomp_pvals = f"{outdir_pref}.pvals.parquet"
+            
             fit_params_path = f"{outdir_pref}.fit_params.parquet"
-            per_region_stats = genome_processor.calc_pval(
+            per_region_stats = genome_processor.fit_background_model(
                 cutcounts_path,
                 precomp_pvals,
                 fit_params_path
             ).data_df
             per_region_stats.to_csv(f"{outdir_pref}.fit_stats.tsv.gz", sep='\t', index=False)
+
+            precomp_pvals = f"{outdir_pref}.pvals.parquet"
+            per_region_stats = genome_processor.calc_pvals(
+                cutcounts_path,
+                precomp_pvals,
+                fit_params_path
+            ).data_df
+            
     
     precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
     genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
@@ -88,7 +96,7 @@ def main() -> None:
     if args.save_density:
         root_logger.info('Saving density')
         denisty_path = f"{outdir_pref}.normalized_density.bw"
-        genome_processor.extract_density(smoothed_signal_path, denisty_path)
+        genome_processor.extract_normalized_density(smoothed_signal_path, denisty_path)
     root_logger.info('Program finished')
 
 

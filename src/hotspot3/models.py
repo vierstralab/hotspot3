@@ -24,7 +24,7 @@ class ProcessorOutputData:
     """
     Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
     """
-    identificator: str
+    id: str
     data_df: pd.DataFrame
 
 

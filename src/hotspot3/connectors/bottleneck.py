@@ -28,19 +28,16 @@ class BottleneckWrapper(WithLogger):
     @correct_offset
     def centered_running_nanmax(self, array, window):
         return bn.move_max(array, window, min_count=1).astype(np.float32)
-    
-    @wrap_masked
-    def running_nanmedian(self, array, window):
-        return bn.move_median(array, window).astype(np.float32)
 
     def get_min_count(self, window):
-        return max(1, round(window * self.config.min_mappable_bg_frac))
+        return max(1, round(window * self.config.min_mappable_bases_proportion))
     
     @wrap_masked
     def get_max_count_with_flanks(self, array: np.ndarray):
         flanks_window = self.config.exclude_peak_flank_length * 2 + 1
         return self.centered_running_nanmax(array, flanks_window)
     
+    @wrap_masked
     def get_signal_mask_for_tr(self, array: np.ndarray, tr: float):
         max_count = self.get_max_count_with_flanks(array)
         return max_count >= tr

@@ -49,13 +49,17 @@ def wrap_masked(func) -> ma.MaskedArray:
         result = func(*args, **kwargs)
 
         if isinstance(result, np.ndarray):
-            return ma.masked_where(mask, result)
+            return wrap_if_1d(mask, result)
         elif isinstance(result, tuple):
-            return tuple(ma.masked_where(mask, r) for r in result)
+            return tuple(wrap_if_1d(mask, r) for r in result)
         else:
             return result
     return wrapper
 
+def wrap_if_1d(mask: np.ndarray, result: np.ndarray):
+    if result.ndim == 0:
+        return result
+    return ma.masked_where(mask, result)
 
 def compress_masked_arg(arg):
     if isinstance(arg, ma.MaskedArray):

@@ -19,7 +19,7 @@ class ChromReader(WithLoggerAndInterval):
         self.chrom_name = genomic_interval.chrom
         self.chrom_size = genomic_interval.end
 
-        self.bottleneck_model = BottleneckWrapper(config)
+        self.bn_wrapper = self.copy_with_params(BottleneckWrapper)
 
     def extract_mappable_bases(self, mappable_file) -> np.ndarray:
         """
@@ -54,9 +54,9 @@ class ChromReader(WithLoggerAndInterval):
     
     def extract_aggregated_cutcounts(self, cutcounts_file):
         cutcounts = self.extract_cutcounts(cutcounts_file).astype(np.float32)
-        window = self.bottleneck_model.config.window
+        window = self.bn_wrapper.config.window
         
-        agg_cutcounts = self.bottleneck_model.centered_running_nansum(cutcounts, window)
+        agg_cutcounts = self.bn_wrapper.centered_running_nansum(cutcounts, window)
         return agg_cutcounts
     
 

@@ -1,10 +1,13 @@
 import logging
 import sys
+from typing import Type, TypeVar
 
 from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.config import ProcessorConfig
 
+
+T = TypeVar('T', bound='WithLogger')
 
 class WithLogger:
     def __init__(self, config=None, logger=None, name=None):
@@ -26,12 +29,42 @@ class WithLogger:
     def logger(self, logger: logging.Logger):
         # Setter allows updating the logger
         self._logger = logger
+    
+    def copy_with_params(self, cls: Type[T]) -> T:
+        """
+        Creates a new instance of the specified class `cls` with the same initialization parameters.
+        """
+        assert issubclass(cls, WithLogger), "cls should be a subclass of WithLogger"
+        return cls(
+            name=self.name,
+            config=self.config,
+            logger=self.logger
+        )
 
 
 class WithLoggerAndInterval(WithLogger): # TODO: Add method to quickly inherit for a subclass
     def __init__(self, genomic_interval: GenomicInterval, config: ProcessorConfig=None, logger=None):
         super().__init__(logger=logger, config=config, name=genomic_interval.to_ucsc())
         self.genomic_interval = genomic_interval
+    
+    def copy_with_params(self, cls: Type[T]) -> T:
+        """
+        Creates a new instance of the specified class `cls` with the same initialization parameters.
+        """
+        if issubclass(cls, WithLoggerAndInterval):
+            return cls(
+                genomic_interval=self.genomic_interval,
+                config=self.config,
+                logger=self.logger
+            )
+        elif issubclass(cls, WithLogger):
+            return cls(
+                name=self.name,
+                config=self.config,
+                logger=self.logger
+            )
+        else:
+            raise ValueError(f"cls should be a subclass of WithLogger or WithLoggerAndInterval, got {cls}")
 
 
 def setup_logger(name='hotspot3', level=None, outstream=None) -> logging.Logger:
