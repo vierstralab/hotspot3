@@ -8,17 +8,24 @@ from hotspot3.config import ProcessorConfig
 
 class WithLogger:
     def __init__(self, config=None, logger=None, name=None):
-        if logger is None:
-            logger = setup_logger()
-        self.logger = logger
-
         if config is None:
             config = ProcessorConfig()
         self.config = config
 
+        self._logger = logger if logger is not None else setup_logger(level=self.config.logger_level)
+
         if name is None:
             name = self.__class__.__name__
         self.name = name
+    
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
+
+    @logger.setter
+    def logger(self, logger: logging.Logger):
+        # Setter allows updating the logger
+        self._logger = logger
 
 
 class WithLoggerAndInterval(WithLogger): # TODO: Add method to quickly inherit for a subclass

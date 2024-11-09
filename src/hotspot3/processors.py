@@ -91,10 +91,6 @@ class GenomeProcessor(WithLogger):
         for name, value in state.items():
             setattr(self, name, value)
 
-    @property
-    def logger(self) -> logging.Logger:
-        return setup_logger(level=self.config.logger_level)
-
 
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
