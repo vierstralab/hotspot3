@@ -348,8 +348,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         bad_segments = seg.run_segmentation(
             agg_cutcounts,
             per_window_trs_global,
-            global_fit,
-            self.genomic_interval
+            global_fit
         )
 
         self.logger.debug(
