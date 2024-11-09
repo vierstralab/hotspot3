@@ -36,7 +36,7 @@ class ProcessorConfig:
 
     signal_prop_sampling_step: int = 75
     signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
-    exclude_peak_flank_length: int = 150 # half window
+    exclude_peak_flank_length: int = 0 # half window
 
     num_background_bins: int = 20
     num_signal_bins: int = 100
