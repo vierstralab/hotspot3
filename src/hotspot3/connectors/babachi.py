@@ -1,22 +1,24 @@
-from hotspot3.models import GlobalFitResults
-from hotspot3.logging import WithLogger
-from hotspot3.connectors.bottleneck import BottleneckWrapper
-from babachi.segmentation import GenomeSegmentator
-from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
 import numpy as np
 import numpy.ma as ma
 from typing import List
+
 from genome_tools.genomic_interval import GenomicInterval
 
+from hotspot3.models import GlobalFitResults
+from hotspot3.io.logging import WithLoggerAndInterval
+from hotspot3.connectors.bottleneck import BottleneckWrapper
 
-class BabachiWrapper(WithLogger):
+from babachi.segmentation import GenomeSegmentator
+from babachi.models import GenomeSNPsHandler, ChromosomeSNPsHandler
+
+
+class BabachiWrapper(WithLoggerAndInterval):
 
     def craft_snps_collection(
             self,
             agg_cutcounts: ma.MaskedArray,
             per_window_trs: np.ndarray,
             global_fit: GlobalFitResults,
-            genomic_interval: GenomicInterval
         ):
         step = self.config.babachi_segmentation_step
 
@@ -28,7 +30,7 @@ class BabachiWrapper(WithLogger):
         valid_counts = ~np.isnan(background)
         
         chrom_handler = ChromosomeSNPsHandler(
-            genomic_interval.chrom,
+            self.genomic_interval.chrom,
             positions=starts[valid_counts], 
             read_counts=np.stack(
                 [
@@ -39,10 +41,14 @@ class BabachiWrapper(WithLogger):
         )
         return GenomeSNPsHandler(chrom_handler)
 
-    def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_interval: GenomicInterval):
+    def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults):
         bads, chrom_bad = self.get_bads(global_fit)
-        snps_collection = self.craft_snps_collection(agg_cutcounts, per_window_trs, global_fit, chrom_interval)
-        chrom_sizes = {chrom_interval.chrom: len(chrom_interval)}
+        snps_collection = self.craft_snps_collection(
+            agg_cutcounts,
+            per_window_trs,
+            global_fit
+        )
+        chrom_sizes = {self.genomic_interval.chrom: len(self.genomic_interval)}
         bad_segments = self.run_babachi(snps_collection, chrom_sizes, bads)
         return [
             GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments

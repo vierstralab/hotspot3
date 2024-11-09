@@ -1,8 +1,9 @@
 import numpy as np
-from hotspot3.logging import WithLogger
-from hotspot3.models import WindowedFitResults
-from hotspot3.stats import logpval_for_dtype
 import itertools
+
+from hotspot3.io.logging import WithLogger
+from hotspot3.models import WindowedFitResults
+from hotspot3.scoring import logpval_for_dtype, fast_logfdr_below_threshold, fix_inf_pvals
 
 
 class PvalueEstimator(WithLogger):
@@ -19,7 +20,6 @@ class PvalueEstimator(WithLogger):
             self.logger.critical(f"{self.name}: {len(ids)} p-values are NaN for betainc method, {ids}. Parameters: r={r[ids]}, p={p[ids]}, count={agg_cutcounts[ids]}")
             raise ValueError(f"{self.name}: {len(ids)} p-values are NaN for betainc method, {ids}")
         return result
-
 
     def negbin_neglog10pvalue(self, x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.ndarray:
         result = logpval_for_dtype(x, r, p, dtype=np.float32, calc_type="betainc").astype(np.float16)
@@ -50,4 +50,8 @@ class PvalueEstimator(WithLogger):
         result /= -np.log(10).astype(result.dtype)
         return result, None
 
-        
+    def log10_fdr_from_log10pvals(self, pvals: np.ndarray, max_fdr: float) -> np.ndarray:
+        return fast_logfdr_below_threshold(pvals, max_fdr, fdr_method=self.config.fdr_method)
+    
+    def fix_inf_pvals(self, pvals):
+        return fix_inf_pvals(pvals)

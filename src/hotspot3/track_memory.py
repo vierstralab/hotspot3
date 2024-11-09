@@ -5,8 +5,9 @@ import sys
 import os
 import threading
 import logging
+
 from hotspot3.main import parse_arguments
-from hotspot3.logging import setup_logger
+from hotspot3.io.logging import setup_logger
 
 """
 This script is used to call main.py with memory tracking.

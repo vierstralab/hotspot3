@@ -1,19 +1,20 @@
-from hotspot3.logging import WithLogger
-from hotspot3.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
-from hotspot3.models import GlobalFitResults, WindowedFitResults, NotEnoughDataForContig
-from hotspot3.utils import interpolate_nan
-from hotspot3.stats import check_valid_fit
+
 import numpy.ma as ma
 import numpy as np
-from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
 from typing import List
 
+from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
 
-class ChromosomeFit(WithLogger):
-    def __init__(self, genomic_interval: GenomicInterval, config=None, logger=None):
-        super().__init__(logger=logger, config=config, name=genomic_interval.chrom)
-        self.genomic_interval = genomic_interval
+from hotspot3.io.logging import WithLoggerAndInterval
+from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
+from hotspot3.models import GlobalFitResults, WindowedFitResults, NotEnoughDataForContig
 
+from hotspot3.utils import interpolate_nan
+from hotspot3.background_fit import check_valid_fit
+
+
+
+class ChromosomeFit(WithLoggerAndInterval):
     def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: GlobalFitResults=None):
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
@@ -78,11 +79,7 @@ class ChromosomeFit(WithLogger):
         ), per_window_trs, final_rmsea, intervals_stats
 
 
-class SegmentFit(WithLogger):
-    def __init__(self, genomic_interval: GenomicInterval, config=None, logger=None):
-        self.genomic_interval = genomic_interval
-        super().__init__(logger=logger, config=config, name=genomic_interval.to_ucsc())
-    
+class SegmentFit(WithLoggerAndInterval):
     def filter_signal_to_segment(self, agg_cutcounts: np.ndarray) -> np.ndarray:
         return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
     
@@ -98,7 +95,7 @@ class SegmentFit(WithLogger):
         if not valid_segment and global_fit is not None:
             segment_fit = g_fit.fit(signal_at_segment, global_fit=global_fit, step=step)
 
-        fine_signal_level_fit = StridedBackgroundFit(self.config, name=self.name)
+        fine_signal_level_fit = StridedBackgroundFit(config=self.config, name=self.name)
         thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
             signal_at_segment,
            # global_fit=segment_fit,
@@ -126,4 +123,3 @@ class SegmentFit(WithLogger):
             ).p[need_global_fit]
         self.logger.debug(f"{self.name}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
-

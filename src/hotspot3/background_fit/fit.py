@@ -8,10 +8,12 @@ StridedBackgroundFit: Fit the array using a strided approach (takes a lot of mem
 import numpy.ma as ma
 import numpy as np
 from scipy.special import betainc
-from hotspot3.models import NotEnoughDataForContig, ProcessorConfig, GlobalFitResults, WindowedFitResults
+
+from hotspot3.models import NotEnoughDataForContig, GlobalFitResults, WindowedFitResults
+from hotspot3.config import ProcessorConfig
 from hotspot3.connectors.bottleneck import BottleneckWrapper
-from hotspot3.utils import wrap_masked, rolling_view_with_nan_padding
-from hotspot3.stats import calc_rmsea, check_valid_fit
+from hotspot3.background_fit import calc_rmsea, check_valid_fit, rolling_view_with_nan_padding
+from hotspot3.utils import wrap_masked
 
 
 class BackgroundFit(BottleneckWrapper):
@@ -199,8 +201,9 @@ class GlobalBackgroundFit(BackgroundFit):
             
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
-        return GlobalFitResults(p, r, rmsea, quantile, tr)#, result
+        return GlobalFitResults(p, r, rmsea, quantile, tr) #, result
 
+    @wrap_masked
     def fit_for_tr(self, agg_cutcounts, tr, bin_edges=None, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
         if bin_edges is None:
             bin_edges, _ = self.get_all_bins(agg_cutcounts)

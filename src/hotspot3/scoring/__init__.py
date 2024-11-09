@@ -2,9 +2,6 @@ import numpy as np
 import scipy.stats as st
 import gc
 from scipy.special import logsumexp, betainc, hyp2f1, betaln
-from hotspot3.models import WindowedFitResults, GlobalFitResults
-from typing import Union
-import pandas as pd
 
 
 # Calculate p-values and FDR
@@ -47,13 +44,7 @@ def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.n
         )
 
 
-def fast_logfdr_below_threshold(pvals_path: str, max_fdr: float, fdr_method):
-    log_pval = pd.read_parquet(
-        pvals_path,
-        engine='pyarrow', 
-        columns=['log10_pval']
-    )['log10_pval'].values
-
+def fast_logfdr_below_threshold(log_pval: np.ndarray, max_fdr: float, fdr_method: str):
     result = np.full_like(log_pval, np.nan)
     mask = ~np.isnan(log_pval)
     not_nan_shape = np.sum(mask)
@@ -103,41 +94,10 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
     return np.clip(log_pvals, a_min=None, a_max=0)
 
 
-def fix_inf_pvals(neglog_pvals, fname): # TODO move somewhere else
+def fix_inf_pvals(neglog_pvals):
     infs = np.isinf(neglog_pvals)
     n_infs = np.sum(infs) 
     if n_infs > 0:
-        np.savetxt(fname, np.where(infs)[0], fmt='%d')
         neglog_pvals[infs] = 300
     return neglog_pvals
 
-
-def calc_g_sq(obs, exp):
-    valid = (exp != 0) & (obs != 0)
-    with np.errstate(over='ignore'):
-        ratio = np.divide(obs, exp, out=np.zeros_like(obs), where=valid)
-    ratio = np.where(valid, ratio, 1)
-    return obs * np.log(ratio) * 2
-
-
-def calc_chisq(obs, exp):
-    with np.errstate(over='ignore'):
-        return np.where((exp != 0) & (obs != 0), (obs - exp) ** 2 / exp, 0)
-
-
-def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
-    assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
-    if stat == 'G_sq':
-        G_sq = calc_g_sq(obs, exp)
-    else:
-        G_sq = calc_chisq(obs, exp)
-
-    G_sq = np.sum(G_sq, axis=0, where=where)
-    G_sq = np.divide(G_sq, df, out=np.zeros_like(G_sq), where=df>=min_df)
-    rmsea = np.sqrt(np.maximum(G_sq - 1, 0) / (N - 1))
-    rmsea = np.where(df >= min_df, rmsea, np.inf)
-    return rmsea
-
-
-def check_valid_fit(fit: Union[WindowedFitResults, GlobalFitResults]):
-    return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 

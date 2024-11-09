@@ -1,11 +1,13 @@
 import logging
 import argparse
-from genome_tools.helpers import df_to_tabix
 import numpy as np
+
+from genome_tools.helpers import df_to_tabix
+
 from hotspot3.processors import GenomeProcessor
-from hotspot3.utils import read_chrom_sizes
-from hotspot3.models import ProcessorConfig
-from hotspot3.logging import setup_logger
+from hotspot3.io import read_chrom_sizes
+from hotspot3.io.logging import setup_logger
+from hotspot3.config import ProcessorConfig
 
 
 def main() -> None:

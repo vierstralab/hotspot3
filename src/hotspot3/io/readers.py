@@ -4,19 +4,21 @@ import pandas as pd
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 from genome_tools.genomic_interval import GenomicInterval
 
-from hotspot3.models import NotEnoughDataForContig, ProcessorConfig
+from hotspot3.models import NotEnoughDataForContig, WindowedFitResults
+from hotspot3.config import ProcessorConfig
 from hotspot3.connectors.bottleneck import BottleneckWrapper
-from hotspot3.logging import WithLogger
+from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 
 counts_dtype = np.int32
 
 
-class ChromosomeExtractor(WithLogger):
+class ChromReader(WithLoggerAndInterval):
     def __init__(self, genomic_interval: GenomicInterval, config: ProcessorConfig=None, logger=None):
+        super().__init__(genomic_interval=self.genomic_interval, config=config, logger=logger)
+
         self.chrom_name = genomic_interval.chrom
         self.chrom_size = genomic_interval.end
-        self.genomic_interval = genomic_interval
-        super().__init__(name=self.chrom_name, config=config, logger=logger)
+
         self.bottleneck_model = BottleneckWrapper(config)
 
     def extract_mappable_bases(self, mappable_file) -> np.ndarray:
@@ -73,7 +75,41 @@ class ChromosomeExtractor(WithLogger):
         if signal_df.empty:
             raise NotEnoughDataForContig
         return signal_df
+    
+    def extract_fit_params(self, fit_params_parquet) -> WindowedFitResults:
+        fit_params = self.extract_from_parquet(
+            fit_params_parquet,
+            columns=['p', 'r', 'enough_bg']
+        )
+        return WindowedFitResults(
+            fit_params['p'].values,
+            fit_params['r'].values,
+            fit_params['enough_bg'].values
+        )
 
     def extract_fdr_track(self, fdr_path):
         log10_fdrs = self.extract_from_parquet(fdr_path, columns=['log10_fdr'])['log10_fdr'].values
         return log10_fdrs
+
+
+class GenomeReader(WithLogger):
+
+    def read_full_parquet(self, pvals_path, column):
+        return pd.read_parquet(
+            pvals_path,
+            engine='pyarrow', 
+            columns=column
+        )[column]
+
+    def read_pval_from_parquet(self, pvals_path):
+        return self.read_full_parquet(pvals_path, column='log10_pval').values
+    
+    def read_chrom_pos_mapping(self, pvals_path):
+        chrom_pos_mapping = self.read_full_parquet(pvals_path, column='chrom')
+
+        total_len = chrom_pos_mapping.shape[0]
+        chrom_pos_mapping = chrom_pos_mapping.drop_duplicates()
+        starts = chrom_pos_mapping.index
+        # file is always sorted within chromosomes
+        ends = [*starts[1:], total_len]
+        return chrom_pos_mapping, starts, ends
