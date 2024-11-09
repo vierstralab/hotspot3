@@ -13,9 +13,10 @@ def logpval_for_dtype(x: np.ndarray, r: np.ndarray, p: np.ndarray, dtype=None, c
     Implementation of log(pval) with high precision
     """
     mask = x > 0
-    x = np.round(np.asarray(x, dtype=dtype)[mask])
-    r = np.asarray(r, dtype=dtype)[mask]
-    p = np.asarray(p, dtype=dtype)[mask]
+    x = np.round(np.asarray(x, dtype=dtype))
+    r = np.broadcast_to(np.asarray(r, dtype=dtype), x.shape)[mask]
+    p = np.broadcast_to(np.asarray(p, dtype=dtype), x.shape)[mask]
+    x = x[mask]
     
     result = np.zeros(mask.shape, dtype=dtype)
     if calc_type == 'nbinom':

@@ -337,8 +337,7 @@ class ChromosomeProcessor:
             agg_cutcounts,
             per_window_trs_global,
             global_fit,
-            self.chrom_name,
-            self.chrom_size
+            self.genomic_interval
         )
 
         self.gp.logger.debug(

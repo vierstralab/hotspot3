@@ -11,7 +11,13 @@ from genome_tools.genomic_interval import GenomicInterval
 
 class BabachiWrapper(WithLogger):
 
-    def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_name, chrom_size):
+    def craft_snps_collection(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            per_window_trs: np.ndarray,
+            global_fit: GlobalFitResults,
+            genomic_interval: GenomicInterval
+        ):
         step = self.config.babachi_segmentation_step
 
         bn_wrapper = BottleneckWrapper(config=self.config, logger=self.logger)
@@ -19,15 +25,10 @@ class BabachiWrapper(WithLogger):
         background = agg_cutcounts.filled(np.nan)[::step]
         background[assumed_signal_mask[::step]] = np.nan
         starts = np.arange(0, len(background), dtype=np.uint32) * step
-
-        chrom_bad = (1 - global_fit.p) / global_fit.p
-        mult = np.linspace(1, 10, 20)
-        bads = [*(mult * chrom_bad), *(1 / mult[1:] * chrom_bad)]
-
         valid_counts = ~np.isnan(background)
-
+        
         chrom_handler = ChromosomeSNPsHandler(
-            chrom_name,
+            genomic_interval.chrom,
             positions=starts[valid_counts], 
             read_counts=np.stack(
                 [
@@ -36,27 +37,39 @@ class BabachiWrapper(WithLogger):
                 ]
             ).T[valid_counts, :]
         )
-        snps_collection = GenomeSNPsHandler(chrom_handler)
+        return GenomeSNPsHandler(chrom_handler)
 
+    def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults, chrom_interval: GenomicInterval):
+        bads, chrom_bad = self.get_bads(global_fit)
+        snps_collection = self.craft_snps_collection(agg_cutcounts, per_window_trs, global_fit, chrom_interval)
+        chrom_sizes = {chrom_interval.chrom: len(chrom_interval)}
+        bad_segments = self.run_babachi(snps_collection, chrom_sizes, bads)
+        return [
+            GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments
+        ]
+    
+    def get_bads(self, global_fit: GlobalFitResults, n_bads=20):
+        chrom_bad = global_fit.p / (1 - global_fit.p)
+        mult = np.linspace(1, 10, n_bads)
+        return [*(mult * chrom_bad), *(1 / mult[1:] * chrom_bad)], chrom_bad
+    
+    def run_babachi(self, snps_collection, chrom_sizes, bads):
         gs = GenomeSegmentator(
             snps_collection=snps_collection,
-            chrom_sizes={chrom_name: chrom_size},
+            chrom_sizes=chrom_sizes,
             jobs=1,
             logger_level=self.config.logger_level,
             segmentation_mode='binomial',
             states=bads,
             logger=self.logger,
             allele_reads_tr=0,
-            b_penalty=9,
-            min_seg_bp=5000,
+            b_penalty=self.config.babachi_boundary_penalty,
+            min_seg_bp=self.config.babachi_min_segment_size,
             min_seg_snps=0,
             subchr_filter=0
         )
-        bad_segments = gs.estimate_BAD()
-        return [
-            GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments
-        ]
-    
+        return gs.estimate_BAD()
+
     def annotate_with_segments(self, shape, bad_segments: List[GenomicInterval]):
         babachi_result = np.zeros(shape, dtype=np.float16)
         for segment in bad_segments:

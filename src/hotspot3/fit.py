@@ -165,8 +165,8 @@ class GlobalBackgroundFit(BackgroundFit):
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(
                     agg_cutcounts,
-                    bin_edges=trs,
                     tr=tr,
+                    bin_edges=trs,
                     assumed_signal_mask=assumed_signal_mask,
                     global_fit=global_fit
                 )
@@ -184,8 +184,8 @@ class GlobalBackgroundFit(BackgroundFit):
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(
                     agg_cutcounts,
-                    bin_edges=trs,
                     tr=tr,
+                    bin_edges=trs,
                     assumed_signal_mask=assumed_signal_mask,
                     global_fit=global_fit
                 )
@@ -201,7 +201,10 @@ class GlobalBackgroundFit(BackgroundFit):
 
         return GlobalFitResults(p, r, rmsea, quantile, tr)#, result
 
-    def fit_for_tr(self, agg_cutcounts, bin_edges, tr, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
+    def fit_for_tr(self, agg_cutcounts, tr, bin_edges=None, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
+        if bin_edges is None:
+            bin_edges, _ = self.get_all_bins(agg_cutcounts)
+            bin_edges = bin_edges[:, None]
         
         if assumed_signal_mask is None:
             assumed_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, tr)
@@ -217,7 +220,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
         if not check_valid_fit(GlobalFitResults(p, r, 0, 0, 0)):
             raise NotEnoughDataForContig
-
+        
         value_counts = self.value_counts_per_bin(agg_cutcounts[~assumed_signal_mask, None], bin_edges)
         rmsea = self.calc_rmsea_all_windows(
             p,
