@@ -41,7 +41,7 @@ class ChromWriter(WithLoggerAndInterval):
 
 
 class GenomeWriter(WithLogger):
-    def df_to_bigwig(df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
+    def df_to_bigwig(self, df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
         with pyBigWig.open(outpath, 'w') as bw:
             bw.addHeader(list(chrom_sizes.items()))
             chroms = df['chrom'].to_list()
