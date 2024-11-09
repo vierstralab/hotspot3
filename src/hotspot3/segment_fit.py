@@ -24,11 +24,13 @@ class ChromosomeFit(WithLogger):
         segment_fits: List[GlobalFitResults] = []
         segments = bad_segments
         types = []
+        success_fit = []
         if global_fit is not None:
             segment_fits.append(global_fit)
             self.genomic_interval.BAD = None
             segments = [self.genomic_interval, *segments]
             types.append('global')
+            success_fit.append(True)
         for segment_interval in bad_segments:
             start = int(segment_interval.start)
             end = int(segment_interval.end)
@@ -39,11 +41,12 @@ class ChromosomeFit(WithLogger):
                     agg_cutcounts,
                     global_fit=global_fit,
                 )
-                segment_fits.append(segment_fit_results)
+                success_fit.append(True)
             except NotEnoughDataForContig:
-                segment_fits.append(None)
-                continue
-
+                segment_fit_results = global_fit
+                success_fit.append(False)
+            
+            segment_fits.append(segment_fit_results)
 
             fit_res = s_fit.fit_segment_params(
                 agg_cutcounts,
@@ -63,7 +66,8 @@ class ChromosomeFit(WithLogger):
         intervals_stats['rmsea'] = [x.rmsea for x in segment_fits]
         intervals_stats['signal_tr'] = [x.fit_threshold for x in segment_fits]
         intervals_stats['quantile_tr'] = [x.fit_quantile for x in segment_fits]
-        intervals_stats['type'] = types
+        intervals_stats['fit_type'] = types
+        intervals_stats['success_fit'] = success_fit
 
         return WindowedFitResults(
             p=final_p,
