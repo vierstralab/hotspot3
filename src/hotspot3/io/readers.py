@@ -98,7 +98,7 @@ class GenomeReader(WithLogger):
         return pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
-            columns=column
+            columns=[column]
         )[column]
 
     def read_pval_from_parquet(self, pvals_path):
