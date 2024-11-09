@@ -297,21 +297,6 @@ class WindowBackgroundFit(BackgroundFit):
         mean = ma.masked_invalid(mean)
         var = ma.masked_invalid(var)
         return mean, var
-    
-    @wrap_masked
-    def find_heterogeneous_windows(self, array):
-        median_left = self.running_nanmedian(
-            array,
-            window=self.config.bg_window,
-        )
-        median_right = self.running_nanmedian(
-            array[::-1],
-            window=self.config.bg_window,
-        )[::-1]
-
-        score = np.abs(median_right - median_left)
-        outlier_score = np.nanquantile(score, self.config.outlier_detection_tr)
-        return score > outlier_score
 
 
 class StridedBackgroundFit(BackgroundFit):
