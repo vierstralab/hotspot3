@@ -191,13 +191,20 @@ class GenomeProcessor(WithLogger):
 
     def calc_pval(self, cutcounts_file, pvals_path: str, fit_params_path: str) -> ProcessorOutputData:
         self.logger.info('Calculating per-bp p-values')
-        delete_path(pvals_path)
+        
         delete_path(fit_params_path)
         per_region_params = self.parallel_by_chromosome(
+            ChromosomeProcessor.fit_background_model,
+            cutcounts_file,
+            fit_params_path,
+        )
+
+        delete_path(pvals_path)
+        self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
+            fit_params_path,
             pvals_path,
-            fit_params_path
         )
         per_region_params = self.merge_and_add_chromosome(per_region_params)
         return per_region_params
