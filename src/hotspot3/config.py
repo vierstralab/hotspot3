@@ -35,7 +35,7 @@ class ProcessorConfig:
 
     # Background model
     bg_window: int = 50001
-    exclude_peak_flank_length: int = 0 # half window
+    exclude_peak_flank_length: int = 150 # half window
     min_background_prop: float = 0.6
     max_background_prop: float = 0.99
 
@@ -53,7 +53,7 @@ class ProcessorConfig:
     babachi_boundary_penalty: int = 9
     babachi_min_segment_size: int = 5000
 
-    fdr_method: str = 'by'
+    fdr_method: str = 'bh'
     density_step: int = 20
 
     cpus: int = 1

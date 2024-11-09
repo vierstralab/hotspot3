@@ -3,6 +3,9 @@ import shutil
 import pandas as pd
 import tempfile
 import pyBigWig
+
+from genome_tools.helpers import df_to_tabix
+
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
 from hotspot3.io import to_parquet_high_compression
@@ -56,3 +59,6 @@ class GenomeWriter(WithLogger):
                 shutil.rmtree(path)
             else:
                 os.remove(path)
+    
+    def df_to_tabix(self, df, outpath):
+        df_to_tabix(df, outpath)

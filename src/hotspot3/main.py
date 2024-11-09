@@ -1,7 +1,7 @@
 import logging
 import argparse
 import numpy as np
-
+import os
 from genome_tools.helpers import df_to_tabix
 
 from hotspot3.processors import GenomeProcessor
@@ -33,17 +33,23 @@ def main() -> None:
     cutcounts_path = args.cutcounts
     smoothed_signal_path = args.signal_parquet
     sample_id = args.id
-    outdir_pref = f"{args.outdir}/{sample_id}"
+
+    debug_dir = f"{args.outdir}/debug/"
+    os.makedirs(debug_dir, exist_ok=True)
+
+    main_dir_prefix = f"{args.outdir}/{sample_id}"
+    debug_dir_prefix = f"{args.outdir}/debug/{sample_id}"
+    
 
     if smoothed_signal_path is None or precomp_pvals is None:
         if cutcounts_path is None:
-            cutcounts_path = f"{outdir_pref}.cutcounts.bed.gz"
+            cutcounts_path = f"{main_dir_prefix}.cutcounts.bed.gz"
             genome_processor.write_cutcounts(args.bam, cutcounts_path)
+            total_cutcounts = genome_processor.get_total_cutcounts(cutcounts_path)
+            np.savetxt(f"{main_dir_prefix}.total_cutcounts", [total_cutcounts], fmt='%d')
         
         if smoothed_signal_path is None:
-            smoothed_signal_path = f"{outdir_pref}.smoothed_signal.parquet"
-            total_cutcounts = genome_processor.get_total_cutcounts(cutcounts_path)
-            np.savetxt(f"{outdir_pref}.total_cutcounts", [total_cutcounts], fmt='%d')
+            smoothed_signal_path = f"{debug_dir_prefix}.smoothed_signal.parquet"
             genome_processor.smooth_signal_modwt(
                 cutcounts_path,
                 total_cutcounts=total_cutcounts,
@@ -51,36 +57,35 @@ def main() -> None:
             )
 
         if precomp_pvals is None:
-            
-            fit_params_path = f"{outdir_pref}.fit_params.parquet"
+            fit_params_path = f"{debug_dir_prefix}.smoothed_signal.parquet"
             per_region_stats = genome_processor.fit_background_model(
                 cutcounts_path,
-                precomp_pvals,
                 fit_params_path
             ).data_df
-            per_region_stats.to_csv(f"{outdir_pref}.fit_stats.tsv.gz", sep='\t', index=False)
+            per_region_stats.to_csv(f"{debug_dir_prefix}.fit_stats.tsv.gz", sep='\t', index=False)
 
-            precomp_pvals = f"{outdir_pref}.pvals.parquet"
-            per_region_stats = genome_processor.calc_pvals(
+            precomp_pvals = f"{main_dir_prefix}.pvals.parquet"
+            genome_processor.calc_pvals(
                 cutcounts_path,
+                fit_params_path,
                 precomp_pvals,
-                fit_params_path
-            ).data_df
+            )
             
-    
-    precomp_fdrs = f"{outdir_pref}.fdrs.parquet"
+    precomp_fdrs = f"{debug_dir_prefix}.fdrs.parquet"
     genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
+        fdr_pref = f"{args.outdir}/fdr{fdr}/{sample_id}"
         root_logger.debug(f'Calling hotspots at FDR={fdr}')
         hotspots = genome_processor.call_hotspots(
             precomp_fdrs,
             sample_id,
             fdr_tr=fdr
         ).data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
-        hotspots_path = f"{outdir_pref}.hotspots.fdr{fdr}.bed.gz"
+        hotspots_path = f"{fdr_pref}.hotspots.fdr{fdr}.bed.gz"
         df_to_tabix(hotspots, hotspots_path)
+        # df_to_bigbed
 
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
         peaks = genome_processor.call_variable_width_peaks(
@@ -90,12 +95,13 @@ def main() -> None:
         ).data_df
         peaks['id'] = sample_id
         peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
-        peaks_path = f"{outdir_pref}.peaks.fdr{fdr}.bed.gz"
+        peaks_path = f"{fdr_pref}.peaks.fdr{fdr}.bed.gz"
         df_to_tabix(peaks, peaks_path)
+        # df_to_bigbed
 
     if args.save_density:
         root_logger.info('Saving density')
-        denisty_path = f"{outdir_pref}.normalized_density.bw"
+        denisty_path = f"{main_dir_prefix}.normalized_density.bw"
         genome_processor.extract_normalized_density(smoothed_signal_path, denisty_path)
     root_logger.info('Program finished')
 
