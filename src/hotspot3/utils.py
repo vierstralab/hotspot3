@@ -72,6 +72,7 @@ def correct_offset(func):
         assert window % 2 == 1, "Window size should be odd"
         if len(array) < window:
             window = len(array)
+        array = np.asarray(array, dtype=np.float32)
         offset = window // 2
         result = func(
             self,

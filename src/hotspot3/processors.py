@@ -413,7 +413,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
         log10_fdrs = self.reader.extract_fdr_track(fdr_path)
         self.logger.debug(f"{self.chrom_name}: Calling hotspots")
-        signif_fdrs = (log10_fdrs >= -np.log10(fdr_threshold)).astype(np.float32)
+        signif_fdrs = (log10_fdrs >= -np.log10(fdr_threshold))
         bn_wrapper = BottleneckWrapper(self.config)
         smoothed_signif = bn_wrapper.centered_running_nansum(
             signif_fdrs,

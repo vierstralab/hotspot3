@@ -79,7 +79,7 @@ class ChromReader(WithLoggerAndInterval):
     def extract_fit_params(self, fit_params_parquet) -> WindowedFitResults:
         fit_params = self.extract_from_parquet(
             fit_params_parquet,
-            columns=['p', 'r', 'enough_bg']
+            columns=['sliding_r', 'sliding_p', 'enough_bg']
         )
         return WindowedFitResults(
             fit_params['p'].values,

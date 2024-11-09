@@ -27,7 +27,6 @@ class BottleneckWrapper(WithLogger):
     @wrap_masked
     @correct_offset
     def centered_running_nanmax(self, array, window):
-        min_count = self.get_min_count(window)
         return bn.move_max(array, window, min_count=1).astype(np.float32)
     
     @wrap_masked
