@@ -3,6 +3,7 @@ import os
 import shutil
 import pyBigWig
 
+# Move to writers/readers
 
 def read_chrom_sizes(chrom_sizes):
     if chrom_sizes is None:

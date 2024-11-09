@@ -12,7 +12,7 @@ import importlib.resources as pkg_resources
 
 from genome_tools.genomic_interval import GenomicInterval
 
-from hotspot3.io.logging import setup_logger, WithLoggerAndInterval, WithLogger
+from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
 
 from hotspot3.io.readers import ChromReader, GenomeReader

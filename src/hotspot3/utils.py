@@ -63,6 +63,7 @@ def compress_masked_arg(arg):
     else:
         return arg
 
+
 def correct_offset(func):
     """
     Correct offset of a trailing running window to make it centered.
@@ -83,6 +84,7 @@ def correct_offset(func):
         )
         return result[offset:]
     return wrapper
+
 
 @wrap_masked
 def interpolate_nan(array):
