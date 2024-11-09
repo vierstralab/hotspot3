@@ -43,7 +43,7 @@ class ProcessorConfig:
     rmsea_tr: float = 0.05
     min_obs_rmsea: int = 5
 
-    babachi_boundary_penalty: int = 4
+    babachi_boundary_penalty: int = 9
     babachi_min_segment_size: int = 5000
 
     nonzero_windows_to_fit: float = 0.01

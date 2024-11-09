@@ -48,9 +48,9 @@ class BabachiWrapper(WithLogger):
             GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments
         ]
     
-    def get_bads(self, global_fit: GlobalFitResults, n_bads=20):
+    def get_bads(self, global_fit: GlobalFitResults, max_bad=10):
         chrom_bad = global_fit.p / (1 - global_fit.p)
-        mult = np.linspace(1, 10, n_bads)
+        mult = np.arange(1, max_bad + 0.1, 0.5)
         return [*(mult * chrom_bad), *(1 / mult[1:] * chrom_bad)], chrom_bad
     
     def run_babachi(self, snps_collection, chrom_sizes, bads):
