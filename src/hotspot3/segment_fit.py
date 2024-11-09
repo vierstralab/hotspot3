@@ -43,6 +43,8 @@ class ChromosomeFit(WithLogger):
                 )
                 success_fit.append(True)
             except NotEnoughDataForContig:
+                thresholds = np.max(agg_cutcounts)
+                rmsea = np.nan
                 segment_fit_results = global_fit
                 success_fit.append(False)
             
