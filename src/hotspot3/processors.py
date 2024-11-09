@@ -56,7 +56,7 @@ class GenomeProcessor(WithLogger):
         - config: ProcessorConfig object containing parameters.
     """
     def __init__(self, chrom_sizes, config=None, mappable_bases_file=None, tmp_dir=None, chromosomes=None):
-        super().__init__(config=config, logger=self.logger)
+        super().__init__(config=config)
         self.reader = GenomeReader(config=self.config, logger=self.logger)
         self.chrom_sizes = chrom_sizes
         if chromosomes is not None:
