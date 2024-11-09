@@ -100,7 +100,7 @@ class SegmentFit(WithLoggerAndInterval):
             signal_at_segment,
            # global_fit=segment_fit,
         )
-        thresholds = interpolate_nan(thresholds)
+        thresholds = interpolate_nan(thresholds).astype(np.float16)
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
         return thresholds, rmsea, segment_fit
     
