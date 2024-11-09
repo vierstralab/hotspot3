@@ -82,8 +82,8 @@ class ChromReader(WithLoggerAndInterval):
             columns=['sliding_r', 'sliding_p', 'enough_bg']
         )
         return WindowedFitResults(
-            fit_params['p'].values,
-            fit_params['r'].values,
+            fit_params['sliding_p'].values,
+            fit_params['sliding_r'].values,
             fit_params['enough_bg'].values
         )
 
