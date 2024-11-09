@@ -15,7 +15,7 @@ from hotspot3.background_fit import check_valid_fit
 
 
 class ChromosomeFit(WithLoggerAndInterval):
-    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: GlobalFitResults=None):
+    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit_results: GlobalFitResults=None):
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
@@ -26,8 +26,8 @@ class ChromosomeFit(WithLoggerAndInterval):
         segments = bad_segments
         types = []
         success_fit = []
-        if global_fit is not None:
-            segment_fits.append(global_fit)
+        if global_fit_results is not None:
+            segment_fits.append(global_fit_results)
             self.genomic_interval.BAD = None
             segments = [self.genomic_interval, *segments]
             types.append('global')
@@ -40,13 +40,13 @@ class ChromosomeFit(WithLoggerAndInterval):
             try:
                 thresholds, rmsea, segment_fit_results = s_fit.fit_segment_thresholds(
                     agg_cutcounts,
-                    global_fit=global_fit,
+                    global_fit=global_fit_results,
                 )
                 success_fit.append(True)
             except NotEnoughDataForContig:
                 thresholds = np.max(agg_cutcounts)
                 rmsea = np.nan
-                segment_fit_results = global_fit
+                segment_fit_results = global_fit_results
                 success_fit.append(False)
             
             segment_fits.append(segment_fit_results)
@@ -60,7 +60,7 @@ class ChromosomeFit(WithLoggerAndInterval):
             final_r[start:end] = fit_res.r
             final_p[start:end] = fit_res.p
             final_rmsea[start:end] = rmsea
-            per_window_trs[start:end] = thresholds
+            per_window_trs[start:end] = segment_fit_results.fit_threshold # TMP fixme
             enough_bg[start:end] = fit_res.enough_bg_mask
         
         intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
