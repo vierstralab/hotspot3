@@ -77,6 +77,7 @@ def main() -> None:
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
         fdr_pref = f"{args.outdir}/fdr{fdr}/{sample_id}"
+        os.makedirs(f"{args.outdir}/fdr{fdr}", exist_ok=True)
         root_logger.debug(f'Calling hotspots at FDR={fdr}')
         hotspots = genome_processor.call_hotspots(
             precomp_fdrs,
