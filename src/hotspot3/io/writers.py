@@ -74,7 +74,7 @@ class GenomeWriter(WithLogger):
     def df_to_gzip(self, df: pd.DataFrame, outpath):
         df.to_csv(outpath, sep='\t', index=False, compression='gzip')
     
-    def save_cutcounts(total_cutcounts, total_cutcounts_path):
+    def save_cutcounts(self, total_cutcounts, total_cutcounts_path):
         np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')
     
     def df_to_bigbed(self, df: pd.DataFrame, chrom_sizes, outpath):
@@ -99,7 +99,6 @@ class GenomeWriter(WithLogger):
         peaks_df['thickEnd'] = peaks_df['summit'] + 1
         peaks_df['itemRgb'] = get_bb_color(fdr_tr, mode='peaks')
 
-        weird_peaks = peaks_df.eval('end ')
         peaks_df['blockCount'] = 3
         peaks_df['blockSizes'] = '1,1,1'
         peaks_df['blockStarts'] = '0,' + peaks_df.eval('summit - start').astype(str) + ',' + peaks_df.eval('end - start - 1').astype(str)
