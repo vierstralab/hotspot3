@@ -246,7 +246,6 @@ class GenomeProcessor(WithLogger):
             fdr_tr,
         )
         hotspots = self.merge_and_add_chromosome(hotspots).data_df
-        print(hotspots)
         signif_stretches = hotspots['signif_stretches'].values
         hotspots['id'] = sample_id
         if len(hotspots) == 0:
@@ -450,11 +449,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             start = region_starts[i]
             end = region_ends[i]
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
-            signif_stretches.append(
-                [find_stretches(signif_fdrs[start:end])]
-            )
+            signif_stretches.append(find_stretches(signif_fdrs[start:end]))
 
-        
         self.logger.debug(f"{self.chrom_name}: {len(region_starts)} hotspots called")
 
         data = pd.DataFrame({
