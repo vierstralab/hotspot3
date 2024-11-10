@@ -114,14 +114,16 @@ class GenomeWriter(WithLogger):
         block_count = []
         block_sizes = []
         block_starts = []
+        lengths = hotspots_df.eval('end - start').values
         for i, (starts, ends) in enumerate(significant_stretches):
-            block_count.append(len(starts))
-            block_sizes.append(
-                ','.join(map(str, [end - start for start, end in zip(starts, ends)]))
-            )
-            block_starts.append(
-                ','.join(map(str, starts))
-            )
+            block_count.append(len(starts) + 2)
+
+            sizes = np.pad(ends - starts, (1, 1), mode='constant', constant_values=(1, 1))
+            block_sizes.append(','.join(map(str, sizes)))
+
+            starts = np.pad(starts, (1, 1), mode='constant', constant_values=(0, lengths[i] - 1))
+            block_starts.append(','.join(map(str, starts)))
+
         hotspots_df['blockCount'] = block_count
         hotspots_df['blockSizes'] = block_sizes
         hotspots_df['blockStarts'] = block_starts
