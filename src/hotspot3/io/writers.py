@@ -98,6 +98,8 @@ class GenomeWriter(WithLogger):
         peaks_df['thickStart'] = peaks_df['summit']
         peaks_df['thickEnd'] = peaks_df['summit'] + 1
         peaks_df['itemRgb'] = get_bb_color(fdr_tr, mode='peaks')
+
+        weird_peaks = peaks_df.eval('end ')
         peaks_df['blockCount'] = 3
         peaks_df['blockSizes'] = '1,1,1'
         peaks_df['blockStarts'] = '0,' + peaks_df.eval('summit - start').astype(str) + ',' + peaks_df.eval('end - start - 1').astype(str)

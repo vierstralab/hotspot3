@@ -63,8 +63,8 @@ def find_closest_min_peaks(signal):
         padding = 1
     minima = np.pad(minima, padding, mode='constant', constant_values=(0, len(signal) - 1))
     peaks_coordinates = np.zeros([len(maxima), 3], dtype=int) # start, summit, end
-    peaks_coordinates[:, 1] = maxima
 
+    peaks_coordinates[:, 1] = maxima
     peaks_coordinates[:, 0] = minima[:len(maxima)]
     peaks_coordinates[:, 2] = minima[1:]
     return peaks_coordinates
@@ -86,7 +86,7 @@ def trim_at_threshold(signal, peaks_coordinates):
         threshold = threshold_heights[i]
         new_left = summit - np.argmax(signal[left:summit + 1][::-1] <= threshold)
 
-        new_right = summit + np.argmax(signal[summit:right + 1] <= threshold) - 1
+        new_right = summit + np.argmax(signal[summit:right + 1] <= threshold)
         peaks_in_hotspots_trimmed[i, :] = np.array([new_left, summit, new_right])
     return peaks_in_hotspots_trimmed, threshold_heights
 
