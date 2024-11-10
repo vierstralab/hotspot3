@@ -246,6 +246,7 @@ class GenomeProcessor(WithLogger):
             fdr_tr,
         )
         hotspots = self.merge_and_add_chromosome(hotspots).data_df
+        print(hotspots)
         signif_stretches = hotspots['signif_stretches'].values
         hotspots['id'] = sample_id
         if len(hotspots) == 0:
