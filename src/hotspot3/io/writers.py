@@ -3,6 +3,7 @@ import shutil
 import pandas as pd
 import tempfile
 import pyBigWig
+import numpy as np
 
 from genome_tools.helpers import df_to_tabix
 
@@ -62,3 +63,9 @@ class GenomeWriter(WithLogger):
     
     def df_to_tabix(self, df, outpath):
         df_to_tabix(df, outpath)
+    
+    def df_to_gzip(self, df: pd.DataFrame, outpath):
+        df.to_csv(outpath, sep='\t', index=False, compression='gzip')
+    
+    def save_cutcounts(total_cutcounts, total_cutcounts_path):
+        np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')

@@ -2,7 +2,7 @@ import logging
 import argparse
 import numpy as np
 import os
-from genome_tools.helpers import df_to_tabix
+import shutil
 
 from hotspot3.processors import GenomeProcessor
 from hotspot3.io import read_chrom_sizes
@@ -45,24 +45,24 @@ def main() -> None:
         if cutcounts_path is None:
             cutcounts_path = f"{main_dir_prefix}.cutcounts.bed.gz"
             genome_processor.write_cutcounts(args.bam, cutcounts_path)
-            total_cutcounts = genome_processor.get_total_cutcounts(cutcounts_path)
-            np.savetxt(f"{main_dir_prefix}.total_cutcounts", [total_cutcounts], fmt='%d')
         
         if smoothed_signal_path is None:
             smoothed_signal_path = f"{debug_dir_prefix}.smoothed_signal.parquet"
+            total_cutcounts_path = f"{main_dir_prefix}.total_cutcounts"
             genome_processor.smooth_signal_modwt(
                 cutcounts_path,
-                total_cutcounts=total_cutcounts,
-                save_path=smoothed_signal_path
+                save_path=smoothed_signal_path,
+                total_cutcounts_path=total_cutcounts_path
             )
 
         if precomp_pvals is None:
-            fit_params_path = f"{debug_dir_prefix}.smoothed_signal.parquet"
-            per_region_stats = genome_processor.fit_background_model(
+            fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
+            per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
+            genome_processor.fit_background_model(
                 cutcounts_path,
-                fit_params_path
-            ).data_df
-            per_region_stats.to_csv(f"{debug_dir_prefix}.fit_stats.tsv.gz", sep='\t', index=False)
+                fit_params_path,
+                per_region_stats_path
+            )
 
             precomp_pvals = f"{main_dir_prefix}.pvals.parquet"
             genome_processor.calc_pvals(
@@ -76,28 +76,30 @@ def main() -> None:
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
-        fdr_pref = f"{args.outdir}/fdr{fdr}/{sample_id}"
-        os.makedirs(f"{args.outdir}/fdr{fdr}", exist_ok=True)
-        root_logger.debug(f'Calling hotspots at FDR={fdr}')
-        hotspots = genome_processor.call_hotspots(
-            precomp_fdrs,
-            sample_id,
-            fdr_tr=fdr
-        ).data_df[['chrom', 'start', 'end', 'id', 'score', 'max_neglog10_fdr']]
+        fdr_dir = f"{args.outdir}/fdr{fdr}"
+        if os.path.exists(fdr_dir):
+            shutil.rmtree(fdr_dir)
+        os.makedirs(fdr_dir, exist_ok=True)
+        fdr_pref = f"{fdr_dir}/{sample_id}"
+        
         hotspots_path = f"{fdr_pref}.hotspots.fdr{fdr}.bed.gz"
-        df_to_tabix(hotspots, hotspots_path)
-        # df_to_bigbed
+        root_logger.debug(f'Calling hotspots at FDR={fdr}')
+        genome_processor.call_hotspots(
+            precomp_fdrs,
+            sample_id=sample_id,
+            save_path=hotspots_path,
+            fdr_tr=fdr
+        )
 
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
-        peaks = genome_processor.call_variable_width_peaks(
-            smoothed_signal_path,
-            fdrs_path=precomp_fdrs,
-            fdr_tr=fdr
-        ).data_df
-        peaks['id'] = sample_id
-        peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
         peaks_path = f"{fdr_pref}.peaks.fdr{fdr}.bed.gz"
-        df_to_tabix(peaks, peaks_path)
+        genome_processor.call_variable_width_peaks(
+            smoothed_signal_path,
+            precomp_fdrs,
+            sample_id=sample_id,
+            save_path=peaks_path,
+            fdr_tr=fdr
+        )
         # df_to_bigbed
 
     if args.save_density:

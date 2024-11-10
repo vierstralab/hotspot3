@@ -143,11 +143,10 @@ class GenomeProcessor(WithLogger):
         return ProcessorOutputData('all', data)
 
     # Processing functions
-    def write_cutcounts(self, bam_path, outpath) -> None:
+    def write_cutcounts(self, bam_path, outpath):
         # TODO: rewrite with pysam
         self.logger.info('Extracting cutcounts from bam file')
         run_bam2_bed(bam_path, outpath, self.chrom_sizes.keys())
-
 
     def get_total_cutcounts(self, cutcounts_path) -> int:
         total_cutcounts = sum(
@@ -160,9 +159,11 @@ class GenomeProcessor(WithLogger):
         return total_cutcounts
 
 
-    def smooth_signal_modwt(self, cutcounts_path, total_cutcounts, save_path):
+    def smooth_signal_modwt(self, cutcounts_path, save_path, total_cutcounts_path):
         self.logger.info('Smoothing signal using MODWT')
-    
+        total_cutcounts = self.get_total_cutcounts(cutcounts_path)
+        self.writer.save_cutcounts(total_cutcounts, total_cutcounts_path)
+
         self.writer.clean_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.smooth_density_modwt,
@@ -172,7 +173,7 @@ class GenomeProcessor(WithLogger):
         )
     
 
-    def fit_background_model(self, cutcounts_file, save_path: str) -> ProcessorOutputData:
+    def fit_background_model(self, cutcounts_file, save_path: str, per_region_stats_path):
         self.logger.info('Estimating parameters of background model')
         
         self.writer.clean_path(save_path)
@@ -181,8 +182,10 @@ class GenomeProcessor(WithLogger):
             cutcounts_file,
             save_path,
         )
-        per_region_params = self.merge_and_add_chromosome(per_region_params)
-        return per_region_params
+        per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
+        cols_order = ['chrom'] + [col for col in per_region_params.columns if col != 'chrom']
+        per_region_params = per_region_params[cols_order]
+        self.writer.df_to_gzip(per_region_params, per_region_stats_path)
 
 
     def calc_pvals(self, cutcounts_file, fit_path: str, save_path: str):
@@ -224,10 +227,9 @@ class GenomeProcessor(WithLogger):
             save_path,
             0
         )
-        return save_path
 
 
-    def call_hotspots(self, fdr_path, prefix, fdr_tr=0.05) -> ProcessorOutputData:
+    def call_hotspots(self, fdr_path, sample_id, save_path, fdr_tr=0.05):
         """
         Call hotspots from path to parquet file containing log10(FDR) values.
 
@@ -245,16 +247,24 @@ class GenomeProcessor(WithLogger):
             fdr_tr,
         )
         hotspots = self.merge_and_add_chromosome(hotspots)
-        hotspots.data_df['id'] = prefix
+        hotspots.data_df['id'] = sample_id
         hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
         if len(hotspots.data_df) == 0:
             self.logger.critical(f"No hotspots called at FDR={fdr_tr}. Most likely something went wrong!")
         else:
             self.logger.info(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
-        return hotspots
+        
+        self.writer.df_to_tabix(hotspots, save_path)
 
 
-    def call_variable_width_peaks(self, smoothed_signal_path, fdrs_path, fdr_tr) -> ProcessorOutputData:
+    def call_variable_width_peaks(
+            self,
+            smoothed_signal_path,
+            fdrs_path,
+            sample_id,
+            save_path,
+            fdr_tr=0.05
+        ):
         """
         Call variable width peaks from smoothed signal and hotspots.
 
@@ -267,18 +277,23 @@ class GenomeProcessor(WithLogger):
             - peaks_data: ProcessorOutputData containing the peaks in bed format
 
         """
+        if sample_id is None:
+            sample_id = 'id'
         peaks_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks,
             smoothed_signal_path,
             fdrs_path,
             fdr_tr
         )
-        peaks_data = self.merge_and_add_chromosome(peaks_data)
-        if len(peaks_data.data_df) == 0:
+        peaks_data = self.merge_and_add_chromosome(peaks_data).data_df
+        if len(peaks_data) == 0:
             self.logger.critical(f"No peaks called at FDR={fdr_tr}. Most likely something went wrong!")
+            return
         else:
-            self.logger.info(f"There are {len(peaks_data.data_df)} peaks called at FDR={fdr_tr}")
-        return peaks_data
+            self.logger.info(f"There are {len(peaks_data)} peaks called at FDR={fdr_tr}")
+        peaks_data['id'] = sample_id
+        peaks_data = peaks_data[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
+        self.writer.df_to_tabix(peaks_data, save_path)
 
 
     def extract_normalized_density(self, smoothed_signal, density_path):
