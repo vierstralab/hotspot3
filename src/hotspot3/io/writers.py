@@ -45,7 +45,7 @@ class ChromWriter(WithLoggerAndInterval):
 
 class GenomeWriter(WithLogger):
 
-    bed9_columns = ['chrom', 'start', 'end', 'name', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb']
+    bed9_columns = ['chrom', 'start', 'end', 'id', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb']
     bed12_columns = bed9_columns + ['blockCount', 'blockSizes', 'blockStarts']
 
 
