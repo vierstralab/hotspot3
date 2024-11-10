@@ -77,7 +77,7 @@ class GenomeWriter(WithLogger):
     def save_cutcounts(total_cutcounts, total_cutcounts_path):
         np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')
     
-    def df_to_bigbed(self, df: pd.DataFrame, chrom_sizes, outpath):
+    def df_to_bigbed(self, df: pd.DataFrame, chrom_sizes: dict, outpath):
         with tempfile.NamedTemporaryFile(suffix=".bed") as temp_sorted_bed:
             # Write sorted data to the temporary file
             df.to_csv(temp_sorted_bed.name, sep='\t', header=False, index=False)
@@ -128,4 +128,8 @@ class GenomeWriter(WithLogger):
         hotspots_df['blockStarts'] = block_starts
 
         return hotspots_df[self.bed12_columns]
-    
+
+    def get_chrom_sizes_file(self, chrom_sizes_file):
+        if chrom_sizes_file is None:
+            raise NotImplementedError("Chromosome sizes file is not embedded yet")
+        return chrom_sizes_file

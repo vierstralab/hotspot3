@@ -1,11 +1,9 @@
 import logging
 import argparse
-import numpy as np
 import os
 import shutil
 
 from hotspot3.processors import GenomeProcessor
-from hotspot3.io import read_chrom_sizes
 from hotspot3.io.logging import setup_logger
 from hotspot3.config import ProcessorConfig
 
@@ -13,7 +11,6 @@ from hotspot3.config import ProcessorConfig
 def main() -> None:
     args, logger_level = parse_arguments()
     root_logger = setup_logger()
-    chrom_sizes = read_chrom_sizes(args.chrom_sizes)
     config = ProcessorConfig(
         window=args.window,
         bg_window=args.background_window,
@@ -24,7 +21,7 @@ def main() -> None:
         tmp_dir=args.tempdir,
     )
     genome_processor = GenomeProcessor(
-        chrom_sizes=chrom_sizes,
+        chrom_sizes_file=args.chrom_sizes,
         mappable_bases_file=args.mappable_bases,
         chromosomes=args.chromosomes,
         config=config,

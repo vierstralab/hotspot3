@@ -113,3 +113,12 @@ class GenomeReader(WithLogger):
         # file is always sorted within chromosomes
         ends = [*starts[1:], total_len]
         return chrom_pos_mapping, starts, ends
+
+    def read_chrom_sizes(self, chrom_sizes):
+        if chrom_sizes is None:
+            raise NotImplementedError("hg38 chromosome sizes are not embedded yet. Please provide a chromosome sizes file.")
+        return pd.read_table(
+            chrom_sizes,
+            header=None,
+            names=['chrom', 'size']
+        ).set_index('chrom')['size'].to_dict()

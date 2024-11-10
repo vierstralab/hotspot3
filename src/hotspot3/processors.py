@@ -28,27 +28,31 @@ class GenomeProcessor(WithLogger):
     Main class to run hotspot3-related functions and store parameters.
 
     Parameters:
-        - chrom_sizes: Dictionary containing chromosome sizes.
+        - chrom_sizes: Path to chromosome sizes file.
         - mappable_bases_file: Path to the tabix-indexed file containing mappable bases or None.
         - tmp_dir: Temporary directory for intermediate files. Will use system default if None.
         - chromosomes: List of chromosomes to process or None. Used mostly for debugging. Will generate FDR corrections only for these chromosomes.
 
         - config: ProcessorConfig object containing parameters.
     """
-    def __init__(self, chrom_sizes, config=None, mappable_bases_file=None, chromosomes=None):
+    def __init__(self, chrom_sizes_file=None, config=None, mappable_bases_file=None, chromosomes=None):
         super().__init__(config=config)
+        self.reader = self.copy_with_params(GenomeReader)
+        self.writer = self.copy_with_params(GenomeWriter)
         self.mappable_bases_file = mappable_bases_file
-        self.chrom_sizes = chrom_sizes
+        self.chrom_sizes_file = chrom_sizes_file
+
         self.cpus = min(self.config.cpus, max(1, mp.cpu_count()))
 
+        self.chrom_sizes = self.reader.read_chrom_sizes(chrom_sizes_file)
+
         if chromosomes is not None:
-            self.chrom_sizes = {k: v for k, v in chrom_sizes.items() if k in chromosomes}
+            self.chrom_sizes = {k: v for k, v in chrom_sizes_file.items() if k in chromosomes}
         
         chroms = [x for x in self.chrom_sizes.keys()]
         self.logger.debug(f"Chromosomes to process: {chroms}")
 
-        self.reader = self.copy_with_params(GenomeReader)
-        self.writer = self.copy_with_params(GenomeWriter)
+
         chrom_intervals = [
             GenomicInterval(chrom, 0, length) 
             for chrom, length in self.chrom_sizes.items()
@@ -257,7 +261,7 @@ class GenomeProcessor(WithLogger):
         self.writer.df_to_tabix(hotspots, save_path)
 
         hotspots = self.writer.hotspots_to_bed12(hotspots, fdr_tr, signif_stretches)
-        self.writer.df_to_bigbed(hotspots, self.chrom_sizes, save_path_bb)
+        self.writer.df_to_bigbed(hotspots, self.chrom_sizes_file, save_path_bb)
 
 
     def call_variable_width_peaks(
@@ -298,7 +302,7 @@ class GenomeProcessor(WithLogger):
         self.writer.df_to_tabix(peaks, save_path)
 
         peaks = self.writer.peaks_to_bed9(peaks, fdr_tr)
-        self.writer.df_to_bigbed(peaks, self.chrom_sizes, save_path_bb)
+        self.writer.df_to_bigbed(peaks, self.chrom_sizes_file, save_path_bb)
 
 
     def extract_normalized_density(self, smoothed_signal, density_path):

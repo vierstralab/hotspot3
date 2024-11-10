@@ -4,15 +4,6 @@ import importlib.resources as pkg_resources
 import numpy as np
 
 
-def read_chrom_sizes(chrom_sizes):
-    if chrom_sizes is None:
-        raise NotImplementedError("hg38 chromosome sizes are not embedded yet. Please provide a chromosome sizes file.")
-    return pd.read_table(
-        chrom_sizes,
-        header=None,
-        names=['chrom', 'size']
-    ).set_index('chrom')['size'].to_dict()
-
 def to_parquet_high_compression(df: pd.DataFrame, outpath, compression_level=22, **kwargs):
     df.to_parquet(
         outpath,
