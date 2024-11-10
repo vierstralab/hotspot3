@@ -164,7 +164,7 @@ class GenomeProcessor(WithLogger):
         total_cutcounts = self.get_total_cutcounts(cutcounts_path)
         self.writer.save_cutcounts(total_cutcounts, total_cutcounts_path)
 
-        self.writer.clean_path(save_path)
+        self.writer.sanitize_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.smooth_density_modwt,
             cutcounts_path,
@@ -176,7 +176,7 @@ class GenomeProcessor(WithLogger):
     def fit_background_model(self, cutcounts_file, save_path: str, per_region_stats_path):
         self.logger.info('Estimating parameters of background model')
         
-        self.writer.clean_path(save_path)
+        self.writer.sanitize_path(save_path)
         per_region_params = self.parallel_by_chromosome(
             ChromosomeProcessor.fit_background_model,
             cutcounts_file,
@@ -191,7 +191,7 @@ class GenomeProcessor(WithLogger):
     def calc_pvals(self, cutcounts_file, fit_path: str, save_path: str):
         self.logger.info('Calculating per-bp p-values')
         
-        self.writer.clean_path(save_path)
+        self.writer.sanitize_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.calc_pvals,
             cutcounts_file,
@@ -220,7 +220,7 @@ class GenomeProcessor(WithLogger):
             in zip(*chrom_pos_mapping)
         ]
         self.logger.debug('Saving per-bp FDRs')
-        self.writer.clean_path(save_path)
+        self.writer.sanitize_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.write_to_parquet,
             result,
@@ -229,32 +229,35 @@ class GenomeProcessor(WithLogger):
         )
 
 
-    def call_hotspots(self, fdr_path, sample_id, save_path, fdr_tr=0.05):
+    def call_hotspots(self, fdr_path, sample_id, save_path, save_path_bb, fdr_tr):
         """
         Call hotspots from path to parquet file containing log10(FDR) values.
 
         Parameters:
             - fdr_path: Path to the parquet file containing the log10(FDR) values.
+            - sample_id: Sample ID.
+            - save_path: Path to save the hotspots in bed format.
+            - save_path_bb: Path to save the hotspots in bigbed format.
             - fdr_tr: FDR threshold for calling hotspots.
-            - min_width: Minimum width for a region to be called a hotspot.
-
-        Returns:
-            - hotspots: ProcessorOutputData containing the hotspots in bed format.
         """
         hotspots = self.parallel_by_chromosome(
             ChromosomeProcessor.call_hotspots,
             fdr_path,
             fdr_tr,
         )
-        hotspots = self.merge_and_add_chromosome(hotspots)
-        hotspots.data_df['id'] = sample_id
-        hotspots.data_df['score'] = np.round(hotspots.data_df['max_neglog10_fdr'] * 10).astype(np.int64).clip(0, 1000)
-        if len(hotspots.data_df) == 0:
+        hotspots = self.merge_and_add_chromosome(hotspots).data_df
+        signif_stretches = hotspots['signif_stretches'].values
+        hotspots['id'] = sample_id
+        if len(hotspots) == 0:
             self.logger.critical(f"No hotspots called at FDR={fdr_tr}. Most likely something went wrong!")
         else:
-            self.logger.info(f"There are {len(hotspots.data_df)} hotspots called at FDR={fdr_tr}")
+            self.logger.info(f"There are {len(hotspots)} hotspots called at FDR={fdr_tr}")
         
+        hotspots = hotspots[['chrom', 'start', 'end', 'id', 'max_neglog10_fdr']]
         self.writer.df_to_tabix(hotspots, save_path)
+
+        hotspots = self.writer.hotspots_to_bed12(hotspots, fdr_tr, signif_stretches)
+        self.writer.df_to_bigbed(hotspots, self.chrom_sizes, save_path_bb)
 
 
     def call_variable_width_peaks(
@@ -263,6 +266,7 @@ class GenomeProcessor(WithLogger):
             fdrs_path,
             sample_id,
             save_path,
+            save_path_bb,
             fdr_tr=0.05
         ):
         """
@@ -271,29 +275,30 @@ class GenomeProcessor(WithLogger):
         Parameters:
             - smoothed_signal_path: Path to the parquet file containing the smoothed signal.
             - fdrs_path: Path to the parquet file containing the log10(FDR) values.
+            - sample_id: Sample ID.
+            - save_path: Path to save the peaks in bed format.
+            - save_path_bb: Path to save the peaks in bigbed format.
             - fdr_tr: FDR threshold for calling peaks.
-        
-        Returns:
-            - peaks_data: ProcessorOutputData containing the peaks in bed format
-
         """
-        if sample_id is None:
-            sample_id = 'id'
         peaks_data = self.parallel_by_chromosome(
             ChromosomeProcessor.call_variable_width_peaks,
             smoothed_signal_path,
             fdrs_path,
             fdr_tr
         )
-        peaks_data = self.merge_and_add_chromosome(peaks_data).data_df
-        if len(peaks_data) == 0:
+        peaks = self.merge_and_add_chromosome(peaks_data).data_df
+        if len(peaks) == 0:
             self.logger.critical(f"No peaks called at FDR={fdr_tr}. Most likely something went wrong!")
             return
         else:
-            self.logger.info(f"There are {len(peaks_data)} peaks called at FDR={fdr_tr}")
-        peaks_data['id'] = sample_id
-        peaks_data = peaks_data[['chrom', 'start', 'end', 'id', 'max_density', 'summit']]
-        self.writer.df_to_tabix(peaks_data, save_path)
+            self.logger.info(f"There are {len(peaks)} peaks called at FDR={fdr_tr}")
+        
+        peaks['id'] = sample_id
+        peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit_density', 'summit']]
+        self.writer.df_to_tabix(peaks, save_path)
+
+        peaks = self.writer.peaks_to_bed9(peaks, fdr_tr)
+        self.writer.df_to_bigbed(peaks, self.chrom_sizes, save_path_bb)
 
 
     def extract_normalized_density(self, smoothed_signal, density_path):
@@ -398,11 +403,11 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         df = pd.DataFrame({
             'sliding_r': fit_res.r,
             'sliding_p': fit_res.p,
+            'enough_bg': fit_res.enough_bg_mask,
             'tr': per_window_trs,
             'initial_tr': per_window_trs_global,
             'bad': segmentation.annotate_with_segments(agg_cutcounts.shape, bad_segments),
             'rmsea': final_rmsea,
-            'enough_bg': fit_res.enough_bg_mask
         })
         self.write_to_parquet(df, save_path, compression_level=0)
         
@@ -439,18 +444,23 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         region_starts, region_ends = find_stretches(smoothed_signif)
 
         max_log10_fdrs = np.empty(region_ends.shape)
+        signif_stretches = []
         for i in range(len(region_starts)):
             start = region_starts[i]
             end = region_ends[i]
-        
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
+            signif_stretches.append(
+                [find_stretches(signif_fdrs[start:end])]
+            )
+
         
         self.logger.debug(f"{self.chrom_name}: {len(region_starts)} hotspots called")
 
         data = pd.DataFrame({
             'start': region_starts,
             'end': region_ends,
-            'max_neglog10_fdr': max_log10_fdrs
+            'max_neglog10_fdr': max_log10_fdrs,
+            'signif_stretches': signif_stretches
         })
         return ProcessorOutputData(self.chrom_name, data)
     

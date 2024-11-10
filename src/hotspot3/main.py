@@ -83,24 +83,27 @@ def main() -> None:
         fdr_pref = f"{fdr_dir}/{sample_id}"
         
         hotspots_path = f"{fdr_pref}.hotspots.fdr{fdr}.bed.gz"
+        hotspots_path_bb = f"{fdr_pref}.hotspots.fdr{fdr}.bb"
         root_logger.debug(f'Calling hotspots at FDR={fdr}')
         genome_processor.call_hotspots(
             precomp_fdrs,
             sample_id=sample_id,
             save_path=hotspots_path,
+            save_path_bb=hotspots_path_bb,
             fdr_tr=fdr
         )
 
         root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
         peaks_path = f"{fdr_pref}.peaks.fdr{fdr}.bed.gz"
+        peaks_path_bb = f"{fdr_pref}.peaks.fdr{fdr}.bb"
         genome_processor.call_variable_width_peaks(
             smoothed_signal_path,
             precomp_fdrs,
             sample_id=sample_id,
             save_path=peaks_path,
+            save_path_bb=peaks_path_bb,
             fdr_tr=fdr
         )
-        # df_to_bigbed
 
     if args.save_density:
         root_logger.info('Saving density')

@@ -42,7 +42,7 @@ class WithLogger:
         )
 
 
-class WithLoggerAndInterval(WithLogger): # TODO: Add method to quickly inherit for a subclass
+class WithLoggerAndInterval(WithLogger):
     def __init__(self, genomic_interval: GenomicInterval, config: ProcessorConfig=None, logger=None):
         super().__init__(logger=logger, config=config, name=genomic_interval.to_ucsc())
         self.genomic_interval = genomic_interval

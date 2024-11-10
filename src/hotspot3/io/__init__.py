@@ -1,6 +1,7 @@
 import pandas as pd
 import subprocess
 import importlib.resources as pkg_resources
+import numpy as np
 
 
 def read_chrom_sizes(chrom_sizes):
@@ -35,3 +36,10 @@ def run_bam2_bed(bam_path, tabix_bed_path, chromosomes=None):
             check=True,
             text=True
         )
+
+def log10_fdr_to_score(array):
+    return np.round(array * 10).astype(np.int64).clip(0, 1000)
+
+
+def norm_density_to_score(array):
+    return np.round(array * 100).astype(np.int64).clip(0, 1000)

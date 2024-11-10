@@ -4,12 +4,14 @@ import pandas as pd
 import tempfile
 import pyBigWig
 import numpy as np
+import subprocess
 
 from genome_tools.helpers import df_to_tabix
 
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
-from hotspot3.io import to_parquet_high_compression
+from hotspot3.io import to_parquet_high_compression, log10_fdr_to_score, norm_density_to_score
+from hotspot3.io.colors import get_bed9_color
 
 
 class ChromWriter(WithLoggerAndInterval):
@@ -42,6 +44,11 @@ class ChromWriter(WithLoggerAndInterval):
 
 
 class GenomeWriter(WithLogger):
+
+    bed9_columns = ['chrom', 'start', 'end', 'name', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb']
+    bed12_columns = bed9_columns + ['blockCount', 'blockSizes', 'blockStarts']
+
+
     def df_to_bigwig(self, df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
         with pyBigWig.open(outpath, 'w') as bw:
             bw.addHeader(list(chrom_sizes.items()))
@@ -51,7 +58,7 @@ class GenomeWriter(WithLogger):
             values = df[col].to_list()
             bw.addEntries(chroms, starts, ends=ends, values=values)
     
-    def clean_path(self, path):
+    def sanitize_path(self, path):
         """
         Call to properly clean up the path to replace parquets
         """
@@ -69,3 +76,56 @@ class GenomeWriter(WithLogger):
     
     def save_cutcounts(total_cutcounts, total_cutcounts_path):
         np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')
+    
+    def df_to_bigbed(self, df: pd.DataFrame, chrom_sizes, outpath):
+        with tempfile.NamedTemporaryFile(suffix=".bed") as temp_sorted_bed:
+            # Write sorted data to the temporary file
+            df.to_csv(temp_sorted_bed.name, sep='\t', header=False, index=False)
+            
+            # Run bedToBigBed
+            try:
+                subprocess.run(["bedToBigBed", temp_sorted_bed.name, chrom_sizes, outpath], check=True)
+            except subprocess.CalledProcessError as e:
+                self.logger.warning(f"Error converting to BigBed: {e}")
+    
+
+    def peaks_to_bed9(self, peaks_df, fdr_tr):
+        """
+        Convert peaks to bed9 format.
+        """
+        peaks_df['strand'] = '.'
+        peaks_df['score'] = norm_density_to_score(peaks_df['max_density'])
+        peaks_df['thickStart'] = peaks_df['summit']
+        peaks_df['thickEnd'] = peaks_df['summit'] + 1
+        peaks_df['itemRgb'] = get_bed9_color(fdr_tr, mode='peaks')
+
+        return peaks_df[self.bed9_columns]
+
+
+    def hotspots_to_bed12(self, hotspots_df, fdr_tr, significant_stretches):
+        """
+        Convert hotspots to bed9 format.
+        """
+        hotspots_df['strand'] = '.'
+        hotspots_df['score'] = log10_fdr_to_score(hotspots_df['max_neglog10_fdr'])
+        hotspots_df['thickStart'] = hotspots_df['start']
+        hotspots_df['thickEnd'] = hotspots_df['end']
+        hotspots_df['itemRgb'] = get_bed9_color(fdr_tr, mode='hotspots')
+        block_count = []
+        block_sizes = []
+        block_starts = []
+        hotspot_starts = hotspots_df['start'].values
+        for i, (starts, ends) in enumerate(significant_stretches):
+            block_count.append(len(starts))
+            block_sizes.append(
+                ','.join([end - start for start, end in zip(starts, ends)])
+            )
+            block_starts.append(
+                ','.join([start - hotspot_starts[i] for start in starts])
+            )
+        hotspots_df['blockCount'] = block_count
+        hotspots_df['blockSizes'] = block_sizes
+        hotspots_df['blockStarts'] = block_starts
+
+        return hotspots_df[self.bed12_columns]
+    
