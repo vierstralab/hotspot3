@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-def get_bed9_color(fdr, mode='peaks'):
+def get_bb_color(fdr, mode='peaks'):
     thresholds = [0.001, 0.01, 0.05, 0.1]
     cmap_tab20c = plt.get_cmap("tab20c")
 

@@ -11,7 +11,7 @@ from genome_tools.helpers import df_to_tabix
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
 from hotspot3.io import to_parquet_high_compression, log10_fdr_to_score, norm_density_to_score
-from hotspot3.io.colors import get_bed9_color
+from hotspot3.io.colors import get_bb_color
 
 
 class ChromWriter(WithLoggerAndInterval):
@@ -45,8 +45,8 @@ class ChromWriter(WithLoggerAndInterval):
 
 class GenomeWriter(WithLogger):
 
-    bed9_columns = ['chrom', 'start', 'end', 'id', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb']
-    bed12_columns = bed9_columns + ['blockCount', 'blockSizes', 'blockStarts']
+
+    bed12_columns = ['chrom', 'start', 'end', 'id', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb', 'blockCount', 'blockSizes', 'blockStarts']
 
 
     def df_to_bigwig(self, df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
@@ -89,7 +89,7 @@ class GenomeWriter(WithLogger):
                 self.logger.warning(f"Error converting to BigBed: {e}")
     
 
-    def peaks_to_bed9(self, peaks_df, fdr_tr):
+    def peaks_to_bed12(self, peaks_df, fdr_tr):
         """
         Convert peaks to bed9 format.
         """
@@ -97,9 +97,12 @@ class GenomeWriter(WithLogger):
         peaks_df['score'] = norm_density_to_score(peaks_df['max_density'])
         peaks_df['thickStart'] = peaks_df['summit']
         peaks_df['thickEnd'] = peaks_df['summit'] + 1
-        peaks_df['itemRgb'] = get_bed9_color(fdr_tr, mode='peaks')
+        peaks_df['itemRgb'] = get_bb_color(fdr_tr, mode='peaks')
+        peaks_df['blockCount'] = 3
+        peaks_df['blockSizes'] = '1,1,1'
+        peaks_df['blockStarts'] = '0,' + peaks_df.eval('summit - start').astype(str) + ',' + peaks_df.eval('end - start - 1').astype(str)
 
-        return peaks_df[self.bed9_columns]
+        return peaks_df[self.bed12_columns]
 
 
     def hotspots_to_bed12(self, hotspots_df, fdr_tr, significant_stretches):
@@ -110,7 +113,7 @@ class GenomeWriter(WithLogger):
         hotspots_df['score'] = log10_fdr_to_score(hotspots_df['max_neglog10_fdr'])
         hotspots_df['thickStart'] = hotspots_df['start']
         hotspots_df['thickEnd'] = hotspots_df['end']
-        hotspots_df['itemRgb'] = get_bed9_color(fdr_tr, mode='hotspots')
+        hotspots_df['itemRgb'] = get_bb_color(fdr_tr, mode='hotspots')
         block_count = []
         block_sizes = []
         block_starts = []

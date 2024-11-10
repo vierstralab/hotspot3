@@ -301,7 +301,7 @@ class GenomeProcessor(WithLogger):
         peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit_density', 'summit']]
         self.writer.df_to_tabix(peaks, save_path)
 
-        peaks = self.writer.peaks_to_bed9(peaks, fdr_tr)
+        peaks = self.writer.peaks_to_bed12(peaks, fdr_tr)
         self.writer.df_to_bigbed(peaks, self.chrom_sizes_file, save_path_bb)
 
 
