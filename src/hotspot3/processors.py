@@ -47,7 +47,7 @@ class GenomeProcessor(WithLogger):
         self.chrom_sizes = self.reader.read_chrom_sizes(chrom_sizes_file)
 
         if chromosomes is not None:
-            self.chrom_sizes = {k: v for k, v in chrom_sizes_file.items() if k in chromosomes}
+            self.chrom_sizes = {k: v for k, v in self.chrom_sizes.items() if k in chromosomes}
         
         chroms = [x for x in self.chrom_sizes.keys()]
         self.logger.debug(f"Chromosomes to process: {chroms}")

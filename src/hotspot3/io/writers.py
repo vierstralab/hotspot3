@@ -77,7 +77,7 @@ class GenomeWriter(WithLogger):
     def save_cutcounts(total_cutcounts, total_cutcounts_path):
         np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')
     
-    def df_to_bigbed(self, df: pd.DataFrame, chrom_sizes: dict, outpath):
+    def df_to_bigbed(self, df: pd.DataFrame, chrom_sizes, outpath):
         with tempfile.NamedTemporaryFile(suffix=".bed") as temp_sorted_bed:
             # Write sorted data to the temporary file
             df.to_csv(temp_sorted_bed.name, sep='\t', header=False, index=False)
