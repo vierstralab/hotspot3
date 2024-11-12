@@ -86,7 +86,7 @@ def trim_at_threshold(signal, peaks_coordinates):
         threshold = threshold_heights[i]
         new_left = summit - np.argmax(signal[left:summit + 1][::-1] <= threshold)
 
-        new_right = summit + np.argmax(signal[summit:right + 1] <= threshold)
+        new_right = summit + np.argmax(signal[summit:right + 1] <= threshold) - 1
         peaks_in_hotspots_trimmed[i, :] = np.array([new_left, summit, new_right])
     return peaks_in_hotspots_trimmed, threshold_heights
 
@@ -107,7 +107,7 @@ def find_varwidth_peaks(signal: np.ndarray, starts=None, ends=None):
     if starts is None:
         assert ends is None
         starts = np.zeros(1)
-        ends = np.zeros(1)
+        ends = np.full(1, len(signal))
     peaks_coordinates = find_closest_min_peaks(signal)
     in_sign_stretch = filter_peaks_summits_within_regions(peaks_coordinates, starts, ends)
     

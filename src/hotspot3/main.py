@@ -37,15 +37,19 @@ def main() -> None:
     main_dir_prefix = f"{args.outdir}/{sample_id}"
     debug_dir_prefix = f"{args.outdir}/debug/{sample_id}"
     
+    total_cutcounts_path = f"{main_dir_prefix}.total_cutcounts"
 
     if smoothed_signal_path is None or precomp_pvals is None:
         if cutcounts_path is None:
             cutcounts_path = f"{main_dir_prefix}.cutcounts.bed.gz"
-            genome_processor.write_cutcounts(args.bam, cutcounts_path)
+            genome_processor.extract_cutcounts_from_bam(args.bam, cutcounts_path)
+
+            genome_processor.get_total_cutcounts(cutcounts_path, total_cutcounts_path)
+            
         
         if smoothed_signal_path is None:
             smoothed_signal_path = f"{debug_dir_prefix}.smoothed_signal.parquet"
-            total_cutcounts_path = f"{main_dir_prefix}.total_cutcounts"
+            
             genome_processor.smooth_signal_modwt(
                 cutcounts_path,
                 save_path=smoothed_signal_path,
@@ -96,6 +100,7 @@ def main() -> None:
         genome_processor.call_variable_width_peaks(
             smoothed_signal_path,
             precomp_fdrs,
+            total_cutcounts_path,
             sample_id=sample_id,
             save_path=peaks_path,
             save_path_bb=peaks_path_bb,
@@ -111,6 +116,7 @@ def main() -> None:
 
 def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     name = "Run hotspot2 peak calling" + extra_desc
+    # TODO: Change description to reflect the new functionality
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description=name + """

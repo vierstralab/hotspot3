@@ -8,9 +8,10 @@ import subprocess
 
 from genome_tools.helpers import df_to_tabix
 
-from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
-from hotspot3.io import to_parquet_high_compression, log10_fdr_to_score, norm_density_to_score
+
+from hotspot3.io import to_parquet_high_compression, convert_to_score
+from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io.colors import get_bb_color
 
 
@@ -94,7 +95,7 @@ class GenomeWriter(WithLogger):
         Convert peaks to bed9 format.
         """
         peaks_df['strand'] = '.'
-        peaks_df['score'] = norm_density_to_score(peaks_df['max_density'])
+        peaks_df['score'] = convert_to_score(peaks_df['max_density'], 100)
         peaks_df['thickStart'] = peaks_df['summit']
         peaks_df['thickEnd'] = peaks_df['summit'] + 1
         peaks_df['itemRgb'] = get_bb_color(fdr_tr, mode='peaks')
@@ -111,7 +112,7 @@ class GenomeWriter(WithLogger):
         Convert hotspots to bed9 format.
         """
         hotspots_df['strand'] = '.'
-        hotspots_df['score'] = log10_fdr_to_score(hotspots_df['max_neglog10_fdr'])
+        hotspots_df['score'] = convert_to_score(hotspots_df['max_neglog10_fdr'], 10)
         hotspots_df['thickStart'] = hotspots_df['start']
         hotspots_df['thickEnd'] = hotspots_df['end']
         hotspots_df['itemRgb'] = get_bb_color(fdr_tr, mode='hotspots')

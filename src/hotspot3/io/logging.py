@@ -2,7 +2,7 @@ import logging
 import sys
 from typing import Type, TypeVar
 
-from genome_tools.genomic_interval import GenomicInterval
+from genome_tools import GenomicInterval
 
 from hotspot3.config import ProcessorConfig
 

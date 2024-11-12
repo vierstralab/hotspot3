@@ -2,13 +2,12 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
 import pandas as pd
-from typing import Iterable, List, cast
+from typing import Iterable, List, cast, Callable, Any
 
 from genome_tools.genomic_interval import GenomicInterval
 
 from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
 
-from hotspot3.io import run_bam2_bed
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io.readers import ChromReader, GenomeReader
 from hotspot3.io.writers import ChromWriter, GenomeWriter
@@ -18,9 +17,9 @@ from hotspot3.connectors.babachi import BabachiWrapper
 from hotspot3.signal_smoothing import modwt_smooth, normalize_density
 from hotspot3.background_fit.segment_fit import SegmentFit, ChromosomeFit
 from hotspot3.scoring.pvalue import PvalueEstimator
-from hotspot3.peak_calling.peak_calling import find_stretches, find_varwidth_peaks
-
+from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.utils import is_iterable, ensure_contig_exists
+
 
 
 class GenomeProcessor(WithLogger):
@@ -72,9 +71,11 @@ class GenomeProcessor(WithLogger):
             del state['logger']
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict):
         for name, value in state.items():
             setattr(self, name, value)
+    
+    ## Parallel processing functions
 
     def construct_parallel_args(self, *args):
         res_args = []
@@ -102,6 +103,14 @@ class GenomeProcessor(WithLogger):
             res_args.append(reformat_arg)
         return [self.chromosome_processors, *res_args]
 
+    def parallel_func_error_handler(self, func: Callable[..., Any]):
+        def wrapper(processor: 'ChromosomeProcessor', *args):
+            try:
+                return func(processor, *args)
+            except:
+                self.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
+                raise
+        return wrapper
 
     def parallel_by_chromosome(self, func, *args, cpus=None):
         """
@@ -111,6 +120,7 @@ class GenomeProcessor(WithLogger):
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {cpus} CPUs to {func.__name__}')
+        func = self.parallel_func_error_handler(func)
         results = []
         if self.cpus == 1:
             for func_args in zip(*args):
@@ -146,13 +156,41 @@ class GenomeProcessor(WithLogger):
         data = pd.concat(data, ignore_index=True)
         return ProcessorOutputData('all', data)
 
-    # Processing functions
-    def write_cutcounts(self, bam_path, outpath):
-        # TODO: rewrite with pysam
-        self.logger.info('Extracting cutcounts from bam file')
-        run_bam2_bed(bam_path, outpath, self.chrom_sizes.keys())
 
-    def get_total_cutcounts(self, cutcounts_path) -> int:
+    ## Processing functions
+    def extract_cutcounts_from_bam(self, bam_path, outpath):
+        """
+        Extract cutcounts from BAM file and save to tabix file.
+
+        Parameters:
+            - bam_path: Path to the BAM/CRAM/SAM file.
+            - outpath: Path to save the cutcounts to.
+        """
+        self.logger.info('Extracting cutcounts from bam file')
+        if self.cpus >= 3:
+            data = self.parallel_by_chromosome(
+                ChromosomeProcessor.extract_cutcounts_from_bam,
+                bam_path,
+            )
+            data = self.merge_and_add_chromosome(data).data_df
+            self.writer.df_to_tabix(data, outpath)
+        else:
+            # BAM2BED is faster in ~almost~ single-threaded mode
+            self.reader.extract_reads_bam2bed(
+                bam_path,
+                outpath,
+                self.chrom_sizes.keys()
+            )
+
+
+    def get_total_cutcounts(self, cutcounts_path, total_cutcounts_path) -> int:
+        """
+        Extract total cutcounts from cutcounts file and save to a separate file.
+
+        Parameters:
+            - cutcounts_path: Path to tabix file containing the cutcounts.
+            - total_cutcounts_path: Path to save the total cutcounts to.
+        """
         total_cutcounts = sum(
             self.parallel_by_chromosome(
                 ChromosomeProcessor.get_total_cutcounts,
@@ -160,14 +198,16 @@ class GenomeProcessor(WithLogger):
             )
         )
         self.logger.info('Total cutcounts = %d', total_cutcounts)
-        return total_cutcounts
+        self.writer.save_cutcounts(total_cutcounts, total_cutcounts_path)
 
 
     def smooth_signal_modwt(self, cutcounts_path, save_path, total_cutcounts_path):
+        """
+        Smooth signal using MODWT and save to parquet file.
+        """
         self.logger.info('Smoothing signal using MODWT')
-        total_cutcounts = self.get_total_cutcounts(cutcounts_path)
-        self.writer.save_cutcounts(total_cutcounts, total_cutcounts_path)
-
+        total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
+        
         self.writer.sanitize_path(save_path)
         self.parallel_by_chromosome(
             ChromosomeProcessor.smooth_density_modwt,
@@ -178,6 +218,9 @@ class GenomeProcessor(WithLogger):
     
 
     def fit_background_model(self, cutcounts_file, save_path: str, per_region_stats_path):
+        """"
+        Fit background model of cutcounts distribution and save fit parameters to parquet file.
+        """
         self.logger.info('Estimating parameters of background model')
         
         self.writer.sanitize_path(save_path)
@@ -193,6 +236,9 @@ class GenomeProcessor(WithLogger):
 
 
     def calc_pvals(self, cutcounts_file, fit_path: str, save_path: str):
+        """
+        Calculate per-bp p-values from cutcounts and background model parameters.
+        """
         self.logger.info('Calculating per-bp p-values')
         
         self.writer.sanitize_path(save_path)
@@ -205,6 +251,14 @@ class GenomeProcessor(WithLogger):
 
     
     def calc_fdr(self, pvals_path, save_path, max_fdr=1):
+        """
+        Calculate fast per-bp FDRs from p-values. If max_fdr is set to 1, will calculate all FDRs.
+
+        Parameters:
+            - pvals_path: Path to the parquet file containing the p-values.
+            - save_path: Path to save the FDRs in parquet format.
+            - max_fdr: Maximum FDR to calculate.
+        """
         self.logger.info('Calculating per-bp FDRs')
         
         chrom_pos_mapping = self.reader.read_chrom_pos_mapping(pvals_path)
@@ -235,7 +289,7 @@ class GenomeProcessor(WithLogger):
 
     def call_hotspots(self, fdr_path, sample_id, save_path, save_path_bb, fdr_tr):
         """
-        Call hotspots from path to parquet file containing log10(FDR) values.
+        Call hotspots from parquet file containing log10(FDR) values.
 
         Parameters:
             - fdr_path: Path to the parquet file containing the log10(FDR) values.
@@ -268,13 +322,14 @@ class GenomeProcessor(WithLogger):
             self,
             smoothed_signal_path,
             fdrs_path,
+            total_cutcounts_path,
             sample_id,
             save_path,
             save_path_bb,
             fdr_tr=0.05
         ):
         """
-        Call variable width peaks from smoothed signal and hotspots.
+        Call variable width peaks from smoothed signal and parquet file containing log10(FDR) values.
 
         Parameters:
             - smoothed_signal_path: Path to the parquet file containing the smoothed signal.
@@ -290,6 +345,7 @@ class GenomeProcessor(WithLogger):
             fdrs_path,
             fdr_tr
         )
+        total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         peaks = self.merge_and_add_chromosome(peaks_data).data_df
         if len(peaks) == 0:
             self.logger.critical(f"No peaks called at FDR={fdr_tr}. Most likely something went wrong!")
@@ -298,7 +354,11 @@ class GenomeProcessor(WithLogger):
             self.logger.info(f"There are {len(peaks)} peaks called at FDR={fdr_tr}")
         
         peaks['id'] = sample_id
-        peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit_density', 'summit']]
+        peaks = peaks[['chrom', 'start', 'end', 'id', 'max_density', 'summit_density', 'summit', 'smoothed_peak_height']]
+        peaks['smoothed_peak_height'] = normalize_density(
+            peaks['smoothed_peak_height'],
+            total_cutcounts
+        )
         self.writer.df_to_tabix(peaks, save_path)
 
         peaks = self.writer.peaks_to_bed12(peaks, fdr_tr)
@@ -306,6 +366,13 @@ class GenomeProcessor(WithLogger):
 
 
     def extract_normalized_density(self, smoothed_signal, density_path):
+        """
+        Save normalized density to bigwig file. Uses the density_step parameter from the config to downsample the data.
+
+        Parameters:
+            - smoothed_signal: Path to the parquet file containing the smoothed signal.
+            - density_path: Path to save the bigwig file.
+        """
         density_data = self.parallel_by_chromosome(
             ChromosomeProcessor.extract_normalized_density,
             smoothed_signal
@@ -334,6 +401,12 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self.chrom_size = len(self.genomic_interval)
         self.reader = self.copy_with_params(ChromReader)
         self.writer = self.copy_with_params(ChromWriter)
+
+
+    @ensure_contig_exists
+    def extract_cutcounts_from_bam(self, bam_path) -> ProcessorOutputData:
+        data = self.reader.extract_reads_pysam(bam_path)
+        return ProcessorOutputData(self.chrom_name, data)
 
 
     @ensure_contig_exists
@@ -440,20 +513,25 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
         log10_fdrs = self.reader.extract_fdr_track(fdr_path)
         self.logger.debug(f"{self.chrom_name}: Calling hotspots")
+        
+        # TODO: move logic to a peak calling class
         signif_fdrs = (log10_fdrs >= -np.log10(fdr_threshold))
-        smoothed_signif = self.reader.bn_wrapper.centered_running_nansum(
-            signif_fdrs,
-            window=self.config.window,
-        ) > 0
+        smoothed_signif = self.reader.extract_significant_bases(
+            log10_fdrs,
+            fdr_threshold,
+            min_signif_bases=1
+        )
         region_starts, region_ends = find_stretches(smoothed_signif)
 
         max_log10_fdrs = np.empty(region_ends.shape)
         signif_stretches = []
+        n_signif_bases = []
         for i in range(len(region_starts)):
             start = region_starts[i]
             end = region_ends[i]
             max_log10_fdrs[i] = np.nanmax(log10_fdrs[start:end])
             signif_stretches.append(find_stretches(signif_fdrs[start:end]))
+            n_signif_bases.append(np.sum(signif_fdrs[start:end]))
 
         self.logger.debug(f"{self.chrom_name}: {len(region_starts)} hotspots called")
 
@@ -461,7 +539,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             'start': region_starts,
             'end': region_ends,
             'max_neglog10_fdr': max_log10_fdrs,
-            'signif_stretches': signif_stretches
+            'n_significant_bases': n_signif_bases,
+            'signif_stretches': signif_stretches,
         })
         return ProcessorOutputData(self.chrom_name, data)
     
@@ -472,15 +551,23 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             smoothed_signal_path,
             columns=['smoothed', 'normalized_density']
         )
+        log10_fdrs = self.reader.extract_fdr_track(fdr_path)
         self.logger.debug(f"{self.chrom_name}: Calling peaks at FDR={fdr_threshold}")
-        signif_fdrs = self.reader.extract_fdr_track(fdr_path) >= -np.log10(fdr_threshold)
-        starts, ends = find_stretches(signif_fdrs)
+        
+        # TODO: move logic to a peak calling class
+        smoothed_signif = self.reader.extract_significant_bases(
+            log10_fdrs,
+            fdr_threshold,
+            min_signif_bases=self.config.min_signif_bases_for_peak
+        )
+
+        starts, ends = find_stretches(smoothed_signif)
         if len(starts) == 0:
             self.logger.warning(f"{self.chrom_name}: No peaks found. Skipping...")
             raise NotEnoughDataForContig
 
         normalized_density = signal_df['normalized_density'].values
-        peaks_in_hotspots_trimmed, _ = find_varwidth_peaks(
+        peaks_in_hotspots_trimmed, cutoff_height = find_varwidth_peaks(
             signal_df['smoothed'].values,
             starts,
             ends
@@ -489,7 +576,13 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             peaks_in_hotspots_trimmed,
             columns=['start', 'summit', 'end']
         )
+        # TODO: wrap in function
+        peaks_df['end'] = peaks_df['summit'] + np.maximum(peaks_df.eval('end - summit'), self.config.min_peak_half_width)
+        peaks_df['start'] = peaks_df['summit'] - np.maximum(peaks_df.eval('summit - start'), self.config.min_peak_half_width)
+    
+        peaks_df['end'] += 1 # BED format, half-open intervals
         peaks_df['summit_density'] = normalized_density[peaks_df['summit']]
+        peaks_df['smoothed_peak_height'] = cutoff_height
         
         peaks_df['max_density'] = [
             np.max(normalized_density[start:end])

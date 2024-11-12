@@ -11,9 +11,10 @@ from hotspot3.io.logging import setup_logger
 
 """
 This script is used to call main.py with memory tracking.
-Inefficient to use this script in a pipeline, didn't optimize too much.
-Also time estimates from logger are not accurate due to output buffering.
+Inefficient to use this script in a pipeline, didn't optimize it too much.
+Also, time estimates from logger might be inaccurate due to output buffering.
 """
+
 
 def format_memory(size_in_bytes):
     """Format the memory size from bytes to a human-readable format."""
@@ -22,7 +23,6 @@ def format_memory(size_in_bytes):
             return f"{size_in_bytes:.2f} {unit}"
         size_in_bytes /= 1024
     return f"{size_in_bytes:.2f} PB"
-
 
 
 def track_memory(process, logger: logging.Logger, interval=2):
@@ -66,7 +66,6 @@ def run_process_with_memory_tracking(cmd, logger: logging.Logger):
                 process.kill()
                 raise
         
-
 
 def main():
     args, logger_level = parse_arguments(" with memory tracking. Creates {args.id}.memory_usage.tsv in output folder.")

@@ -20,7 +20,6 @@ class BackgroundFit(BottleneckWrapper):
     def __init__(self, config: ProcessorConfig=None, logger=None, name=None):
         super().__init__(logger=logger, config=config, name=name)
 
-        self.min_mappable_bg = round(self.config.min_mappable_bases_proportion * self.config.bg_window)
         self.sampling_step = self.config.signal_prop_sampling_step
         self.interpolation_step = self.config.signal_prop_interpolation_step // self.sampling_step
         self.points_in_bg_window = (self.config.bg_window - 1) // self.sampling_step

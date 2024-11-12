@@ -72,7 +72,7 @@ class BabachiWrapper(WithLoggerAndInterval):
             b_penalty=self.config.babachi_boundary_penalty,
             min_seg_bp=self.config.babachi_min_segment_size,
             min_seg_snps=0,
-            subchr_filter=0
+            subchr_filter=self.config.babachi_min_segment_size // self.config.babachi_segmentation_step
         )
         return gs.estimate_BAD()
 

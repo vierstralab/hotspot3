@@ -1,15 +1,17 @@
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
+
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
-from genome_tools.genomic_interval import GenomicInterval
+from genome_tools import GenomicInterval
 
 from hotspot3.models import NotEnoughDataForContig, WindowedFitResults
 from hotspot3.config import ProcessorConfig
-from hotspot3.connectors.bottleneck import BottleneckWrapper
-from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 
-counts_dtype = np.int32
+from hotspot3.connectors.bottleneck import BottleneckWrapper
+from hotspot3.connectors.bam2bed import BamFileCutsExtractor
+
+from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 
 
 class ChromReader(WithLoggerAndInterval):
@@ -20,6 +22,7 @@ class ChromReader(WithLoggerAndInterval):
         self.chrom_size = genomic_interval.end
 
         self.bn_wrapper = self.copy_with_params(BottleneckWrapper)
+        self.read_extractor = self.copy_with_params(BamFileCutsExtractor)
 
     def extract_mappable_bases(self, mappable_file) -> np.ndarray:
         """
@@ -54,10 +57,14 @@ class ChromReader(WithLoggerAndInterval):
     
     def extract_aggregated_cutcounts(self, cutcounts_file):
         cutcounts = self.extract_cutcounts(cutcounts_file).astype(np.float32)
-        window = self.bn_wrapper.config.window
+        window = self.config.window
         
         agg_cutcounts = self.bn_wrapper.centered_running_nansum(cutcounts, window)
         return agg_cutcounts
+
+
+    def extract_reads_pysam(self, bam_path):
+        return self.read_extractor.extract_reads_pysam(bam_path, self.chrom_name)
     
 
     def extract_mappable_agg_cutcounts(self, cutcounts_file, mappable_file) -> ma.MaskedArray:
@@ -90,6 +97,14 @@ class ChromReader(WithLoggerAndInterval):
     def extract_fdr_track(self, fdr_path):
         log10_fdrs = self.extract_from_parquet(fdr_path, columns=['log10_fdr'])['log10_fdr'].values
         return log10_fdrs
+    
+    def extract_significant_bases(self, fdrs, fdr_threshold, min_signif_bases=1):
+        signif_bases = fdrs >= -np.log10(fdr_threshold)
+        smoothed_signif = self.bn_wrapper.centered_running_nansum(
+            signif_bases,
+            window=self.config.window,
+        ) >= min_signif_bases
+        return smoothed_signif
 
 
 class GenomeReader(WithLogger):
@@ -122,3 +137,10 @@ class GenomeReader(WithLogger):
             header=None,
             names=['chrom', 'size']
         ).set_index('chrom')['size'].to_dict()
+
+    def extract_reads_bam2bed(self, bam_path, tabix_path, chromosomes):
+        read_extractor = self.copy_with_params(BamFileCutsExtractor)
+        return read_extractor.extract_reads_bam2bed(bam_path, tabix_path, chromosomes)
+    
+    def read_total_cutcounts(self, total_cutcounts_path):
+        return np.loadtxt(total_cutcounts_path, dtype=int)
