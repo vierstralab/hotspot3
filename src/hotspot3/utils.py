@@ -24,9 +24,9 @@ def ensure_contig_exists(func):
 
 def parallel_func_error_handler(func):
     @functools.wraps(func)
-    def wrapper(processor: 'ChromosomeProcessor', *args):
+    def wrapper(processor: 'ChromosomeProcessor', *args, **kwargs):
         try:
-            return func(processor, *args)
+            return func(processor, *args, **kwargs)
         except:
             processor.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
             raise
