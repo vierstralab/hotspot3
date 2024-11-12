@@ -22,6 +22,17 @@ def ensure_contig_exists(func):
     return wrapper
 
 
+def parallel_func_error_handler(func):
+    @functools.wraps(func)
+    def wrapper(processor: 'ChromosomeProcessor', *args):
+        try:
+            return func(processor, *args)
+        except:
+            processor.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
+            raise
+    return wrapper
+
+
 def is_iterable(obj):
     if isinstance(obj, pd.DataFrame) or isinstance(obj, str):
         return False

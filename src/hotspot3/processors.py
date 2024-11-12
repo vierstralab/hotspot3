@@ -19,18 +19,8 @@ from hotspot3.signal_smoothing import modwt_smooth, normalize_density
 from hotspot3.background_fit.segment_fit import SegmentFit, ChromosomeFit
 from hotspot3.scoring.pvalue import PvalueEstimator
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-from hotspot3.utils import is_iterable, ensure_contig_exists
+from hotspot3.utils import is_iterable, ensure_contig_exists, parallel_func_error_handler
 
-
-def parallel_func_error_handler(func):
-    @functools.wraps(func)
-    def wrapper(processor: 'ChromosomeProcessor', *args):
-        try:
-            return func(processor, *args)
-        except:
-            processor.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
-            raise
-    return wrapper
 
 
 class GenomeProcessor(WithLogger):
@@ -404,11 +394,13 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self.reader = self.copy_with_params(ChromReader)
         self.writer = self.copy_with_params(ChromWriter)
 
+
     @parallel_func_error_handler
     @ensure_contig_exists
     def extract_cutcounts_from_bam(self, bam_path) -> ProcessorOutputData:
         data = self.reader.extract_reads_pysam(bam_path)
         return ProcessorOutputData(self.chrom_name, data)
+
 
     @parallel_func_error_handler
     @ensure_contig_exists
@@ -418,6 +410,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         """
         self.logger.debug(f"{self.chrom_name}: Calculating total cutcounts")
         return self.reader.extract_cutcounts(cutcounts).sum()
+
 
     @parallel_func_error_handler
     @ensure_contig_exists
@@ -493,6 +486,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         
         return ProcessorOutputData(self.chrom_name, per_interval_params)
 
+
     @parallel_func_error_handler
     @ensure_contig_exists
     def calc_pvals(self, cutcounts_file, fit_parquet_path, save_path) -> ProcessorOutputData:
@@ -511,6 +505,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
  
         neglog_pvals = pd.DataFrame({'log10_pval': pval_estimator.fix_inf_pvals(neglog_pvals)})
         self.write_to_parquet(neglog_pvals, save_path)
+
 
     @parallel_func_error_handler
     @ensure_contig_exists
@@ -547,7 +542,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             'signif_stretches': signif_stretches,
         })
         return ProcessorOutputData(self.chrom_name, data)
-    
+
+
     @parallel_func_error_handler
     @ensure_contig_exists
     def call_variable_width_peaks(self, smoothed_signal_path, fdr_path, fdr_threshold) -> ProcessorOutputData:
@@ -595,6 +591,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self.logger.debug(f"{self.chrom_name}: {len(peaks_df)} peaks called")
 
         return ProcessorOutputData(self.chrom_name, peaks_df)
+
 
     @parallel_func_error_handler
     @ensure_contig_exists
