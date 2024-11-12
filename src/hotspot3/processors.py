@@ -112,8 +112,8 @@ class GenomeProcessor(WithLogger):
         if cpus is None: # override cpus if provided
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
-        self.logger.debug(f'Using {cpus} CPUs to {func.__name__}')
         func = parallel_func_error_handler(raw_func)
+        self.logger.debug(f'Using {cpus} CPUs to {raw_func.__name__}')
         results = []
         if self.cpus == 1:
             for func_args in zip(*args):
