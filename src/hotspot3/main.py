@@ -37,11 +37,15 @@ def main() -> None:
     main_dir_prefix = f"{args.outdir}/{sample_id}"
     debug_dir_prefix = f"{args.outdir}/debug/{sample_id}"
     
-    total_cutcounts_path = f"{main_dir_prefix}.total_cutcounts"
+    if cutcounts_path is None:
+        total_cutcounts_path = None
+    else:
+        total_cutcounts_path = cutcounts_path.replace('.cutcounts.bed.gz', '.total_cutcounts')
 
     if smoothed_signal_path is None or precomp_pvals is None:
         if cutcounts_path is None:
             cutcounts_path = f"{main_dir_prefix}.cutcounts.bed.gz"
+            total_cutcounts_path = f"{main_dir_prefix}.total_cutcounts"
             genome_processor.extract_cutcounts_from_bam(args.bam, cutcounts_path)
 
             genome_processor.get_total_cutcounts(cutcounts_path, total_cutcounts_path)
