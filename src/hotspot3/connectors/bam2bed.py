@@ -9,7 +9,7 @@ from hotspot3.models import NotEnoughDataForContig
 
 
 class BamFileCutsExtractor(WithLogger):
-    def extract_reads_bam2bed(bam_path, tabix_bed_path, chromosomes=None):
+    def extract_reads_bam2bed(self, bam_path, tabix_bed_path, chromosomes=None):
         """
         Run bam2bed conversion script.
         Very fast but can't be parallelized.
