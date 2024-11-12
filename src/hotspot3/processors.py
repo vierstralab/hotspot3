@@ -159,7 +159,7 @@ class GenomeProcessor(WithLogger):
             - outpath: Path to save the cutcounts to.
         """
         self.logger.info('Extracting cutcounts from bam file')
-        if self.cpus >= 3:
+        if False: #self.cpus >= 3: # TMP hotfix to have uniform data processing
             data = self.parallel_by_chromosome(
                 ChromosomeProcessor.extract_cutcounts_from_bam,
                 bam_path,

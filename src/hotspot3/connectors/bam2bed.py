@@ -22,7 +22,7 @@ class BamFileCutsExtractor(WithLogger):
                 text=True
             )
 
-    def extract_reads_pysam(bam_path, chromosome) -> pd.DataFrame:
+    def extract_reads_pysam(self, bam_path, chromosome) -> pd.DataFrame:
         """
         Extract reads with pysam for a single chromosome.
         Slower than bam2bed conversion but can be heavily parallelized.
