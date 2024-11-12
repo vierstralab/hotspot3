@@ -104,17 +104,8 @@ class GenomeProcessor(WithLogger):
             res_args.append(reformat_arg)
         return [self.chromosome_processors, *res_args]
 
-    def parallel_func_error_handler(self, func: Callable[..., Any]):
-        @functools.wraps(func)
-        def wrapper(processor: 'ChromosomeProcessor', *args):
-            try:
-                return func(processor, *args)
-            except:
-                self.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
-                raise
-        return wrapper
 
-    def parallel_by_chromosome(self, func, *args, cpus=None):
+    def parallel_by_chromosome(self, raw_func, *args, cpus=None):
         """
         Basic function that handles parallel execution of a function by chromosome.
         """
@@ -122,7 +113,7 @@ class GenomeProcessor(WithLogger):
             cpus = self.cpus
         args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {cpus} CPUs to {func.__name__}')
-        func = self.parallel_func_error_handler(func)
+        func = parallel_func_error_handler(raw_func)
         results = []
         if self.cpus == 1:
             for func_args in zip(*args):
@@ -615,3 +606,14 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             chrom_names=[x for x in self.gp.chrom_sizes.keys()],
             compression_level=compression_level,
         )
+
+
+def parallel_func_error_handler(func: Callable[..., Any]):
+    @functools.wraps(func)
+    def wrapper(processor: 'ChromosomeProcessor', *args):
+        try:
+            return func(processor, *args)
+        except:
+            processor.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
+            raise
+    return wrapper
