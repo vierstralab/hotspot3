@@ -500,11 +500,11 @@ class ChromosomeProcessor(WithLoggerAndInterval):
 
     @parallel_func_error_handler
     @ensure_contig_exists
-    def extract_fit_threholds(self, fit_parquet_path):
+    def extract_fit_threholds(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_threholds(fit_parquet_path).iloc[::self.config.density_step]
         fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
         fit_res['end'] = fit_res['start'] + self.config.density_step
-        return fit_res
+        return ProcessorOutputData(self.chrom_name, fit_res)
 
     @parallel_func_error_handler
     @ensure_contig_exists
