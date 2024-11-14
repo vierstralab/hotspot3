@@ -12,10 +12,11 @@ from hotspot3.models import NotEnoughDataForContig
 def run_bam2bed(*args):
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
         result = subprocess.run(
-            ['bash', script, *args],
+            f'bash {script} {" ".join(args)}',
             check=True,
             text=True,
-            capture_output=True
+            capture_output=True,
+            shell=True,
         )
     return result
 
@@ -26,8 +27,7 @@ class BamFileCutsExtractor(WithLogger):
         Run bam2bed conversion script.
         Very fast but can't be parallelized.
         """
-        chromosomes = ' '.join(list(chromosomes))
-        run_bam2bed(bam_path, chromosomes, '|', 'bgzip', '>', tabix_bed_path)
+        run_bam2bed(bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path)
         pysam.tabix_index(tabix_bed_path, preset='bed', force=True)
 
 

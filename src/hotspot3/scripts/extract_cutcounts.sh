@@ -2,18 +2,17 @@
 set -e -o pipefail
 
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-  echo "Usage: $0 <input.bam> <chromosome>"
+  echo "Usage: $0 <input.bam> <chromosome(s)>"
   exit 1
 fi
 
 AWK_EXE=$(which mawk 2>/dev/null || which awk)
 BAM_FILE=$1
-CHROM=$2
+# Can accept any number of chromosomes
+CHROMS="${@:2}"
 
-INPUT_CMD="samtools view -b $BAM_FILE $CHROM"
 
-
-eval "$INPUT_CMD" \
+samtools view -b $BAM_FILE $CHROMS \
   | bam2bed --do-not-sort \
   | "$AWK_EXE" -v FS="\t" -v OFS="\t" '
     {
