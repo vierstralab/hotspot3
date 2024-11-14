@@ -3,24 +3,42 @@ import importlib.resources as pkg_resources
 from collections import defaultdict
 import pysam
 import pandas as pd
+from io import StringIO
 
 from hotspot3.io.logging import WithLogger
 from hotspot3.models import NotEnoughDataForContig
 
 
+def run_bam2bed(*args):
+    with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
+        result = subprocess.run(
+            ['bash', script, *args],
+            check=True,
+            text=True,
+            capture_output=True
+        )
+    return result
+
+
 class BamFileCutsExtractor(WithLogger):
-    def extract_reads_bam2bed(self, bam_path, tabix_bed_path, chromosomes=None):
+    def extract_all_chroms(self, bam_path, tabix_bed_path, chromosomes):
         """
         Run bam2bed conversion script.
         Very fast but can't be parallelized.
         """
-        with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
-            chroms = ','.join(chromosomes) if chromosomes else ""
-            subprocess.run(
-                ['bash', script, bam_path, tabix_bed_path, chroms],
-                check=True,
-                text=True
-            )
+        chromosomes = ' '.join(list(chromosomes))
+        run_bam2bed(bam_path, chromosomes, '|', 'bgzip', '>', tabix_bed_path)
+        pysam.tabix_index(tabix_bed_path, preset='bed', force=True)
+
+
+    def extract_chromosome_to_df(self, bam_path, chromosome: str) -> pd.DataFrame:
+        """
+        Run bam2bed for a single chromosome. Returns a pandas DataFrame.
+        """
+        result = run_bam2bed(bam_path, chromosome)
+        df = pd.read_table(StringIO(result.stdout))
+        return df.drop(columns=['#chr'])
+
 
     def extract_reads_pysam(self, bam_path, chromosome) -> pd.DataFrame:
         """

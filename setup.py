@@ -13,7 +13,9 @@ setup(
     include_package_data=True,
     package_dir={'': 'src'},
     package_data={
-        'hotspot3': ['scripts/extract_cutcounts.sh'],  # Include the shell script inside the package
+        'hotspot3': [
+            'scripts/extract_cutcounts.sh',
+        ],
     },
     install_requires=[
         "numpy == 1.26.0",

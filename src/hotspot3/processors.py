@@ -146,6 +146,7 @@ class GenomeProcessor(WithLogger):
             data.append(df)
             
         data = pd.concat(data, ignore_index=True)
+        data = data[['chrom'] + [col for col in data.columns if col != 'chrom']]
         return ProcessorOutputData('all', data)
 
 
@@ -159,20 +160,21 @@ class GenomeProcessor(WithLogger):
             - outpath: Path to save the cutcounts to.
         """
         self.logger.info('Extracting cutcounts from bam file')
-        if False: #self.cpus >= 3: # TMP hotfix to have uniform data processing
+        if self.cpus >= 3:
             data = self.parallel_by_chromosome(
-                ChromosomeProcessor.extract_cutcounts_from_bam,
+                ChromosomeProcessor.extract_cutcounts_for_chromosome,
                 bam_path,
             )
             data = self.merge_and_add_chromosome(data).data_df
             self.writer.df_to_tabix(data, outpath)
         else:
             # BAM2BED is faster in ~almost~ single-threaded mode
-            self.reader.extract_reads_bam2bed(
+            self.reader.extract_cutcounts_all_chroms(
                 bam_path,
                 outpath,
                 self.chrom_sizes.keys()
             )
+
 
 
     def get_total_cutcounts(self, cutcounts_path, total_cutcounts_path) -> int:
@@ -397,8 +399,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
 
     @parallel_func_error_handler
     @ensure_contig_exists
-    def extract_cutcounts_from_bam(self, bam_path) -> ProcessorOutputData:
-        data = self.reader.extract_reads_pysam(bam_path)
+    def extract_cutcounts_for_chromosome(self, bam_path) -> ProcessorOutputData:
+        data = self.reader.extract_cutcounts_for_chrom(bam_path)
         return ProcessorOutputData(self.chrom_name, data)
 
 

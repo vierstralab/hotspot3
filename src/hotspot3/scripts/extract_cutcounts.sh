@@ -2,19 +2,16 @@
 set -e -o pipefail
 
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-  echo "Usage: $0 <input.bam> <output.bed.gz> [chromosomes]"
+  echo "Usage: $0 <input.bam> <chromosome>"
   exit 1
 fi
 
 AWK_EXE=$(which mawk 2>/dev/null || which awk)
 BAM_FILE=$1
-CHROMS=${3:-}
+CHROM=$2
 
-if [ -n "$CHROMS" ]; then
-  INPUT_CMD="samtools view -b $BAM_FILE $(echo "$CHROMS" | sed 's/,/ /g')"
-else
-  INPUT_CMD="cat $BAM_FILE"
-fi
+INPUT_CMD="samtools view -b $BAM_FILE $CHROM"
+
 
 eval "$INPUT_CMD" \
   | bam2bed --do-not-sort \
@@ -36,7 +33,4 @@ eval "$INPUT_CMD" \
   | sort-bed - \
   | uniq -c \
   | "$AWK_EXE" -v OFS='\t' '{ print $2,$3,$4,$1 }' \
-  | { echo -e "#chr\tstart\tend\tcount"; cat; } \
-  | bgzip > "$2"
-
-tabix -p bed "$2"
+  | { echo -e "#chr\tstart\tend\tcount"; cat; }
