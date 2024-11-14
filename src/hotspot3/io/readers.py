@@ -93,6 +93,13 @@ class ChromReader(WithLoggerAndInterval):
             fit_params['sliding_r'].values,
             fit_params['enough_bg'].values
         )
+    
+    def extract_fit_threholds(self, fit_params_parquet):
+        threholds = self.extract_from_parquet(
+            fit_params_parquet,
+            columns=['chrom', 'tr']
+        )
+        return threholds
 
     def extract_fdr_track(self, fdr_path):
         log10_fdrs = self.extract_from_parquet(fdr_path, columns=['log10_fdr'])['log10_fdr'].values

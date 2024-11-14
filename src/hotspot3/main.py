@@ -63,10 +63,12 @@ def main() -> None:
         if precomp_pvals is None:
             fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
             per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
+            threholds_bb_path = f"{main_dir_prefix}.threholds.bb"
             genome_processor.fit_background_model(
                 cutcounts_path,
                 fit_params_path,
-                per_region_stats_path
+                per_region_stats_path,
+                threholds_bb_path
             )
 
             precomp_pvals = f"{main_dir_prefix}.pvals.parquet"
