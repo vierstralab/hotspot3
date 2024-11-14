@@ -143,7 +143,12 @@ class GlobalBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution globally (for chromosome/homogeneous regions)
     """
-    def fit(self, agg_cutcounts: ma.MaskedArray, step=None, global_fit: GlobalFitResults = None) -> GlobalFitResults:
+    def fit(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            step=None,
+            fallback_fit_results: GlobalFitResults = None
+        ) -> GlobalFitResults:
         """
         Fit the global background distribution.
 
@@ -169,7 +174,7 @@ class GlobalBackgroundFit(BackgroundFit):
                     tr=tr,
                     bin_edges=trs,
                     assumed_signal_mask=assumed_signal_mask,
-                    global_fit=global_fit
+                    global_fit=fallback_fit_results
                 )
             except NotEnoughDataForContig:
                 continue
@@ -178,32 +183,51 @@ class GlobalBackgroundFit(BackgroundFit):
             raise NotEnoughDataForContig
 
         tr, rmsea, p, r = min(result, key=lambda x: x[1])
-        if rmsea > self.config.rmsea_tr and global_fit is not None:
-            chrom_quantile_tr = np.nanquantile(agg_cutcounts, global_fit.fit_quantile)
-            if chrom_quantile_tr < global_fit.fit_threshold:
-                tr = global_fit.fit_threshold
+        if rmsea > self.config.rmsea_tr and fallback_fit_results is not None:
+            chrom_quantile_tr = np.nanquantile(agg_cutcounts, fallback_fit_results.fit_quantile)
+            if chrom_quantile_tr < fallback_fit_results.fit_threshold:
+                tr = fallback_fit_results.fit_threshold
                 assumed_signal_mask = max_counts >= tr
                 p, r, rmsea = self.fit_for_tr(
                     agg_cutcounts,
                     tr=tr,
                     bin_edges=trs,
                     assumed_signal_mask=assumed_signal_mask,
-                    global_fit=global_fit
+                    global_fit=fallback_fit_results
                 )
-                self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). Low signal region ({chrom_quantile_tr}<{global_fit.fit_threshold}). Fitting with global {global_fit.fit_threshold}")
+                self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). Low signal region ({chrom_quantile_tr}<{fallback_fit_results.fit_threshold}). Fitting with global {fallback_fit_results.fit_threshold}")
             else:
                 if tr < chrom_quantile_tr:
-                    self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{global_fit.fit_threshold}). Best tr {tr} < chromosome quantile {chrom_quantile_tr}. Fitting with best {tr}")
+                    self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{fallback_fit_results.fit_threshold}). Best tr {tr} < chromosome quantile {chrom_quantile_tr}. Fitting with best {tr}")
                 else:
                     tr, rmsea, p, r = result[-1]
-                    self.logger.warning(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{global_fit.fit_threshold}). Fitting with last {tr}")
+                    self.logger.warning(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). High signal region ({chrom_quantile_tr}>{fallback_fit_results.fit_threshold}). Fitting with last {tr}")
+        
+        if not check_valid_fit(GlobalFitResults(p, r, rmsea, 0, 0)) and fallback_fit_results is not None:
+            tr = fallback_fit_results.fit_threshold # FIXME for loop to find the best tr
+            assumed_signal_mask = max_counts >= tr
+            p, r, rmsea = self.fit_for_tr(
+                agg_cutcounts,
+                tr=tr,
+                bin_edges=trs,
+                assumed_signal_mask=assumed_signal_mask,
+                fallback_fit_results=fallback_fit_results
+            )
+            self.logger.debug(f"{self.name}: RMSEA ({rmsea}>{self.config.rmsea_tr}). Fitting with global {fallback_fit_results.fit_threshold}")
             
         quantile = np.sum(agg_cutcounts < tr) / np.sum(~np.isnan(agg_cutcounts))
 
         return GlobalFitResults(p, r, rmsea, quantile, tr) #, result
 
     @wrap_masked
-    def fit_for_tr(self, agg_cutcounts, tr, bin_edges=None, assumed_signal_mask=None, global_fit: GlobalFitResults=None):
+    def fit_for_tr(
+        self,
+        agg_cutcounts,
+        tr,
+        bin_edges=None,
+        assumed_signal_mask=None,
+        fallback_fit_results: GlobalFitResults=None
+    ):
         if bin_edges is None:
             bin_edges, _ = self.get_all_bins(agg_cutcounts)
             bin_edges = bin_edges[:, None]
@@ -212,8 +236,8 @@ class GlobalBackgroundFit(BackgroundFit):
             assumed_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, tr)
 
         mean, var = self.get_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
-        if global_fit is not None:
-            r = global_fit.r
+        if fallback_fit_results is not None:
+            r = fallback_fit_results.r
             n_params = 1
         else:
             r = self.r_from_mean_and_var(mean, var)

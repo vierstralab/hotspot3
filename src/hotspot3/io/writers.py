@@ -72,9 +72,6 @@ class GenomeWriter(WithLogger):
     def df_to_tabix(self, df, outpath):
         df_to_tabix(df, outpath)
     
-    def df_to_gzip(self, df: pd.DataFrame, outpath):
-        df.to_csv(outpath, sep='\t', index=False, compression='gzip')
-    
     def save_cutcounts(self, total_cutcounts, total_cutcounts_path):
         np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')
     

@@ -16,7 +16,7 @@ from hotspot3.io.writers import ChromWriter, GenomeWriter
 from hotspot3.connectors.babachi import BabachiWrapper
 
 from hotspot3.signal_smoothing import modwt_smooth, normalize_density
-from hotspot3.background_fit.segment_fit import SegmentFit, ChromosomeFit
+from hotspot3.background_fit.segment_fit import ChromosomeFit, SegmentsFit
 from hotspot3.scoring.pvalue import PvalueEstimator
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.utils import is_iterable, ensure_contig_exists, parallel_func_error_handler
@@ -458,7 +458,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         )
         self.logger.debug(f'{self.chrom_name}: Estimating proportion of background vs signal')
         
-        s_fit = self.copy_with_params(SegmentFit)
+        s_fit = self.copy_with_params(ChromosomeFit)
         per_window_trs_global, rmseas, global_fit_params = s_fit.fit_segment_thresholds(
             agg_cutcounts,
         )
@@ -484,7 +484,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
         )
 
-        chrom_fit = self.copy_with_params(ChromosomeFit)
+        chrom_fit = self.copy_with_params(SegmentsFit)
         fit_res, per_window_trs, final_rmsea, per_interval_params = chrom_fit.fit_params(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,

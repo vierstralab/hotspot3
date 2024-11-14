@@ -13,8 +13,11 @@ from hotspot3.utils import interpolate_nan
 from hotspot3.background_fit import check_valid_fit
 
 
+class SegmentsFit(WithLoggerAndInterval):
+    def filter_signal_to_segment(self, agg_cutcounts: np.ndarray) -> np.ndarray:
+        return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
 
-class ChromosomeFit(WithLoggerAndInterval):
+
     def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: GlobalFitResults=None):
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
@@ -32,16 +35,20 @@ class ChromosomeFit(WithLoggerAndInterval):
             segments = [self.genomic_interval, *segments]
             types.append('global')
             success_fit.append(True)
+
         for segment_interval in bad_segments:
             start = int(segment_interval.start)
-            end = int(segment_interval.end)
-            s_fit = SegmentFit(segment_interval, self.config, logger=self.logger)            
+            end = int(segment_interval.end)        
             types.append('segment')
+            segment_step = 20
             try:
-                thresholds, rmsea, segment_fit_results = s_fit.fit_segment_thresholds(
-                    agg_cutcounts,
-                    global_fit=global_fit,
-                )
+                signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
+                g_fit = self.copy_with_params(GlobalBackgroundFit)
+
+                segment_fit = g_fit.fit(signal_at_segment, step=segment_step)
+                if not check_valid_fit(segment_fit) and global_fit is not None:
+                    segment_fit = g_fit.fit(signal_at_segment, fallback_fit_results=global_fit, step=segment_step)
+                
                 success_fit.append(True)
             except NotEnoughDataForContig:
                 thresholds = np.max(agg_cutcounts)
@@ -53,7 +60,7 @@ class ChromosomeFit(WithLoggerAndInterval):
 
             #thresholds = np.full_like(thresholds, segment_fit_results.fit_threshold)
 
-            fit_res = s_fit.fit_segment_params(
+            fit_res = self.fit_segment_params(
                 agg_cutcounts,
                 thresholds,
                 global_fit=segment_fit_results
@@ -81,33 +88,14 @@ class ChromosomeFit(WithLoggerAndInterval):
         ), per_window_trs, final_rmsea, intervals_stats
 
 
-class SegmentFit(WithLoggerAndInterval):
-    def filter_signal_to_segment(self, agg_cutcounts: np.ndarray) -> np.ndarray:
-        return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
-    
-    def fit_segment_thresholds(self, agg_cutcounts: ma.MaskedArray, global_fit: GlobalFitResults=None, step=None):
-        if step is None:
-            step = self.config.window
+    def fit_segment_params(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            thresholds: np.ndarray,
+            global_fit: GlobalFitResults=None
+        ) -> WindowedFitResults:
 
-        signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
-        g_fit = GlobalBackgroundFit(self.config, name=self.name)
-
-        segment_fit = g_fit.fit(signal_at_segment, step=step)
-        valid_segment = check_valid_fit(segment_fit)
-        if not valid_segment and global_fit is not None:
-            segment_fit = g_fit.fit(signal_at_segment, global_fit=global_fit, step=step)
-
-        fine_signal_level_fit = StridedBackgroundFit(config=self.config, name=self.name)
-        thresholds, _, rmsea = fine_signal_level_fit.fit_tr(
-            signal_at_segment,
-           # global_fit=segment_fit,
-        )
-        thresholds = interpolate_nan(thresholds).astype(np.float16)
-        self.logger.debug(f"{self.name}: Signal thresholds approximated")
-        return thresholds, rmsea, segment_fit
-    
-    def fit_segment_params(self, agg_cutcounts: ma.MaskedArray, thresholds: np.ndarray, global_fit: GlobalFitResults=None) -> WindowedFitResults:
-        w_fit = WindowBackgroundFit(self.config)
+        w_fit = WindowBackgroundFit(self.config) # FIXME use copy with params
         signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
         fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
         success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
@@ -125,3 +113,29 @@ class SegmentFit(WithLoggerAndInterval):
             ).p[need_global_fit]
         self.logger.debug(f"{self.name}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
+
+
+class ChromosomeFit(WithLoggerAndInterval):
+    
+    def fit_segment_thresholds(
+            self,
+            signal_at_segment: ma.MaskedArray,
+            fallback_fit_results: GlobalFitResults=None,
+            step=None
+        ):
+        if step is None:
+            step = self.config.window
+
+        g_fit = self.copy_with_params(GlobalBackgroundFit)
+        global_fit_results = g_fit.fit(signal_at_segment, step=step)
+        if not check_valid_fit(global_fit_results) and fallback_fit_results is not None:
+            global_fit_results = g_fit.fit(signal_at_segment, fallback_fit_results=fallback_fit_results, step=step)
+
+        strided_fit = self.copy_with_params(StridedBackgroundFit)
+        thresholds, _, rmsea = strided_fit.fit_tr(
+            signal_at_segment,
+            global_fit=global_fit_results
+        )
+        thresholds = interpolate_nan(thresholds).astype(np.float16)
+        self.logger.debug(f"{self.name}: Signal thresholds approximated")
+        return thresholds, rmsea, global_fit_results
