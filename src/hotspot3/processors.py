@@ -208,9 +208,28 @@ class GenomeProcessor(WithLogger):
             total_cutcounts,
             save_path
         )
+
+    def extract_thresholds_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
+        """
+        Convert threshold values to bigwig file.
+        """
+        self.logger.info('Converting threshold values to bigwig')
+        thresholds = self.parallel_by_chromosome(
+            ChromosomeProcessor.extract_fit_threholds,
+            fit_params_path
+        )
+        total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
+        thresholds = self.merge_and_add_chromosome(thresholds).data_df
+        thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
+        self.writer.df_to_bigwig(
+            thresholds,
+            save_path,
+            self.chrom_sizes,
+            col='tr'
+        )
     
 
-    def fit_background_model(self, cutcounts_file, save_path: str, per_region_stats_path, threholds_path: str):
+    def fit_background_model(self, cutcounts_file, save_path: str, per_region_stats_path):
         """"
         Fit background model of cutcounts distribution and save fit parameters to parquet file.
         """
@@ -224,18 +243,6 @@ class GenomeProcessor(WithLogger):
         )
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
-
-        thresholds = self.parallel_by_chromosome(
-            ChromosomeProcessor.extract_fit_threholds,
-            save_path,
-        )
-        thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        self.writer.df_to_bigwig(
-            thresholds,
-            threholds_path,
-            chrom_sizes=self.chrom_sizes,
-            col='tr'
-        )
 
 
     def calc_pvals(self, cutcounts_file, fit_path: str, save_path: str):
