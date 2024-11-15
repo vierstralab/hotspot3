@@ -345,7 +345,8 @@ class StridedBackgroundFit(BackgroundFit):
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]
 
-        for field in dataclasses.fields(fit_results):
+        for data_field in dataclasses.fields(fit_results):
+            field = data_field.name
             values = getattr(fit_results, field)
             if values is not None and not (np.ndim(values) == 0 and np.isnan(values)):
                 upcasted = np.full(original_shape, np.nan, dtype=np.float16)
