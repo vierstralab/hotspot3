@@ -292,7 +292,11 @@ class GlobalBackgroundFit(BackgroundFit):
         if not check_valid_fit(FitResults(p, r, 0, 0, 0)):
             raise NotEnoughDataForContig
         
-        value_counts = self.value_counts_per_bin(agg_cutcounts[~assumed_signal_mask, None], bin_edges)
+        value_counts = self.value_counts_per_bin(
+            agg_cutcounts,
+            bin_edges,
+            where=~assumed_signal_mask
+        )
         rmsea = self.calc_rmsea_all_windows(
             p,
             r,
