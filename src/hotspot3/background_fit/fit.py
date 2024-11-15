@@ -442,10 +442,9 @@ class StridedBackgroundFit(BackgroundFit):
 
         current_agg_cutcounts = data_for_fit.agg_cutcounts[:, changing_indices]
         current_bin_edges = data_for_fit.bin_edges[:right_bin_index, changing_indices]
-        current_thresholds = data_for_fit.bin_edges[-1]
         currect_counts_with_flanks = data_for_fit.max_counts_with_flanks[:, changing_indices]
         
-        assumed_signal_mask = currect_counts_with_flanks >= current_thresholds
+        assumed_signal_mask = currect_counts_with_flanks >= current_bin_edges[-1]
 
         # TODO: don't update the value counts from first iteration
         current_value_counts = self.value_counts_per_bin(
