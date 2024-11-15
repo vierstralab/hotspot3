@@ -28,6 +28,9 @@ class BackgroundFit(BottleneckWrapper):
     def fit(self):
         raise NotImplementedError
     
+    def prepare_data_for_fit(self, array: np.ndarray):
+        raise NotImplementedError
+    
     @wrap_masked
     def get_mean_and_var(self, array: np.ndarray, **kwargs):
         mean = np.nanmean(array, axis=0, dtype=np.float32, **kwargs)
@@ -221,7 +224,9 @@ class GlobalBackgroundFit(BackgroundFit):
             )
         return best_fit_result
     
-    def prepare_data_for_fit(self, agg_cutcounts: ma.MaskedArray, step: int):
+    def prepare_data_for_fit(self, agg_cutcounts: ma.MaskedArray, step: int=None):
+        if step is None:
+            step = self.config.window
         agg_cutcounts = agg_cutcounts.filled(np.nan)
         max_counts_with_flanks = self.get_max_count_with_flanks(agg_cutcounts)[::step]
         agg_cutcounts = agg_cutcounts[::step]
@@ -581,37 +586,33 @@ class WindowBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution in a running window fashion
     """
-    def fit(self, array: ma.MaskedArray, per_window_trs, global_fit: FitResults=None) -> WindowedFitResults:
-        agg_cutcounts = array.copy()
-
-        high_signal_mask = self.get_max_count_with_flanks(agg_cutcounts) >= per_window_trs
-        agg_cutcounts[high_signal_mask] = np.nan
-
-        global_r = global_fit.r if global_fit is not None else None
-        
-        p, r, enough_bg_mask = self.sliding_method_of_moments_fit(
+    def fit(self, array: ma.MaskedArray, per_window_trs, fallback_fit_results: FitResults=None) -> WindowedFitResults:
+        high_signal_mask = self.get_signal_mask_for_tr(array, per_window_trs)
+        agg_cutcounts = ma.masked_where(high_signal_mask, array)
+        fit_results = self.sliding_method_of_moments_fit(
             agg_cutcounts,
-            global_r=global_r
+            fallback_fit_results=fallback_fit_results
         )
 
-        return WindowedFitResults(p, r, enough_bg_mask=enough_bg_mask)
+        return fit_results
     
-    def sliding_method_of_moments_fit(self, agg_cutcounts: ma.MaskedArray, global_r=None):
-        mean, var = self.sliding_mean_and_variance(agg_cutcounts)
+    def sliding_method_of_moments_fit(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            fallback_fit_results: FitResults
+        ):
+        mean, var = self.sliding_mean_and_variance(agg_cutcounts, self.config.bg_window)
         enough_bg_mask = ~mean.mask
-
-        if global_r is not None:
-            r = np.full_like(mean, global_r, dtype=np.float32)
+        
+        if fallback_fit_results is not None:
+            r = np.full_like(mean, fallback_fit_results.r, dtype=np.float32)
         else:
             r = self.r_from_mean_and_var(mean, var).filled(np.nan)
 
         p = self.p_from_mean_and_r(mean, r).filled(np.nan)
-        return p, r, enough_bg_mask
+        return WindowedFitResults(p, r, enough_bg_mask=enough_bg_mask)
 
-    def sliding_mean_and_variance(self, array: ma.MaskedArray, window=None):
-        if window is None:
-            window = self.config.bg_window
-
+    def sliding_mean_and_variance(self, array: ma.MaskedArray, window: int):
         mean = self.centered_running_nanmean(array, window)
         var = self.centered_running_nanvar(array, window)
         mean = ma.masked_invalid(mean)
