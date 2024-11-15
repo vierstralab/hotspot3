@@ -144,6 +144,6 @@ class ChromosomeFit(WithLoggerAndInterval):
             signal_at_segment,
             fallback_fit_results=global_fit_results
         )
-        thresholds = interpolate_nan(thresholds).astype(np.float16)
+        fit_results.fit_threshold = interpolate_nan(fit_results.fit_threshold)
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
         return fit_results.fit_threshold, fit_results.rmsea, global_fit_results
