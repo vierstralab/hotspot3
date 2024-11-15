@@ -235,7 +235,7 @@ class GlobalBackgroundFit(BackgroundFit):
             ) -> List[FitResults]:
         result = []
         for i in np.arange(data_for_fit.n_signal_bins)[::-1]:
-            tr = data_for_fit.bin_edges[len(data_for_fit.bin_edges) - i - 1]
+            tr = data_for_fit.bin_edges[len(data_for_fit.bin_edges) - i - 1, 0]
             #self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
             try:
                 assumed_signal_mask = data_for_fit.max_counts_with_flanks >= tr
