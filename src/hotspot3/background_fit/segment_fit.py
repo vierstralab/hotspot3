@@ -113,7 +113,7 @@ class SegmentsFit(WithLoggerAndInterval):
             fit_res.p[need_global_fit] = w_fit.fit(
                 signal_at_segment,
                 per_window_trs=thresholds,
-                global_fit=fallback_fit_results
+                fallback_fit_results=fallback_fit_results
             ).p[need_global_fit]
         self.logger.debug(f"{self.name}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
