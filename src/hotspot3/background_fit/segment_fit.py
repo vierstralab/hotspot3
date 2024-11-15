@@ -7,7 +7,7 @@ from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_
 
 from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
-from hotspot3.models import GlobalFitResults, WindowedFitResults, NotEnoughDataForContig
+from hotspot3.models import FitResults, WindowedFitResults, NotEnoughDataForContig
 
 from hotspot3.utils import interpolate_nan
 from hotspot3.background_fit import check_valid_fit
@@ -18,14 +18,14 @@ class SegmentsFit(WithLoggerAndInterval):
         return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
 
 
-    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: GlobalFitResults=None):
+    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: FitResults=None):
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
         
-        segment_fits: List[GlobalFitResults] = []
+        segment_fits: List[FitResults] = []
         segments = bad_segments
         types = []
         success_fit = []
@@ -92,7 +92,7 @@ class SegmentsFit(WithLoggerAndInterval):
             self,
             agg_cutcounts: ma.MaskedArray,
             thresholds: np.ndarray,
-            global_fit: GlobalFitResults=None
+            global_fit: FitResults=None
         ) -> WindowedFitResults:
 
         w_fit = WindowBackgroundFit(self.config) # FIXME use copy with params
@@ -120,7 +120,7 @@ class ChromosomeFit(WithLoggerAndInterval):
     def fit_segment_thresholds(
             self,
             signal_at_segment: ma.MaskedArray,
-            fallback_fit_results: GlobalFitResults=None,
+            fallback_fit_results: FitResults=None,
             step=None
         ):
         if step is None:

@@ -4,7 +4,7 @@ from typing import List
 
 from genome_tools.genomic_interval import GenomicInterval
 
-from hotspot3.models import GlobalFitResults
+from hotspot3.models import FitResults
 from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 
@@ -18,7 +18,7 @@ class BabachiWrapper(WithLoggerAndInterval):
             self,
             agg_cutcounts: ma.MaskedArray,
             per_window_trs: np.ndarray,
-            global_fit: GlobalFitResults,
+            fit_results: FitResults,
         ):
         step = self.config.babachi_segmentation_step
 
@@ -34,19 +34,24 @@ class BabachiWrapper(WithLoggerAndInterval):
             positions=starts[valid_counts], 
             read_counts=np.stack(
                 [
-                    np.full(background.shape[0], global_fit.r, dtype=np.float32),
+                    np.full(background.shape[0], fit_results.r, dtype=np.float32),
                     background
                 ]
             ).T[valid_counts, :]
         )
         return GenomeSNPsHandler(chrom_handler)
 
-    def run_segmentation(self, agg_cutcounts: ma.MaskedArray, per_window_trs: np.ndarray, global_fit: GlobalFitResults):
-        bads, chrom_bad = self.get_bads(global_fit)
+    def run_segmentation(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            per_window_trs: np.ndarray,
+            fit_results: FitResults
+        ):
+        bads, chrom_bad = self.get_bads(fit_results)
         snps_collection = self.craft_snps_collection(
             agg_cutcounts,
             per_window_trs,
-            global_fit
+            fit_results
         )
         chrom_sizes = {self.genomic_interval.chrom: len(self.genomic_interval)}
         bad_segments = self.run_babachi(snps_collection, chrom_sizes, bads)
@@ -54,8 +59,8 @@ class BabachiWrapper(WithLoggerAndInterval):
             GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments
         ]
     
-    def get_bads(self, global_fit: GlobalFitResults, max_bad=10):
-        chrom_bad = global_fit.p / (1 - global_fit.p)
+    def get_bads(self, fit_results: FitResults, max_bad=10):
+        chrom_bad = fit_results.p / (1 - fit_results.p)
         mult = np.arange(1, max_bad + 0.1, 0.5)
         return [*(mult * chrom_bad), *(1 / mult[1:] * chrom_bad)], chrom_bad
     

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Union
-from hotspot3.models import WindowedFitResults, GlobalFitResults
+from hotspot3.models import WindowedFitResults, FitResults
 
 
 def rolling_view_with_nan_padding(arr, points_in_window=501, interpolation_step=1000):
@@ -80,5 +80,5 @@ def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
     return rmsea
 
 
-def check_valid_fit(fit: Union[WindowedFitResults, GlobalFitResults]):
+def check_valid_fit(fit: Union[WindowedFitResults, FitResults]):
     return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 

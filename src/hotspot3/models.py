@@ -4,12 +4,12 @@ import numpy as np
 
 
 @dataclasses.dataclass
-class GlobalFitResults:
-    p: np.ndarray
-    r: np.ndarray
-    rmsea: np.ndarray
-    fit_quantile: np.ndarray
-    fit_threshold: np.ndarray
+class FitResults:
+    p: np.ndarray = np.nan
+    r: np.ndarray = np.nan
+    rmsea: np.ndarray = np.nan
+    fit_quantile: np.ndarray = np.nan
+    fit_threshold: np.ndarray = np.nan
 
 
 @dataclasses.dataclass
@@ -17,6 +17,15 @@ class WindowedFitResults:
     p: np.ndarray
     r: np.ndarray
     enough_bg_mask: np.ndarray
+
+
+@dataclasses.dataclass
+class DataForFit:
+    bin_edges: np.ndarray
+    value_counts: np.ndarray
+    n_signal_bins: int
+    agg_cutcounts: np.ndarray
+    max_counts_with_flanks: np.ndarray
 
 
 @dataclasses.dataclass
