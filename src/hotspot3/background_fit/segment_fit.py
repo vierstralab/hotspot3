@@ -52,11 +52,8 @@ class SegmentsFit(WithLoggerAndInterval):
                         fallback_fit_results=fallback_fit_results,
                         step=segment_step
                     )
-                
                 success_fit.append(True)
             except NotEnoughDataForContig:
-                thresholds = np.max(agg_cutcounts)
-                rmsea = np.nan
                 segment_fit_results = fallback_fit_results
                 success_fit.append(False)
             
@@ -66,14 +63,14 @@ class SegmentsFit(WithLoggerAndInterval):
 
             fit_res = self.fit_segment_params(
                 agg_cutcounts,
-                thresholds,
-                global_fit=segment_fit_results
+                segment_fit_results.fit_threshold,
+                fallback_fit_results=segment_fit_results
             )
 
             final_r[start:end] = fit_res.r
             final_p[start:end] = fit_res.p
-            final_rmsea[start:end] = rmsea
-            per_window_trs[start:end] = thresholds
+            final_rmsea[start:end] = segment_fit_results.rmsea
+            per_window_trs[start:end] = segment_fit_results.fit_threshold
             enough_bg[start:end] = fit_res.enough_bg_mask
         
         intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
@@ -96,7 +93,7 @@ class SegmentsFit(WithLoggerAndInterval):
             self,
             agg_cutcounts: ma.MaskedArray,
             thresholds: np.ndarray,
-            global_fit: FitResults=None
+            fallback_fit_results: FitResults=None
         ) -> WindowedFitResults:
 
         w_fit = WindowBackgroundFit(self.config) # FIXME use copy with params
@@ -105,15 +102,15 @@ class SegmentsFit(WithLoggerAndInterval):
         success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
         need_global_fit = ~success_fits & fit_res.enough_bg_mask
         
-        fit_res.r[need_global_fit] = global_fit.r
+        fit_res.r[need_global_fit] = fallback_fit_results.r
 
-        if global_fit.rmsea > self.config.rmsea_tr: 
-            fit_res.p[need_global_fit] = global_fit.p
+        if fallback_fit_results.rmsea > self.config.rmsea_tr: 
+            fit_res.p[need_global_fit] = fallback_fit_results.p
         else:
             fit_res.p[need_global_fit] = w_fit.fit(
                 signal_at_segment,
                 per_window_trs=thresholds,
-                global_fit=global_fit
+                global_fit=fallback_fit_results
             ).p[need_global_fit]
         self.logger.debug(f"{self.name}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
