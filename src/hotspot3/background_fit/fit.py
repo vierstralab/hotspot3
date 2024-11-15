@@ -587,8 +587,10 @@ class WindowBackgroundFit(BackgroundFit):
     Class to fit the background distribution in a running window fashion
     """
     def fit(self, array: ma.MaskedArray, per_window_trs, fallback_fit_results: FitResults=None) -> WindowedFitResults:
-        high_signal_mask = self.get_signal_mask_for_tr(array, per_window_trs)
-        agg_cutcounts = ma.masked_where(high_signal_mask, array)
+        agg_cutcounts = array.copy()
+        
+        high_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, per_window_trs)
+        agg_cutcounts[high_signal_mask] = np.nan
         fit_results = self.sliding_method_of_moments_fit(
             agg_cutcounts,
             fallback_fit_results=fallback_fit_results
