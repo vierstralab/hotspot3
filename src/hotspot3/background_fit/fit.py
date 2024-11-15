@@ -326,7 +326,7 @@ class StridedBackgroundFit(BackgroundFit):
             self,
             fit_results: FitResults,
             original_shape: tuple
-        ):
+        ) -> FitResults:
         subsampled_indices = np.arange(
             0, original_shape[0], self.sampling_step, dtype=np.uint32
         )[::self.interpolation_step]

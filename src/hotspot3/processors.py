@@ -488,7 +488,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         fit_res, per_window_trs, final_rmsea, per_interval_params = chrom_fit.fit_params(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,
-            global_fit=global_fit_params
+            fallback_fit_results=global_fit_params
         )
 
         df = pd.DataFrame({

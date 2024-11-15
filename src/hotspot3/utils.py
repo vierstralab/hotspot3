@@ -43,7 +43,7 @@ def is_iterable(obj):
         return False
 
 
-def wrap_masked(func) -> ma.MaskedArray:
+def wrap_masked(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         masked_arrays = [arg for arg in args if isinstance(arg, ma.MaskedArray)]

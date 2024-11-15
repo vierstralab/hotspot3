@@ -18,7 +18,7 @@ class SegmentsFit(WithLoggerAndInterval):
         return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
 
 
-    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], global_fit: FitResults=None):
+    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], fallback_fit_results: FitResults=None):
         final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
@@ -29,8 +29,8 @@ class SegmentsFit(WithLoggerAndInterval):
         segments = bad_segments
         types = []
         success_fit = []
-        if global_fit is not None:
-            segment_fits.append(global_fit)
+        if fallback_fit_results is not None:
+            segment_fits.append(fallback_fit_results)
             self.genomic_interval.BAD = None
             segments = [self.genomic_interval, *segments]
             types.append('global')
@@ -45,15 +45,19 @@ class SegmentsFit(WithLoggerAndInterval):
                 signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
                 g_fit = self.copy_with_params(GlobalBackgroundFit)
 
-                segment_fit = g_fit.fit(signal_at_segment, step=segment_step)
-                if not check_valid_fit(segment_fit) and global_fit is not None:
-                    segment_fit = g_fit.fit(signal_at_segment, fallback_fit_results=global_fit, step=segment_step)
+                segment_fit_results = g_fit.fit(signal_at_segment, step=segment_step)
+                if not check_valid_fit(segment_fit_results) and fallback_fit_results is not None:
+                    segment_fit_results = g_fit.fit(
+                        signal_at_segment,
+                        fallback_fit_results=fallback_fit_results,
+                        step=segment_step
+                    )
                 
                 success_fit.append(True)
             except NotEnoughDataForContig:
                 thresholds = np.max(agg_cutcounts)
                 rmsea = np.nan
-                segment_fit_results = global_fit
+                segment_fit_results = fallback_fit_results
                 success_fit.append(False)
             
             segment_fits.append(segment_fit_results)
@@ -129,13 +133,17 @@ class ChromosomeFit(WithLoggerAndInterval):
         g_fit = self.copy_with_params(GlobalBackgroundFit)
         global_fit_results = g_fit.fit(signal_at_segment, step=step)
         if not check_valid_fit(global_fit_results) and fallback_fit_results is not None:
-            global_fit_results = g_fit.fit(signal_at_segment, fallback_fit_results=fallback_fit_results, step=step)
+            global_fit_results = g_fit.fit(
+                signal_at_segment,
+                fallback_fit_results=fallback_fit_results,
+                step=step
+            )
 
         strided_fit = self.copy_with_params(StridedBackgroundFit)
-        thresholds, _, rmsea = strided_fit.fit_tr(
+        fit_results = strided_fit.fit(
             signal_at_segment,
-            global_fit=global_fit_results
+            fallback_fit_results=global_fit_results
         )
         thresholds = interpolate_nan(thresholds).astype(np.float16)
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
-        return thresholds, rmsea, global_fit_results
+        return fit_results.fit_threshold, fit_results.rmsea, global_fit_results
