@@ -293,7 +293,7 @@ class StridedBackgroundFit(BackgroundFit):
     """
     @wrap_masked
     def fit(self, agg_cutcounts: np.ndarray, fallback_fit_results: FitResults=None):
-        data_for_fit = self.prepare_data_for_fit(agg_cutcounts, self.sampling_step)
+        data_for_fit = self.prepare_data_for_fit(agg_cutcounts)
 
         best_fit_results = self.find_best_fits(
             data_for_fit,
