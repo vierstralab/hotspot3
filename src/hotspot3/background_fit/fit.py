@@ -401,17 +401,19 @@ class StridedBackgroundFit(BackgroundFit):
                 fallback_fit_results=fallback_fit_results
             )
             enough_bg_mask = bin_fit_results.enough_bg_mask
-            bin_fit_results = FitResults(
-                bin_fit_results.p,
-                bin_fit_results.r,
-            )
 
-            bin_fit_results.rmsea = self.evaluate_fit_for_bin(
+
+            rmsea = self.evaluate_fit_for_bin(
                 data_for_current_threshold,
                 bin_fit_results,
                 fallback_fit_results,
             )
-            bin_fit_results.fit_threshold = current_thresholds
+            bin_fit_results = FitResults(
+                bin_fit_results.p,
+                bin_fit_results.r,
+                rmsea=rmsea,
+                fit_threshold=current_thresholds
+            )
 
             # 3. Update the best fit results
             self.update_remaining_fits(
