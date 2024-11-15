@@ -462,6 +462,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         per_window_trs_global, rmseas, global_fit_params = s_fit.fit_segment_thresholds(
             agg_cutcounts,
         )
+        print(global_fit_params)
         
         if global_fit_params.rmsea > self.config.rmsea_tr:
             self.logger.warning(f"{self.chrom_name}: Best RMSEA: {global_fit_params.rmsea:.3f}. Chromosome fit might be poorly approximated.")
