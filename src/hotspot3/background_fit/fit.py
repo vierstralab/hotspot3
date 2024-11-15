@@ -293,9 +293,9 @@ class GlobalBackgroundFit(BackgroundFit):
             raise NotEnoughDataForContig
         
         value_counts = self.value_counts_per_bin(
-            agg_cutcounts,
+            agg_cutcounts[:, None],
             bin_edges,
-            where=~assumed_signal_mask
+            where=~assumed_signal_mask[:, None]
         )
         rmsea = self.calc_rmsea_all_windows(
             p,
