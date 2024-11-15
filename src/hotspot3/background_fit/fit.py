@@ -46,14 +46,17 @@ class BackgroundFit(BottleneckWrapper):
             r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
         return r
     
-    def value_counts_per_bin(self, array, bin_edges):
-        left_edges = bin_edges[0]
+    def value_counts_per_bin(self, array, bin_edges, where=None):
+        if where is None:
+            where = np.ones(array.shape, dtype=bool)
+        left_edge = bin_edges[0]
         right_edges = bin_edges[1:]
         value_counts = np.full_like(right_edges, 0, dtype=np.float32)
         for i in range(right_edges.shape[0]):
-            bin_membership = (array >= left_edges[None, :]) & (array < right_edges[i][None, :])
-            value_counts[i] = np.sum(bin_membership, axis=0)
-            left_edges = right_edges[i]
+            right_edge = right_edges[i]
+            bin_membership = (array >= left_edge[None, :]) & (array < right_edge[None, :])
+            value_counts[i] = np.sum(bin_membership, axis=0, where=where)
+            left_edge = right_edge
         
         return value_counts
     
@@ -386,14 +389,11 @@ class StridedBackgroundFit(BackgroundFit):
             current_index = data_for_fit.bin_edges.shape[0] - i - 1
             changing_indices = self._get_changing_indices(current_index, data_for_fit, remaing_fits_mask)
 
-            data_for_current_threshold = self.get_data_for_current_threshold(
+            data_for_current_threshold, assumed_signal_mask = self.get_data_for_current_threshold(
                 data_for_fit,
                 current_index,
                 changing_indices
             )
-
-            current_thresholds = data_for_current_threshold.bin_edges[-1]
-            assumed_signal_mask = data_for_current_threshold.max_counts_with_flanks >= current_thresholds
             
             # 2. Fit for the current threshold and evaluate the fit
             bin_fit_results = self.fit_for_bin(
@@ -413,7 +413,7 @@ class StridedBackgroundFit(BackgroundFit):
                 bin_fit_results.p,
                 bin_fit_results.r,
                 rmsea=rmsea,
-                fit_threshold=current_thresholds
+                fit_threshold=data_for_current_threshold.bin_edges[-1]
             )
 
             # 3. Update the best fit results
@@ -442,23 +442,25 @@ class StridedBackgroundFit(BackgroundFit):
 
         current_agg_cutcounts = data_for_fit.agg_cutcounts[:, changing_indices]
         current_bin_edges = data_for_fit.bin_edges[:right_bin_index, changing_indices]
+        current_thresholds = data_for_fit.bin_edges[-1]
+        currect_counts_with_flanks = data_for_fit.max_counts_with_flanks[:, changing_indices]
+        
+        assumed_signal_mask = currect_counts_with_flanks >= current_thresholds
 
-        # TODO:
-        # current_value_counts = self.value_counts_per_bin(
-        #     current_agg_cutcounts,
-        #     current_bin_edges,
-        #     where=~assumed_signal_mask
-        # )
-
-        current_value_counts = data_for_fit.value_counts[:current_index, changing_indices]
+        # TODO: don't update the value counts from first iteration
+        current_value_counts = self.value_counts_per_bin(
+            current_agg_cutcounts,
+            current_bin_edges,
+            where=~assumed_signal_mask
+        )
 
         return DataForFit(
             current_bin_edges,
             current_value_counts,
             data_for_fit.n_signal_bins,
             current_agg_cutcounts,
-            data_for_fit.max_counts_with_flanks[:, changing_indices]
-        )
+            currect_counts_with_flanks
+        ), assumed_signal_mask
         
     
     def _get_changing_indices(self, current_index, data_for_fit: DataForFit, remaing_fits_mask: np.ndarray):

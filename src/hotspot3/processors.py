@@ -19,8 +19,18 @@ from hotspot3.signal_smoothing import modwt_smooth, normalize_density
 from hotspot3.background_fit.segment_fit import ChromosomeFit, SegmentsFit
 from hotspot3.scoring.pvalue import PvalueEstimator
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-from hotspot3.utils import is_iterable, ensure_contig_exists, parallel_func_error_handler
+from hotspot3.utils import is_iterable, ensure_contig_exists
 
+
+def parallel_func_error_handler(func):
+    @functools.wraps(func)
+    def wrapper(processor: 'ChromosomeProcessor', *args, **kwargs):
+        try:
+            return func(processor, *args, **kwargs)
+        except:
+            processor.logger.exception(f"Exception occured in {func.__name__} for chromosome {processor.chrom_name}")
+            raise
+    return wrapper
 
 
 class GenomeProcessor(WithLogger):

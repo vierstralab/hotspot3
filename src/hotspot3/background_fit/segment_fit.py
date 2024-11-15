@@ -85,6 +85,7 @@ class SegmentsFit(WithLoggerAndInterval):
         intervals_stats['fit_type'] = types
         intervals_stats['success_fit'] = success_fit
 
+        # FIXME wrap in dataclass
         return WindowedFitResults(
             p=final_p,
             r=final_r,
@@ -94,13 +95,12 @@ class SegmentsFit(WithLoggerAndInterval):
 
     def fit_segment_params(
             self,
-            agg_cutcounts: ma.MaskedArray,
+            signal_at_segment: ma.MaskedArray,
             thresholds: np.ndarray,
             fallback_fit_results: FitResults=None
         ) -> WindowedFitResults:
 
-        w_fit = WindowBackgroundFit(self.config) # FIXME use copy with params
-        signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
+        w_fit = self.copy_with_params(WindowBackgroundFit)
         fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
         success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
         need_global_fit = ~success_fits & fit_res.enough_bg_mask
