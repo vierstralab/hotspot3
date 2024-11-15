@@ -376,6 +376,15 @@ class StridedBackgroundFit(BackgroundFit):
 
             current_agg_cutcounts = data_for_fit.agg_cutcounts[:, changing_indices]
             current_bin_edges = data_for_fit.bin_edges[:right_bin_index, changing_indices]
+
+            # TODO:
+            # current_value_counts = self.value_counts_per_bin(
+            #     current_agg_cutcounts,
+            #     current_bin_edges,
+            #     where=~assumed_signal_mask
+            # )
+
+            current_value_counts = data_for_fit.value_counts[:current_index, changing_indices]
             
             bin_fit_results = self.fit_for_bin(
                 current_agg_cutcounts,
@@ -387,15 +396,6 @@ class StridedBackgroundFit(BackgroundFit):
                 bin_fit_results.p,
                 bin_fit_results.r,
             )
-
-            # TODO:
-            # current_value_counts = self.value_counts_per_bin(
-            #     current_agg_cutcounts,
-            #     current_bin_edges,
-            #     where=~assumed_signal_mask
-            # )
-
-            current_value_counts = data_for_fit.value_counts[:current_index, changing_indices]
 
             bin_fit_results.rmsea = self.evaluate_fit_for_bin(
                 current_value_counts,
@@ -417,7 +417,7 @@ class StridedBackgroundFit(BackgroundFit):
             if idx % (max(data_for_fit.n_signal_bins, 5) // 5) == 0:
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{data_for_fit.n_signal_bins})")
         
-        best_fit_results.fit_quantile = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, best_tr)
+        best_fit_results.fit_quantile = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, best_fit_results.fit_threshold)
         return best_fit_results
     
     def _get_changing_indices(self, current_index, data_for_fit: DataForFit, remaing_fits_mask: np.ndarray):
