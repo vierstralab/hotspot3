@@ -59,10 +59,8 @@ class SegmentsFit(WithLoggerAndInterval):
             
             segment_fits.append(segment_fit_results)
 
-            #thresholds = np.full_like(thresholds, segment_fit_results.fit_threshold)
-
             fit_res = self.fit_segment_params(
-                agg_cutcounts,
+                signal_at_segment,
                 segment_fit_results.fit_threshold,
                 fallback_fit_results=segment_fit_results
             )
