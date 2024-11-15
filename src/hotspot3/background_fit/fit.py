@@ -229,7 +229,7 @@ class GlobalBackgroundFit(BackgroundFit):
                     data_for_fit.agg_cutcounts,
                     bin_edges=data_for_fit.bin_edges,
                     assumed_signal_mask=assumed_signal_mask,
-                    global_fit=fallback_fit_results
+                    fallback_fit_results=fallback_fit_results
                 )
             except NotEnoughDataForContig:
                 continue
