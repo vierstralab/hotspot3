@@ -14,8 +14,10 @@ from hotspot3.background_fit import check_valid_fit
 
 
 class SegmentsFit(WithLoggerAndInterval):
-    def filter_signal_to_segment(self, agg_cutcounts: np.ndarray) -> np.ndarray:
-        return agg_cutcounts[self.genomic_interval.start:self.genomic_interval.end]
+    def filter_signal_to_segment(self, agg_cutcounts: np.ndarray, segment: GenomicInterval=None) -> np.ndarray:
+        if segment is None:
+            segment = self.genomic_interval
+        return agg_cutcounts[segment.start:segment.end]
 
 
     def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], fallback_fit_results: FitResults=None):
@@ -41,8 +43,11 @@ class SegmentsFit(WithLoggerAndInterval):
             end = int(segment_interval.end)        
             types.append('segment')
             segment_step = 20
+            signal_at_segment = self.filter_signal_to_segment(
+                agg_cutcounts,
+                segment_interval
+            )
             try:
-                signal_at_segment = self.filter_signal_to_segment(agg_cutcounts)
                 g_fit = self.copy_with_params(GlobalBackgroundFit)
 
                 segment_fit_results = g_fit.fit(signal_at_segment, step=segment_step)
