@@ -93,10 +93,24 @@ class BackgroundFit(BottleneckWrapper):
         assert bin_edges.shape[0] == value_counts.shape[0] + 1, f"Bin edges shape should be one more than value counts shape. Got {bin_edges.shape} and {value_counts.shape}"
         for j in np.arange(n_signal_bins):
             i = value_counts.shape[0] - j - 1
-            if value_counts[i] < self.config.min_obs_rmsea:
-                value_counts[i - 1] += value_counts[i]
-                value_counts[i] = 0
-                bin_edges[i] = bin_edges[i + 1]
+
+            condition = value_counts[i] < self.config.min_obs_rmsea
+            value_counts[i - 1] += np.where(
+                condition,
+                value_counts[i],
+                0
+            )
+            bin_edges[i] = np.where(
+                condition,
+                bin_edges[i + 1],
+                bin_edges[i]
+            )
+
+            value_counts[i] = np.where(
+                condition,
+                0,
+                value_counts[i]
+            )
 
     def quantile_ignore_all_na(self, array: np.ndarray, quantile: float):
         """
