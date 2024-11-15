@@ -2,7 +2,7 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
 import pandas as pd
-from typing import Iterable, List, cast, Callable, Any
+from typing import Iterable, List, cast
 import functools
 
 from genome_tools.genomic_interval import GenomicInterval
