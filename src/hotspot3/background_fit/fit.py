@@ -323,13 +323,14 @@ class StridedBackgroundFit(BackgroundFit):
             agg_cutcounts: np.ndarray,
             fit_qunatile: float,
         ):
+        original_shape = agg_cutcounts.shape
         strided_agg_cutcounts = self.get_strided_agg_cutcounts(agg_cutcounts)
-        subsampled_indices = self.get_subsampled_indices(agg_cutcounts.shape)
+        subsampled_indices = self.get_subsampled_indices(original_shape)
         values = self.get_bg_quantile_from_tr(
             strided_agg_cutcounts,
             fit_qunatile
         )
-        return self.upcast(subsampled_indices, values)
+        return self.upcast(original_shape, subsampled_indices, values)
 
     ## Currently deprecated ##
     @wrap_masked
@@ -366,8 +367,8 @@ class StridedBackgroundFit(BackgroundFit):
     def get_subsampled_indices(self, original_shape: tuple):
         return np.arange(0, original_shape[0], self.sampling_step, dtype=np.uint32)[::self.interpolation_step]
     
-    def upcast(self, subsampled_indices: np.ndarray, values: np.ndarray):
-        upcasted = np.full(subsampled_indices.shape, np.nan, dtype=np.float16)
+    def upcast(self, original_shape, subsampled_indices: np.ndarray, values: np.ndarray):
+        upcasted = np.full(original_shape, np.nan, dtype=np.float16)
         upcasted[subsampled_indices] = values
         return upcasted
 
@@ -382,7 +383,7 @@ class StridedBackgroundFit(BackgroundFit):
             field = data_field.name
             values = getattr(fit_results, field)
             if values is not None and not (np.ndim(values) == 0 and np.isnan(values)):
-                upcasted = self.upcast(subsampled_indices, values)
+                upcasted = self.upcast(original_shape, subsampled_indices, values)
                 setattr(fit_results, field, upcasted)
         return fit_results
     
