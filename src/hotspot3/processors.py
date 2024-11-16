@@ -284,6 +284,7 @@ class GenomeProcessor(WithLogger):
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
 
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
+        per_region_params.query('fit_type == "segment"', inplace=True)
         per_region_params['bg'] = upper_bg_quantile(per_region_params['r'], per_region_params['p'])
         per_region_params['bg'] = normalize_density(per_region_params['bg'], total_cutcounts)
 
@@ -508,10 +509,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         )
         self.logger.debug(f'{self.chrom_name}: Estimating proportion of background vs signal')
         
-        s_fit = self.copy_with_params(ChromosomeFit) # Change to GlobalFit
-        per_window_trs_global, global_fit_params = s_fit.fit_segment_thresholds(
-            agg_cutcounts,
-        )
+        s_fit = self.copy_with_params(ChromosomeFit)
+        per_window_trs_global, global_fit_params = s_fit.fit_segment_thresholds(agg_cutcounts)
         
         if global_fit_params.rmsea > self.config.rmsea_tr:
             self.logger.warning(f"{self.chrom_name}: Best RMSEA: {global_fit_params.rmsea:.3f}. Chromosome fit might be poorly approximated.")
@@ -558,6 +557,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
         fit_res.dropna(inplace=True)
         return ProcessorOutputData(self.chrom_name, fit_res)
+
 
     @parallel_func_error_handler
     @ensure_contig_exists
