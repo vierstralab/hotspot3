@@ -143,4 +143,6 @@ def check_valid_fit(fit: Union[WindowedFitResults, FitResults]):
     return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 
 
 def upper_bg_quantile(r, p, quantile=0.005):
+    r = np.asarray(r, dtype=np.float32)
+    p = np.asarray(p, dtype=np.float32)
     return st.nbinom(r, 1 - p).isf(quantile)
