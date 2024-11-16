@@ -545,7 +545,10 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @ensure_contig_exists
     def extract_bg_quantile(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_params(fit_parquet_path)
-        fit_res = upper_bg_quantile(fit_res.r, fit_res.p)[::self.config.density_step]
+        fit_res = upper_bg_quantile(
+            fit_res.r[::self.config.density_step],
+            fit_res.p[::self.config.density_step]
+        )
         fit_res = pd.DataFrame({
             'tr': fit_res,
             'start': np.arange(len(fit_res)) * self.config.density_step
