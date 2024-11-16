@@ -64,7 +64,7 @@ def main() -> None:
             fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
 
             per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
-            per_region_stats_path_bw = f"{main_dir_prefix}.fit_stats.bw"
+            per_region_stats_path_bw = f"{main_dir_prefix}.per_segment.background.bw"
             
             threholds_bw_path = f"{main_dir_prefix}.threholds.bw"
             background_bw_path = f"{main_dir_prefix}.background.bw"
