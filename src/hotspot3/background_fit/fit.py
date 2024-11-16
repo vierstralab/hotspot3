@@ -143,7 +143,7 @@ class BackgroundFit(BottleneckWrapper):
         """
         valid_bins = np.ones_like(value_counts_per_bin, dtype=bool)
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0, where=valid_bins)
-        
+
         sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
@@ -311,6 +311,7 @@ class GlobalBackgroundFit(BackgroundFit):
         return p, r, rmsea
 
 
+## Currently deprecated ##
 class StridedBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution using a strided approach.

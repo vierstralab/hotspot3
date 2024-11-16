@@ -489,8 +489,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         )
         self.logger.debug(f'{self.chrom_name}: Estimating proportion of background vs signal')
         
-        s_fit = self.copy_with_params(ChromosomeFit)
-        per_window_trs_global, rmseas, global_fit_params = s_fit.fit_segment_thresholds(
+        s_fit = self.copy_with_params(ChromosomeFit) # Change to GlobalFit
+        per_window_trs_global, global_fit_params = s_fit.fit_segment_thresholds(
             agg_cutcounts,
         )
         
@@ -498,13 +498,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             self.logger.warning(f"{self.chrom_name}: Best RMSEA: {global_fit_params.rmsea:.3f}. Chromosome fit might be poorly approximated.")
 
         self.logger.debug(f"{self.chrom_name}: Signal quantile: {global_fit_params.fit_quantile:.3f}. signal threshold: {global_fit_params.fit_threshold:.0f}. Best RMSEA: {global_fit_params.rmsea:.3f}")
-
-        good_fits_n = np.sum(rmseas <= self.config.rmsea_tr)
-        n_rmsea = np.sum(~np.isnan(rmseas))
-        self.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
-
-        # HOTFIX
-        per_window_trs_global = np.full_like(per_window_trs_global, global_fit_params.fit_threshold)
 
         # Segmentation
         segmentation = self.copy_with_params(BabachiWrapper)

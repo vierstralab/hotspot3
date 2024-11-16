@@ -138,12 +138,10 @@ class ChromosomeFit(WithLoggerAndInterval):
                 fallback_fit_results=fallback_fit_results,
                 step=step
             )
-
-        strided_fit = self.copy_with_params(StridedBackgroundFit)
-        fit_results = strided_fit.fit(
+        fit_threshold = np.full_like(
             signal_at_segment,
-            fallback_fit_results=global_fit_results
+            global_fit_results.fit_threshold,
+            dtype=np.float32
         )
-        fit_results.fit_threshold = interpolate_nan(fit_results.fit_threshold)
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
-        return fit_results.fit_threshold, fit_results.rmsea, global_fit_results
+        return fit_threshold, global_fit_results
