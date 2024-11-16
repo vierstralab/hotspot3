@@ -50,7 +50,7 @@ class ProcessorConfig:
 
     # Segmentation
     babachi_segmentation_step: int = 500
-    babachi_boundary_penalty: int = 9
+    babachi_boundary_penalty: int = 5
     babachi_min_segment_size: int = 5000
 
     # FDR correction
