@@ -61,7 +61,7 @@ class WithLoggerAndInterval(WithLogger):
             class_fields = dict(
                 config=self.config,
                 logger=self.logger,
-                name=self.name
+                name=self.genomic_interval.to_ucsc()
             )
         else:
             raise ValueError(f"cls should be a subclass of WithLogger or WithLoggerAndInterval, got {cls}")
