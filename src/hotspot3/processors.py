@@ -231,6 +231,7 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
+        thresholds['end'] = thresholds['start'] + self.config.density_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
@@ -250,7 +251,7 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['tr'] = upper_bg_quantile(thresholds['r'], thresholds['p'])
+        thresholds['end'] = thresholds['start'] + self.config.density_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
@@ -537,19 +538,17 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     def extract_fit_threholds(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_threholds(fit_parquet_path).iloc[::self.config.density_step]
         fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
-        fit_res['end'] = fit_res['start'] + self.config.density_step
         return ProcessorOutputData(self.chrom_name, fit_res)
 
     @parallel_func_error_handler
     @ensure_contig_exists
     def extract_bg_quantile(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_params(fit_parquet_path)
+        fit_res = upper_bg_quantile(fit_res.r, fit_res.p)[::self.config.density_step]
         fit_res = pd.DataFrame({
-            'r': fit_res.r,
-            'p': fit_res.p,
-        }).iloc[::self.config.density_step].fillna(0)
-        fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
-        fit_res['end'] = fit_res['start'] + self.config.density_step
+            'tr': fit_res,
+            'start': np.arange(len(fit_res)) * self.config.density_step
+        }).fillna(0)
         return ProcessorOutputData(self.chrom_name, fit_res)
 
     @parallel_func_error_handler
