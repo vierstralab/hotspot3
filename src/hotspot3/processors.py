@@ -538,6 +538,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     def extract_fit_threholds(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_threholds(fit_parquet_path).iloc[::self.config.density_step]
         fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
+        fit_res.dropna(inplace=True)
         return ProcessorOutputData(self.chrom_name, fit_res)
 
     @parallel_func_error_handler
@@ -548,7 +549,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         fit_res = pd.DataFrame({
             'tr': fit_res,
             'start': np.arange(len(fit_res)) * self.config.density_step
-        }).fillna(0)
+        }).dropna()
         return ProcessorOutputData(self.chrom_name, fit_res)
 
     @parallel_func_error_handler
