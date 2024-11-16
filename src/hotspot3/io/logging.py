@@ -47,24 +47,26 @@ class WithLoggerAndInterval(WithLogger):
         super().__init__(logger=logger, config=config, name=genomic_interval.to_ucsc())
         self.genomic_interval = genomic_interval
     
-    def copy_with_params(self, cls: Type[T]) -> T:
+    def copy_with_params(self, cls: Type[T], **kwargs) -> T:
         """
         Creates a new instance of the specified class `cls` with the same initialization parameters.
         """
         if issubclass(cls, WithLoggerAndInterval):
-            return cls(
+            class_fields = dict(
                 genomic_interval=self.genomic_interval,
                 config=self.config,
                 logger=self.logger
             )
         elif issubclass(cls, WithLogger):
-            return cls(
-                name=self.name,
+            class_fields = dict(
                 config=self.config,
-                logger=self.logger
+                logger=self.logger,
+                name=self.name
             )
         else:
             raise ValueError(f"cls should be a subclass of WithLogger or WithLoggerAndInterval, got {cls}")
+        class_fields.update(kwargs)
+        return cls(class_fields)
 
 
 def setup_logger(name='hotspot3', level=None, outstream=None) -> logging.Logger:

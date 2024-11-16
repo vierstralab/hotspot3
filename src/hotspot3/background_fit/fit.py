@@ -311,12 +311,27 @@ class GlobalBackgroundFit(BackgroundFit):
         return p, r, rmsea
 
 
-## Currently deprecated ##
+
 class StridedBackgroundFit(BackgroundFit):
     """
     Class to fit the background distribution using a strided approach.
     Extemely computationally taxing, use large stride values to compensate.
     """
+
+    def find_thresholds_at_chrom_quantile(
+            self,
+            agg_cutcounts: np.ndarray,
+            fit_qunatile: float,
+        ):
+        strided_agg_cutcounts = self.get_strided_agg_cutcounts(agg_cutcounts)
+        subsampled_indices = self.get_subsampled_indices(agg_cutcounts.shape)
+        values = self.get_bg_quantile_from_tr(
+            strided_agg_cutcounts,
+            fit_qunatile
+        )
+        return self.upcast(subsampled_indices, values)
+
+    ## Currently deprecated ##
     @wrap_masked
     def fit(self, agg_cutcounts: np.ndarray, fallback_fit_results: FitResults=None):
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts)
@@ -348,21 +363,26 @@ class StridedBackgroundFit(BackgroundFit):
 
         return strided_agg_cutcounts
     
+    def get_subsampled_indices(self, original_shape: tuple):
+        return np.arange(0, original_shape[0], self.sampling_step, dtype=np.uint32)[::self.interpolation_step]
+    
+    def upcast(self, subsampled_indices: np.ndarray, values: np.ndarray):
+        upcasted = np.full(subsampled_indices.shape, np.nan, dtype=np.float16)
+        upcasted[subsampled_indices] = values
+        return upcasted
+
     def cast_to_original_shape(
             self,
             fit_results: FitResults,
             original_shape: tuple
         ) -> FitResults:
-        subsampled_indices = np.arange(
-            0, original_shape[0], self.sampling_step, dtype=np.uint32
-        )[::self.interpolation_step]
+        subsampled_indices = self.get_subsampled_indices(original_shape)
 
         for data_field in dataclasses.fields(fit_results):
             field = data_field.name
             values = getattr(fit_results, field)
             if values is not None and not (np.ndim(values) == 0 and np.isnan(values)):
-                upcasted = np.full(original_shape, np.nan, dtype=np.float16)
-                upcasted[subsampled_indices] = values
+                upcasted = self.upcast(subsampled_indices, values)
                 setattr(fit_results, field, upcasted)
         return fit_results
     

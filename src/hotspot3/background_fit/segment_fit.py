@@ -48,7 +48,10 @@ class SegmentsFit(WithLoggerAndInterval):
                 segment_interval
             )
             try:
-                g_fit = self.copy_with_params(GlobalBackgroundFit)
+                g_fit = self.copy_with_params(
+                    GlobalBackgroundFit,
+                    genomic_interval=segment_interval
+                )
 
                 segment_fit_results = g_fit.fit(signal_at_segment, step=segment_step)
                 if not check_valid_fit(segment_fit_results) and fallback_fit_results is not None:
@@ -67,7 +70,8 @@ class SegmentsFit(WithLoggerAndInterval):
             fit_res = self.fit_segment_params(
                 signal_at_segment,
                 segment_fit_results.fit_threshold,
-                fallback_fit_results=segment_fit_results
+                fallback_fit_results=segment_fit_results,
+                genomic_interval=segment_interval
             )
 
             final_r[start:end] = fit_res.r
@@ -97,14 +101,20 @@ class SegmentsFit(WithLoggerAndInterval):
             self,
             signal_at_segment: ma.MaskedArray,
             thresholds: np.ndarray,
-            fallback_fit_results: FitResults=None
+            fallback_fit_results: FitResults=None,
+            genomic_interval: GenomicInterval=None
         ) -> WindowedFitResults:
+        if genomic_interval is None:
+            genomic_interval = self.genomic_interval
+        w_fit = self.copy_with_params(
+            WindowBackgroundFit,
+            genomic_interval=genomic_interval
+        )
 
-        w_fit = self.copy_with_params(WindowBackgroundFit)
         fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
         success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
+
         need_global_fit = ~success_fits & fit_res.enough_bg_mask
-        
         fit_res.r[need_global_fit] = fallback_fit_results.r
 
         if fallback_fit_results.rmsea > self.config.rmsea_tr: 
@@ -123,7 +133,7 @@ class ChromosomeFit(WithLoggerAndInterval):
     
     def fit_segment_thresholds(
             self,
-            signal_at_segment: ma.MaskedArray,
+            agg_cutcounts: ma.MaskedArray,
             fallback_fit_results: FitResults=None,
             step=None
         ):
@@ -131,17 +141,17 @@ class ChromosomeFit(WithLoggerAndInterval):
             step = self.config.window
 
         g_fit = self.copy_with_params(GlobalBackgroundFit)
-        global_fit_results = g_fit.fit(signal_at_segment, step=step)
+        global_fit_results = g_fit.fit(agg_cutcounts, step=step)
         if not check_valid_fit(global_fit_results) and fallback_fit_results is not None:
             global_fit_results = g_fit.fit(
-                signal_at_segment,
+                agg_cutcounts,
                 fallback_fit_results=fallback_fit_results,
                 step=step
             )
-        fit_threshold = np.full_like(
-            signal_at_segment,
-            global_fit_results.fit_threshold,
-            dtype=np.float32
+        strided_fit = self.copy_with_params(StridedBackgroundFit)
+        fit_threshold = strided_fit.find_thresholds_at_chrom_quantile(
+            agg_cutcounts,
+            global_fit_results.fit_quantile,
         )
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
         return fit_threshold, global_fit_results
