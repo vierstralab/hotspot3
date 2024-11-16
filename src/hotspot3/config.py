@@ -35,7 +35,7 @@ class ProcessorConfig:
 
     # Background model
     bg_window: int = 50001
-    exclude_peak_flank_length: int = 150 # half window
+    exclude_peak_flank_length: int = 0 # half window
     min_background_prop: float = 0.6
     max_background_prop: float = 0.99
 
