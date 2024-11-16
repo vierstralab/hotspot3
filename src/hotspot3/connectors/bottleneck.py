@@ -34,11 +34,12 @@ class BottleneckWrapper(WithLogger):
         return max(1, round(window * self.config.min_mappable_bases_proportion))
     
     @wrap_masked
-    def get_max_count_with_flanks(self, array: np.ndarray):
-        flanks_window = self.config.exclude_peak_flank_length * 2 + 1
-        return self.centered_running_nanmax(array, flanks_window)
+    def get_max_count_with_flanks(self, array: np.ndarray, flank_length: int=None):
+        if flank_length is None:
+            flank_length = self.config.exclude_peak_flank_length
+        return self.centered_running_nanmax(array, flank_length * 2 + 1)
     
     @wrap_masked
-    def get_signal_mask_for_tr(self, array: np.ndarray, tr: float):
-        max_count = self.get_max_count_with_flanks(array)
+    def get_signal_mask_for_tr(self, array: np.ndarray, tr: float, flank_length: int=None):
+        max_count = self.get_max_count_with_flanks(array, flank_length=flank_length)
         return max_count >= tr

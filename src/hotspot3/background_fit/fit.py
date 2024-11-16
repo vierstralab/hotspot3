@@ -610,7 +610,7 @@ class WindowBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray, per_window_trs, fallback_fit_results: FitResults=None) -> WindowedFitResults:
         agg_cutcounts = array.copy()
 
-        high_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, per_window_trs)
+        high_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, per_window_trs, flank_length=250)
         agg_cutcounts[high_signal_mask] = np.nan
         fit_results = self.sliding_method_of_moments_fit(
             agg_cutcounts,
