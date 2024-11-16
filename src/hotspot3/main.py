@@ -62,13 +62,18 @@ def main() -> None:
 
         if precomp_pvals is None:
             fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
+
             per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
-            threholds_bb_path = f"{main_dir_prefix}.threholds.bw"
-            background_bb_path = f"{main_dir_prefix}.background.bw"
+            per_region_stats_path_bw = f"{main_dir_prefix}.fit_stats.bw"
+            
+            threholds_bw_path = f"{main_dir_prefix}.threholds.bw"
+            background_bw_path = f"{main_dir_prefix}.background.bw"
             genome_processor.fit_background_model(
                 cutcounts_path,
-                fit_params_path,
-                per_region_stats_path,
+                total_cutcounts_path=total_cutcounts_path,
+                save_path=fit_params_path,
+                per_region_stats_path=per_region_stats_path,
+                per_region_stats_path_bw=per_region_stats_path_bw,
             )
 
             precomp_pvals = f"{main_dir_prefix}.pvals.parquet"
@@ -81,13 +86,13 @@ def main() -> None:
             genome_processor.extract_thresholds_to_bw(
                 fit_params_path,
                 total_cutcounts_path,
-                threholds_bb_path,
+                threholds_bw_path,
             )
 
             genome_processor.extract_bg_quantile_to_bw(
                 fit_params_path,
                 total_cutcounts_path,
-                background_bb_path
+                background_bw_path
             )
             
     precomp_fdrs = f"{debug_dir_prefix}.fdrs.parquet"

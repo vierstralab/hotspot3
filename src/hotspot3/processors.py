@@ -261,7 +261,14 @@ class GenomeProcessor(WithLogger):
         )
     
 
-    def fit_background_model(self, cutcounts_file, save_path: str, per_region_stats_path):
+    def fit_background_model(
+            self,
+            cutcounts_file,
+            total_cutcounts_path,
+            save_path: str,
+            per_region_stats_path,
+            per_region_stats_path_bw
+            ):
         """"
         Fit background model of cutcounts distribution and save fit parameters to parquet file.
         """
@@ -276,6 +283,17 @@ class GenomeProcessor(WithLogger):
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
 
+        total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
+        per_region_params['bg'] = upper_bg_quantile(per_region_params['r'], per_region_params['p'])
+        per_region_params['bg'] = normalize_density(per_region_params['bg'], total_cutcounts)
+
+        self.writer.df_to_bigwig(
+            per_region_params,
+            per_region_stats_path_bw,
+            self.chrom_sizes,
+            col='bg'
+        )
+        
 
     def calc_pvals(self, cutcounts_file, fit_path: str, save_path: str):
         """

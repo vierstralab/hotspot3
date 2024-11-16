@@ -9,8 +9,8 @@ from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
 from hotspot3.models import FitResults, WindowedFitResults, NotEnoughDataForContig
 
-from hotspot3.utils import interpolate_nan
 from hotspot3.background_fit import check_valid_fit
+from hotspot3.utils import interpolate_nan
 
 
 class SegmentsFit(WithLoggerAndInterval):
@@ -21,11 +21,14 @@ class SegmentsFit(WithLoggerAndInterval):
 
 
     def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], fallback_fit_results: FitResults=None):
-        final_r = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
-        final_p = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
+        fit_res = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
+        windowed_fit_results = WindowedFitResults(
+            p=fit_res,
+            r=fit_res.copy(),
+            enough_bg_mask=np.zeros(agg_cutcounts.shape[0], dtype=bool)
+        )
         final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
-        enough_bg = np.zeros(agg_cutcounts.shape[0], dtype=bool)
         
         segment_fits: List[FitResults] = []
         segments = bad_segments
@@ -74,12 +77,13 @@ class SegmentsFit(WithLoggerAndInterval):
                 genomic_interval=segment_interval
             )
 
-            final_r[start:end] = fit_res.r
-            final_p[start:end] = fit_res.p
+            windowed_fit_results.r[start:end] = fit_res.r
+            windowed_fit_results.p[start:end] = fit_res.p
+            windowed_fit_results.enough_bg_mask[start:end] = fit_res.enough_bg_mask
+
             final_rmsea[start:end] = segment_fit_results.rmsea
             per_window_trs[start:end] = segment_fit_results.fit_threshold
-            enough_bg[start:end] = fit_res.enough_bg_mask
-        
+
         intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
         intervals_stats['r'] = [x.r for x in segment_fits]
         intervals_stats['p'] = [x.p for x in segment_fits]
@@ -90,11 +94,7 @@ class SegmentsFit(WithLoggerAndInterval):
         intervals_stats['success_fit'] = success_fit
 
         # FIXME wrap in dataclass
-        return WindowedFitResults(
-            p=final_p,
-            r=final_r,
-            enough_bg_mask=enough_bg
-        ), per_window_trs, final_rmsea, intervals_stats
+        return windowed_fit_results, per_window_trs, final_rmsea, intervals_stats
 
 
     def fit_segment_params(
@@ -125,7 +125,7 @@ class SegmentsFit(WithLoggerAndInterval):
                 per_window_trs=thresholds,
                 fallback_fit_results=fallback_fit_results
             ).p[need_global_fit]
-        self.logger.debug(f"{self.name}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
+        self.logger.debug(f"{genomic_interval}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
         return fit_res
 
 
@@ -134,7 +134,6 @@ class ChromosomeFit(WithLoggerAndInterval):
     def fit_segment_thresholds(
             self,
             agg_cutcounts: ma.MaskedArray,
-            fallback_fit_results: FitResults=None,
             step=None
         ):
         if step is None:
@@ -142,16 +141,13 @@ class ChromosomeFit(WithLoggerAndInterval):
 
         g_fit = self.copy_with_params(GlobalBackgroundFit)
         global_fit_results = g_fit.fit(agg_cutcounts, step=step)
-        if not check_valid_fit(global_fit_results) and fallback_fit_results is not None:
-            global_fit_results = g_fit.fit(
-                agg_cutcounts,
-                fallback_fit_results=fallback_fit_results,
-                step=step
-            )
+        if not check_valid_fit(global_fit_results):
+            raise NotEnoughDataForContig
         strided_fit = self.copy_with_params(StridedBackgroundFit)
         fit_threshold = strided_fit.find_thresholds_at_chrom_quantile(
             agg_cutcounts,
             global_fit_results.fit_quantile,
         )
+        fit_threshold = interpolate_nan(fit_threshold)
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
         return fit_threshold, global_fit_results
