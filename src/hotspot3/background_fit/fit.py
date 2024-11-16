@@ -326,7 +326,7 @@ class StridedBackgroundFit(BackgroundFit):
         original_shape = agg_cutcounts.shape
         strided_agg_cutcounts = self.get_strided_agg_cutcounts(agg_cutcounts)
         subsampled_indices = self.get_subsampled_indices(original_shape)
-        values = self.get_bg_quantile_from_tr(
+        values = self.quantile_ignore_all_na(
             strided_agg_cutcounts,
             fit_qunatile
         )

@@ -21,7 +21,7 @@ class SegmentsFit(WithLoggerAndInterval):
 
 
     def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], fallback_fit_results: FitResults=None):
-        fit_res = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
+        fit_res = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         windowed_fit_results = WindowedFitResults(
             p=fit_res,
             r=fit_res.copy(),
@@ -106,6 +106,7 @@ class SegmentsFit(WithLoggerAndInterval):
         ) -> WindowedFitResults:
         if genomic_interval is None:
             genomic_interval = self.genomic_interval
+
         w_fit = self.copy_with_params(
             WindowBackgroundFit,
             name=genomic_interval.to_ucsc()
