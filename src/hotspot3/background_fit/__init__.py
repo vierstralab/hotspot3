@@ -68,6 +68,8 @@ def calc_chisq(obs, exp):
 
 def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
     assert stat in ('G_sq', 'chi_sq'), "Only G_sq and chi_sq statistics are supported"
+    if where is None:
+        where = np.ones_like(obs, dtype=bool)
     if stat == 'G_sq':
         G_sq = calc_g_sq(obs, exp)
     else:

@@ -141,10 +141,9 @@ class BackgroundFit(BottleneckWrapper):
         """
         Calculate RMSEA for all sliding windows.
         """
-        valid_bins = value_counts_per_bin >= self.config.min_obs_rmsea
+        valid_bins = np.ones_like(value_counts_per_bin, dtype=bool)
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0, where=valid_bins)
-        # print(bin_edges)
-        #sf_values = st.nbinom.sf(bin_edges - 1, r, 1 - p)
+        
         sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
@@ -588,7 +587,7 @@ class WindowBackgroundFit(BackgroundFit):
     """
     def fit(self, array: ma.MaskedArray, per_window_trs, fallback_fit_results: FitResults=None) -> WindowedFitResults:
         agg_cutcounts = array.copy()
-        
+
         high_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, per_window_trs)
         agg_cutcounts[high_signal_mask] = np.nan
         fit_results = self.sliding_method_of_moments_fit(
