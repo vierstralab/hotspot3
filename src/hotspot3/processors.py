@@ -243,7 +243,7 @@ class GenomeProcessor(WithLogger):
         """
         Convert threshold values to bigwig file.
         """
-        self.logger.info('Converting threshold values to bigwig')
+        self.logger.info('Converting background quantile values to bigwig')
         thresholds = self.parallel_by_chromosome(
             ChromosomeProcessor.extract_bg_quantile,
             fit_params_path
