@@ -53,7 +53,7 @@ class SegmentsFit(WithLoggerAndInterval):
             try:
                 g_fit = self.copy_with_params(
                     GlobalBackgroundFit,
-                    genomic_interval=segment_interval
+                    name=segment_interval.to_ucsc()
                 )
 
                 segment_fit_results = g_fit.fit(signal_at_segment, step=segment_step)
@@ -108,7 +108,7 @@ class SegmentsFit(WithLoggerAndInterval):
             genomic_interval = self.genomic_interval
         w_fit = self.copy_with_params(
             WindowBackgroundFit,
-            genomic_interval=genomic_interval
+            name=genomic_interval.to_ucsc()
         )
 
         fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
