@@ -285,6 +285,7 @@ class GenomeProcessor(WithLogger):
 
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         per_region_params.query('fit_type == "segment"', inplace=True)
+        per_region_params[['r', 'p']] = per_region_params[['r', 'p']].astype(float)
         per_region_params['bg'] = upper_bg_quantile(per_region_params['r'], per_region_params['p'])
         per_region_params['bg'] = normalize_density(per_region_params['bg'], total_cutcounts)
 
