@@ -482,6 +482,9 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         n_rmsea = np.sum(~np.isnan(rmseas))
         self.logger.debug(f"{self.chrom_name}: Signal thresholds approximated. {good_fits_n:,}/{n_rmsea:,} strided windows have RMSEA <= {self.config.rmsea_tr:.2f}")
 
+        # HOTFIX
+        per_window_trs_global = np.full_like(per_window_trs_global, global_fit_params.fit_threshold)
+
         # Segmentation
         segmentation = self.copy_with_params(BabachiWrapper)
         bad_segments = segmentation.run_segmentation(
