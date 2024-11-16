@@ -141,3 +141,6 @@ def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
 
 def check_valid_fit(fit: Union[WindowedFitResults, FitResults]):
     return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 
+
+def upper_bg_quantile(r, p, quantile=0.005):
+    return st.nbinom(r, 1 - p).isf(quantile)

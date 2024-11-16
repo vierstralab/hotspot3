@@ -20,6 +20,7 @@ from hotspot3.background_fit.segment_fit import ChromosomeFit, SegmentsFit
 from hotspot3.scoring.pvalue import PvalueEstimator
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.utils import is_iterable, ensure_contig_exists
+from hotspot3.stats import upper_bg_quantile
 
 
 def parallel_func_error_handler(func):
@@ -230,6 +231,26 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
+        thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
+        self.writer.df_to_bigwig(
+            thresholds,
+            save_path,
+            self.chrom_sizes,
+            col='tr'
+        )
+    
+    def extract_bg_quantile_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
+        """
+        Convert threshold values to bigwig file.
+        """
+        self.logger.info('Converting threshold values to bigwig')
+        thresholds = self.parallel_by_chromosome(
+            ChromosomeProcessor.extract_bg_quantile,
+            fit_params_path
+        )
+        total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
+        thresholds = self.merge_and_add_chromosome(thresholds).data_df
+        thresholds['tr'] = upper_bg_quantile(thresholds['r'], thresholds['p'])
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
@@ -522,6 +543,18 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @ensure_contig_exists
     def extract_fit_threholds(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_threholds(fit_parquet_path).iloc[::self.config.density_step]
+        fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
+        fit_res['end'] = fit_res['start'] + self.config.density_step
+        return ProcessorOutputData(self.chrom_name, fit_res)
+
+    @parallel_func_error_handler
+    @ensure_contig_exists
+    def extract_bg_quantile(self, fit_parquet_path) -> ProcessorOutputData:
+        fit_res = self.reader.extract_fit_params(fit_parquet_path)
+        fit_res = pd.DataFrame({
+            'r': fit_res.r,
+            'p': fit_res.p,
+        }).iloc[::self.config.density_step].fillna(0)
         fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
         fit_res['end'] = fit_res['start'] + self.config.density_step
         return ProcessorOutputData(self.chrom_name, fit_res)

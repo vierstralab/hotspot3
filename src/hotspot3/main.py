@@ -64,6 +64,7 @@ def main() -> None:
             fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
             per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
             threholds_bb_path = f"{main_dir_prefix}.threholds.bw"
+            qunatile_tr_bb_path = f"{main_dir_prefix}.quantile_tr.bw"
             genome_processor.fit_background_model(
                 cutcounts_path,
                 fit_params_path,
@@ -81,6 +82,12 @@ def main() -> None:
                 fit_params_path,
                 total_cutcounts_path,
                 threholds_bb_path,
+            )
+
+            genome_processor.extract_bg_quantile_to_bw(
+                fit_params_path,
+                total_cutcounts_path,
+                qunatile_tr_bb_path
             )
             
     precomp_fdrs = f"{debug_dir_prefix}.fdrs.parquet"
