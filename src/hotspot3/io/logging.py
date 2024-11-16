@@ -65,7 +65,9 @@ class WithLoggerAndInterval(WithLogger):
             )
         else:
             raise ValueError(f"cls should be a subclass of WithLogger or WithLoggerAndInterval, got {cls}")
+        print(kwargs, class_fields)
         class_fields.update(kwargs)
+        print(class_fields)
         return cls(class_fields)
 
 
