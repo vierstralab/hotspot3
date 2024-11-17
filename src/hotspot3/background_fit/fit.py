@@ -352,7 +352,7 @@ class StridedBackgroundFit(BackgroundFit):
         return self.cast_to_original_shape(best_fit_results, agg_cutcounts.shape)
     
     def get_strided_agg_cutcounts(self, agg_cutcounts: np.ndarray):
-        points_in_bg_window = (self.config.bg_window - 1) * 2 // self.sampling_step
+        points_in_bg_window = (self.config.bg_window - 1) // self.sampling_step
         if points_in_bg_window % 2 == 0:
             points_in_bg_window += 1
         
