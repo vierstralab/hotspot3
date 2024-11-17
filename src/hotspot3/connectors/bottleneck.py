@@ -40,6 +40,6 @@ class BottleneckWrapper(WithLogger):
         return self.centered_running_nanmax(array, flank_length * 2 + 1)
     
     @wrap_masked
-    def get_signal_mask_for_tr(self, array: np.ndarray, tr: float, flank_length: int=500):
+    def get_signal_mask_for_tr(self, array: np.ndarray, tr: float, flank_length: int=None):
         max_count = self.get_max_count_with_flanks(array, flank_length=flank_length)
         return max_count >= tr
