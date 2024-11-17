@@ -35,7 +35,7 @@ class ProcessorConfig:
 
     # Background model
     bg_window: int = 50001
-    bg_window_small: int = 10001
+    bg_window_small: int = 5001
     min_background_prop: float = 0.6
     max_background_prop: float = 0.99
 
