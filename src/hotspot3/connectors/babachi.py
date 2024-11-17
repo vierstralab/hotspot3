@@ -22,7 +22,7 @@ class BabachiWrapper(WithLoggerAndInterval):
         ):
         step = self.config.babachi_segmentation_step
 
-        bn_wrapper = BottleneckWrapper(config=self.config, logger=self.logger)
+        bn_wrapper = self.copy_with_params(BottleneckWrapper)
         assumed_signal_mask = bn_wrapper.get_signal_mask_for_tr(agg_cutcounts, per_window_trs)
         background = agg_cutcounts.filled(np.nan)[::step]
         background[assumed_signal_mask[::step]] = np.nan

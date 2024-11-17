@@ -148,7 +148,13 @@ class ChromosomeFit(WithLoggerAndInterval):
         fit_threshold = strided_fit.find_thresholds_at_chrom_quantile(
             agg_cutcounts,
             global_fit_results.fit_quantile,
+            bg_window=self.config.bg_window
         )
-        fit_threshold = interpolate_nan(fit_threshold)
+        fit_threshold2 = strided_fit.find_thresholds_at_chrom_quantile(
+            agg_cutcounts,
+            global_fit_results.fit_quantile,
+            bg_window=10001
+        )
+        fit_threshold = interpolate_nan(np.minimum(fit_threshold, fit_threshold2))
         self.logger.debug(f"{self.name}: Signal thresholds approximated")
         return fit_threshold, global_fit_results

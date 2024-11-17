@@ -322,15 +322,39 @@ class StridedBackgroundFit(BackgroundFit):
             self,
             agg_cutcounts: np.ndarray,
             fit_quantile: float,
+            bg_window=None
         ):
         original_shape = agg_cutcounts.shape
-        strided_agg_cutcounts = self.get_strided_agg_cutcounts(agg_cutcounts)
+        strided_agg_cutcounts = self.get_strided_agg_cutcounts(agg_cutcounts, bg_window=bg_window)
         subsampled_indices = self.get_subsampled_indices(original_shape)
         values = self.quantile_ignore_all_na(
             strided_agg_cutcounts,
             fit_quantile
         )
         return self.upcast(original_shape, subsampled_indices, values)
+
+    def get_strided_agg_cutcounts(self, agg_cutcounts: np.ndarray, bg_window=None):
+        if bg_window is None:
+            bg_window = self.config.bg_window
+        points_in_bg_window = (bg_window - 1) // self.sampling_step
+        if points_in_bg_window % 2 == 0:
+            points_in_bg_window += 1
+        
+        strided_agg_cutcounts = rolling_view_with_nan_padding(
+            agg_cutcounts[::self.sampling_step],
+            points_in_window=points_in_bg_window,
+            interpolation_step=self.interpolation_step
+        ) # shape (bg_window, n_points)
+
+        return strided_agg_cutcounts
+    
+    def get_subsampled_indices(self, original_shape: tuple):
+        return np.arange(0, original_shape[0], self.sampling_step, dtype=np.uint32)[::self.interpolation_step]
+    
+    def upcast(self, original_shape, subsampled_indices: np.ndarray, values: np.ndarray):
+        upcasted = np.full(original_shape, np.nan, dtype=np.float16)
+        upcasted[subsampled_indices] = values
+        return upcasted
 
     ## Currently deprecated method ##
     @wrap_masked
@@ -350,27 +374,6 @@ class StridedBackgroundFit(BackgroundFit):
             )
 
         return self.cast_to_original_shape(best_fit_results, agg_cutcounts.shape)
-    
-    def get_strided_agg_cutcounts(self, agg_cutcounts: np.ndarray):
-        points_in_bg_window = (self.config.bg_window - 1) // self.sampling_step
-        if points_in_bg_window % 2 == 0:
-            points_in_bg_window += 1
-        
-        strided_agg_cutcounts = rolling_view_with_nan_padding(
-            agg_cutcounts[::self.sampling_step],
-            points_in_window=points_in_bg_window,
-            interpolation_step=self.interpolation_step
-        ) # shape (bg_window, n_points)
-
-        return strided_agg_cutcounts
-    
-    def get_subsampled_indices(self, original_shape: tuple):
-        return np.arange(0, original_shape[0], self.sampling_step, dtype=np.uint32)[::self.interpolation_step]
-    
-    def upcast(self, original_shape, subsampled_indices: np.ndarray, values: np.ndarray):
-        upcasted = np.full(original_shape, np.nan, dtype=np.float16)
-        upcasted[subsampled_indices] = values
-        return upcasted
 
     def cast_to_original_shape(
             self,
@@ -601,7 +604,7 @@ class StridedBackgroundFit(BackgroundFit):
             np.where(
                 fit_results.fit_threshold < global_quantile_tr,
                 fit_results.fit_threshold,
-                self.quantile_ignore_all_na(data_for_fit.agg_cutcounts, self.config.min_background_prop) # FIXME, already calc in bin_edges
+                self.quantile_ignore_all_na(data_for_fit.agg_cutcounts, self.config.min_background_prop) 
             )
         )
     
