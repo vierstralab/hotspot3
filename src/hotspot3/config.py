@@ -36,23 +36,26 @@ class ProcessorConfig:
     # Background model
     bg_window: int = 50001
     bg_window_small: int = 10001
-    exclude_peak_flank_length: int = 0 # half window
     min_background_prop: float = 0.6
     max_background_prop: float = 0.99
 
+    # exclude peak flanks as well as peaks for fitting background
+    exclude_peak_flank_length: int = 0
     signal_prop_sampling_step: int = 75
-    signal_prop_interpolation_step: int = 1500 # shouldn't be less than signal_prop_n_samples!!!!!
+    # don't set less than signal_prop_sampling_step to avoid large memory usage
+    signal_prop_interpolation_step: int = 1500 
 
-    # RMSEA calculation
+    # Goodnes of fit calculation
     num_background_bins: int = 20
     num_signal_bins: int = 100
-    min_obs_rmsea: int = 5 # Merge bins with less than this number of observations
-    rmsea_tr: float = 0.05 # Only used in strided fit. Speeds up the process.
+    min_obs_rmsea: int = 5 # Merge signal bins with less than this number of observations
+    rmsea_tr: float = 0.05 # Threhold for good fit
 
     # Segmentation
+    babachi_min_segment_size: int = 5000
+
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 9
-    babachi_min_segment_size: int = 5000
 
     # FDR correction
     fdr_method: str = 'bh'
