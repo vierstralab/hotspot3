@@ -61,7 +61,7 @@ class BabachiWrapper(WithLoggerAndInterval):
     
     def get_bads(self, fit_results: FitResults, max_bad=10):
         chrom_bad = fit_results.p / (1 - fit_results.p)
-        mult = np.arange(1, max_bad + 0.1, 0.5)
+        mult = np.arange(1, max_bad + 0.1, 1)
         return [*(mult * chrom_bad), *(1 / mult[1:] * chrom_bad)], chrom_bad
     
     def run_babachi(self, snps_collection, chrom_sizes, bads):
