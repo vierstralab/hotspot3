@@ -332,7 +332,7 @@ class StridedBackgroundFit(BackgroundFit):
         )
         return self.upcast(original_shape, subsampled_indices, values)
 
-    ## Currently deprecated ##
+    ## Currently deprecated method ##
     @wrap_masked
     def fit(self, agg_cutcounts: np.ndarray, fallback_fit_results: FitResults=None):
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts)
@@ -352,7 +352,7 @@ class StridedBackgroundFit(BackgroundFit):
         return self.cast_to_original_shape(best_fit_results, agg_cutcounts.shape)
     
     def get_strided_agg_cutcounts(self, agg_cutcounts: np.ndarray):
-        points_in_bg_window = (self.config.bg_window - 1) // self.sampling_step
+        points_in_bg_window = (self.config.bg_window - 1) * 2 // self.sampling_step
         if points_in_bg_window % 2 == 0:
             points_in_bg_window += 1
         
@@ -610,7 +610,7 @@ class WindowBackgroundFit(BackgroundFit):
     def fit(self, array: ma.MaskedArray, per_window_trs, fallback_fit_results: FitResults=None) -> WindowedFitResults:
         agg_cutcounts = array.copy()
 
-        high_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, per_window_trs, flank_length=500)
+        high_signal_mask = self.get_signal_mask_for_tr(agg_cutcounts, per_window_trs)
         agg_cutcounts[high_signal_mask] = np.nan
         fit_results = self.sliding_method_of_moments_fit(
             agg_cutcounts,
