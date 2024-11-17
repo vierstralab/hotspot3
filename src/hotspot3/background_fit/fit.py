@@ -328,7 +328,7 @@ class StridedBackgroundFit(BackgroundFit):
         subsampled_indices = self.get_subsampled_indices(original_shape)
         values = self.quantile_ignore_all_na(
             strided_agg_cutcounts,
-            fit_qunatile
+            self.config.max_background_prop
         )
         return self.upcast(original_shape, subsampled_indices, values)
 
