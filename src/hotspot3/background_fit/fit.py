@@ -321,14 +321,14 @@ class StridedBackgroundFit(BackgroundFit):
     def find_thresholds_at_chrom_quantile(
             self,
             agg_cutcounts: np.ndarray,
-            fit_qunatile: float,
+            fit_quantile: float,
         ):
         original_shape = agg_cutcounts.shape
         strided_agg_cutcounts = self.get_strided_agg_cutcounts(agg_cutcounts)
         subsampled_indices = self.get_subsampled_indices(original_shape)
         values = self.quantile_ignore_all_na(
             strided_agg_cutcounts,
-            self.config.max_background_prop
+            fit_quantile
         )
         return self.upcast(original_shape, subsampled_indices, values)
 
@@ -459,7 +459,10 @@ class StridedBackgroundFit(BackgroundFit):
             if idx % (max(data_for_fit.n_signal_bins, 5) // 5) == 0:
                 self.logger.debug(f"{self.name} (window={self.config.bg_window}): Identifying signal proportion (step {idx}/{data_for_fit.n_signal_bins})")
         
-        best_fit_results.fit_quantile = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, best_fit_results.fit_threshold)
+        best_fit_results.fit_quantile = self.get_bg_quantile_from_tr(
+            data_for_fit.agg_cutcounts,
+            best_fit_results.fit_threshold
+        )
         return best_fit_results
     
     def get_data_for_current_threshold(
