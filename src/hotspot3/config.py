@@ -30,11 +30,12 @@ class ProcessorConfig:
     min_mappable_bases_proportion: float = 0.05
     
     # Signal smoothing
-    filter:str = 'haar'
+    filter: str = 'haar'
     modwt_level: int = 7
 
     # Background model
     bg_window: int = 50001
+    bg_window_small: int = 10001
     exclude_peak_flank_length: int = 0 # half window
     min_background_prop: float = 0.6
     max_background_prop: float = 0.99

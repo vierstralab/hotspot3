@@ -56,13 +56,12 @@ class SegmentsFit(WithLoggerAndInterval):
                     name=segment_interval.to_ucsc()
                 )
 
-                segment_fit_results = g_fit.fit(signal_at_segment, step=segment_step)
-                if not check_valid_fit(segment_fit_results) and fallback_fit_results is not None:
-                    segment_fit_results = g_fit.fit(
-                        signal_at_segment,
-                        fallback_fit_results=fallback_fit_results,
-                        step=segment_step
-                    )
+                segment_fit_results = g_fit.fit(
+                    signal_at_segment,
+                    step=segment_step,
+                    fallback_fit_results=fallback_fit_results
+                )
+  
                 success_fit.append(True)
             except NotEnoughDataForContig:
                 segment_fit_results = fallback_fit_results
@@ -153,7 +152,7 @@ class ChromosomeFit(WithLoggerAndInterval):
         fit_threshold2 = strided_fit.find_thresholds_at_chrom_quantile(
             agg_cutcounts,
             global_fit_results.fit_quantile,
-            bg_window=10001
+            bg_window=self.config.bg_window_small
         )
         fit_threshold = interpolate_nan(np.minimum(fit_threshold, fit_threshold2))
         self.logger.debug(f"{self.name}: Signal thresholds approximated")

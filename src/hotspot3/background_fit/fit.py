@@ -63,9 +63,13 @@ class BackgroundFit(BottleneckWrapper):
         
         return value_counts
     
-    def get_all_bins(self, array: np.ndarray):
+    def get_all_bins(self, array: np.ndarray, fallback_fit_results: FitResults=None):
         min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
-        signal_bins, n_signal_bins = self.get_signal_bins(array, min_bg_tr=min_bg_tr)
+        signal_bins, n_signal_bins = self.get_signal_bins(
+            array,
+            min_bg_tr=min_bg_tr,
+            fallback_fit_results=fallback_fit_results
+        )
         n_bg_bins = min(np.nanmax(min_bg_tr), self.config.num_background_bins)
         n_bg_bins = round(n_bg_bins)
 
@@ -80,10 +84,17 @@ class BackgroundFit(BottleneckWrapper):
         
         return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
-    def get_signal_bins(self, array: np.ndarray, min_bg_tr=None):
+    def get_signal_bins(self, array: np.ndarray, min_bg_tr=None, fallback_fit_results: FitResults=None):
         if min_bg_tr is None:
             min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
+
         max_bg_tr = self.quantile_ignore_all_na(array, self.config.max_background_prop)
+
+        if fallback_fit_results is not None:
+            max_bg_tr = np.maximum(
+                max_bg_tr,
+                fallback_fit_results.fit_threshold
+            )
         n_signal_bins = min(np.nanmax(max_bg_tr - min_bg_tr), self.config.num_signal_bins)
         n_signal_bins = round(n_signal_bins)
         
@@ -180,7 +191,7 @@ class GlobalBackgroundFit(BackgroundFit):
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
         """
         
-        data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step)
+        data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
         result = self.fit_all_thresholds(data_for_fit, None)
         if len(result) == 0:
             raise NotEnoughDataForContig
@@ -201,35 +212,27 @@ class GlobalBackgroundFit(BackgroundFit):
             best_fit_result: FitResults,
             fallback_fit_results: FitResults
         ):
-        #FIXME: it is bullshit
-        if best_fit_result.rmsea > self.config.rmsea_tr and fallback_fit_results is not None:
-            chrom_quantile_tr = np.nanquantile(data_for_fit.agg_cutcounts, fallback_fit_results.fit_quantile)
-            if chrom_quantile_tr < fallback_fit_results.fit_threshold:
-                tr = fallback_fit_results.fit_threshold
-                best_fit_result = self.fit_for_tr(
-                    data_for_fit,
-                    tr=tr,
-                    fallback_fit_results=fallback_fit_results
-                )
-            else:
-                pass
 
         if not check_valid_fit(best_fit_result) and fallback_fit_results is not None:
-            tr = fallback_fit_results.fit_threshold # FIXME for loop to find the best tr
-            best_fit_result = self.fit_for_tr(
+            result = self.fit_all_thresholds(
                 data_for_fit,
-                tr=tr,
-                fallback_fit_results=fallback_fit_results
+                fallback_fit_results
             )
+            best_fit_result = min(result, key=lambda x: x.rmsea)
         return best_fit_result
     
-    def prepare_data_for_fit(self, agg_cutcounts: ma.MaskedArray, step: int=None):
+    def prepare_data_for_fit(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            step: int=None,
+            fallback_fit_results: FitResults=None
+        ):
         if step is None:
             step = self.config.window
         agg_cutcounts = agg_cutcounts.filled(np.nan)
         max_counts_with_flanks = self.get_max_count_with_flanks(agg_cutcounts)[::step]
         agg_cutcounts = agg_cutcounts[::step]
-        bin_edges, n_signal_bins = self.get_all_bins(agg_cutcounts)
+        bin_edges, n_signal_bins = self.get_all_bins(agg_cutcounts, fallback_fit_results)
         bin_edges = bin_edges[:, None]
         value_counts = self.value_counts_per_bin(agg_cutcounts[:, None], bin_edges)
         self.merge_signal_bins_for_rmsea_inplace(value_counts, bin_edges, n_signal_bins)
