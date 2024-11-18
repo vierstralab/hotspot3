@@ -44,7 +44,10 @@ class SegmentsFit(WithLoggerAndInterval):
             start = int(segment_interval.start)
             end = int(segment_interval.end)        
             types.append('segment')
-            segment_step = max(20, round(self.config.window * agg_cutcounts.count() / len(self.genomic_interval)))
+            segment_step = max(
+                20, 
+                round(self.config.chromosome_fit_step / agg_cutcounts.count() * len(segment_interval))
+            )
             signal_at_segment = self.filter_signal_to_segment(
                 agg_cutcounts,
                 segment_interval
@@ -135,7 +138,7 @@ class ChromosomeFit(WithLoggerAndInterval):
             step=None
         ):
         if step is None:
-            step = self.config.window
+            step = self.config.chromosome_fit_step
 
         g_fit = self.copy_with_params(GlobalBackgroundFit)
         global_fit_results = g_fit.fit(agg_cutcounts, step=step)

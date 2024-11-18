@@ -39,6 +39,8 @@ class ProcessorConfig:
     min_background_prop: float = 0.6
     max_background_prop: float = 0.995
 
+    chromosome_fit_step: int = 1500
+
     # option to exclude peak flanks as well as peaks for fitting background
     # not used be default
     exclude_peak_flank_length: int = 0
@@ -58,6 +60,7 @@ class ProcessorConfig:
     babachi_min_segment_size: int = 50001 # same as bg_window, can be changed
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 20
+    
 
     # FDR correction
     fdr_method: str = 'bh'
