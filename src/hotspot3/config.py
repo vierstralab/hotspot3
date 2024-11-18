@@ -37,10 +37,13 @@ class ProcessorConfig:
     bg_window: int = 50001
     bg_window_small: int = 5001
     min_background_prop: float = 0.6
-    max_background_prop: float = 0.99
+    max_background_prop: float = 0.995
 
-    # exclude peak flanks as well as peaks for fitting background
+    # option to exclude peak flanks as well as peaks for fitting background
+    # not used be default
     exclude_peak_flank_length: int = 0
+
+    # Remove obvious signal before segmentation
     signal_prop_sampling_step: int = 75
     # don't set less than signal_prop_sampling_step to avoid large memory usage
     signal_prop_interpolation_step: int = 1500 
@@ -49,11 +52,10 @@ class ProcessorConfig:
     num_background_bins: int = 20
     num_signal_bins: int = 100
     min_obs_rmsea: int = 5 # Merge signal bins with less than this number of observations
-    rmsea_tr: float = 0.05 # Threhold for good fit, 
+    rmsea_tr: float = 0.05 # Threhold for good fit, currently used only for reporting 'bad' rmsea
 
     # Segmentation
     babachi_min_segment_size: int = 50001 # same as bg_window, can be changed
-
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 20
 
@@ -64,8 +66,9 @@ class ProcessorConfig:
     min_signif_bases_for_peak: int = 10
     min_peak_half_width: int = 10
 
-    # Density
-    density_step: int = 20
+    # Bigwigs params
+    density_track_step: int = 20
+    bg_track_step: int = 100
 
     # Utils
     cpus: int = 1

@@ -231,7 +231,7 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['end'] = thresholds['start'] + self.config.density_step
+        thresholds['end'] = thresholds['start'] + self.config.density_track_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
@@ -251,7 +251,7 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['end'] = thresholds['start'] + self.config.density_step
+        thresholds['end'] = thresholds['start'] + self.config.density_track_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
@@ -447,7 +447,7 @@ class GenomeProcessor(WithLogger):
             smoothed_signal
         )
         density_data = self.merge_and_add_chromosome(density_data).data_df
-        density_data['end'] = density_data['start'] + self.config.density_step
+        density_data['end'] = density_data['start'] + self.config.density_track_step
         self.logger.debug(f"Converting density to bigwig")
         self.writer.df_to_bigwig(
             density_data,
@@ -561,8 +561,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @parallel_func_error_handler
     @ensure_contig_exists
     def extract_fit_threholds(self, fit_parquet_path) -> ProcessorOutputData:
-        fit_res = self.reader.extract_fit_threholds(fit_parquet_path).iloc[::self.config.density_step]
-        fit_res['start'] = np.arange(len(fit_res)) * self.config.density_step
+        fit_res = self.reader.extract_fit_threholds(fit_parquet_path).iloc[::self.config.bg_track_step]
+        fit_res['start'] = np.arange(len(fit_res)) * self.config.bg_track_step
         fit_res.dropna(inplace=True)
         return ProcessorOutputData(self.chrom_name, fit_res)
 
@@ -572,12 +572,12 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     def extract_bg_quantile(self, fit_parquet_path) -> ProcessorOutputData:
         fit_res = self.reader.extract_fit_params(fit_parquet_path)
         fit_res = upper_bg_quantile(
-            fit_res.r[::self.config.density_step],
-            fit_res.p[::self.config.density_step]
+            fit_res.r[::self.config.bg_track_step],
+            fit_res.p[::self.config.bg_track_step]
         )
         fit_res = pd.DataFrame({
             'tr': fit_res,
-            'start': np.arange(len(fit_res)) * self.config.density_step
+            'start': np.arange(len(fit_res)) * self.config.bg_track_step
         }).dropna()
         return ProcessorOutputData(self.chrom_name, fit_res)
 
@@ -693,9 +693,9 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         data_df = self.reader.extract_from_parquet(
             smoothed_signal, 
             columns=['chrom', 'normalized_density']
-        )[::self.config.density_step]
+        )[::self.config.density_track_step]
         
-        data_df['start'] = np.arange(len(data_df)) * self.config.density_step
+        data_df['start'] = np.arange(len(data_df)) * self.config.density_track_step
         data_df.query('normalized_density > 0', inplace=True)
         return ProcessorOutputData(self.chrom_name, data_df)
 
