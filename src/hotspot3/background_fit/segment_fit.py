@@ -44,7 +44,7 @@ class SegmentsFit(WithLoggerAndInterval):
             start = int(segment_interval.start)
             end = int(segment_interval.end)        
             types.append('segment')
-            segment_step = 20
+            segment_step = max(20, round(self.config.window * agg_cutcounts.count() / len(self.genomic_interval)))
             signal_at_segment = self.filter_signal_to_segment(
                 agg_cutcounts,
                 segment_interval

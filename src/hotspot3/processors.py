@@ -231,7 +231,7 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['end'] = thresholds['start'] + self.config.density_track_step
+        thresholds['end'] = thresholds['start'] + self.config.bg_track_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
@@ -251,7 +251,7 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['end'] = thresholds['start'] + self.config.density_track_step
+        thresholds['end'] = thresholds['start'] + self.config.bg_track_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.writer.df_to_bigwig(
             thresholds,
