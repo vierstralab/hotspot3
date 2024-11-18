@@ -55,7 +55,7 @@ class ProcessorConfig:
     babachi_min_segment_size: int = 5000
 
     babachi_segmentation_step: int = 500
-    babachi_boundary_penalty: int = 14
+    babachi_boundary_penalty: int = 20
 
     # FDR correction
     fdr_method: str = 'bh'
