@@ -538,7 +538,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         )
 
         chrom_fit = self.copy_with_params(SegmentsFit)
-        fit_res, per_window_trs, final_rmsea, per_interval_params = chrom_fit.fit_params(
+        fit_res, per_window_trs, per_interval_params = chrom_fit.fit_params(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,
             fallback_fit_results=global_fit_params
@@ -551,17 +551,13 @@ class ChromosomeProcessor(WithLoggerAndInterval):
                 'tr': per_window_trs,
                 'initial_tr': per_window_trs_global,
                 'bad': segmentation.annotate_with_segments(agg_cutcounts.shape, bad_segments),
-                'rmsea': final_rmsea,
             })
         else:
-            import gc
-            del final_rmsea, agg_cutcounts
-            gc.collect()
             df = pd.DataFrame({
-                'r': fit_res.r,
-                'p': fit_res.p,
-                'fit_threshold': per_window_trs_global,
-                'success_fit': fit_res.enough_bg_mask
+                'sliding_r': fit_res.r,
+                'sliding_p': fit_res.p,
+                'enough_bg': fit_res.enough_bg_mask,
+                'tr': per_window_trs,
             })
         self.write_to_parquet(df, save_path, compression_level=0)
         

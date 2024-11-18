@@ -27,7 +27,6 @@ class SegmentsFit(WithLoggerAndInterval):
             r=fit_res.copy(),
             enough_bg_mask=np.zeros(agg_cutcounts.shape[0], dtype=bool)
         )
-        final_rmsea = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         
         segment_fits: List[FitResults] = []
@@ -80,7 +79,6 @@ class SegmentsFit(WithLoggerAndInterval):
             windowed_fit_results.p[start:end] = fit_res.p
             windowed_fit_results.enough_bg_mask[start:end] = fit_res.enough_bg_mask
 
-            final_rmsea[start:end] = segment_fit_results.rmsea
             per_window_trs[start:end] = segment_fit_results.fit_threshold
 
         intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
@@ -93,7 +91,7 @@ class SegmentsFit(WithLoggerAndInterval):
         intervals_stats['success_fit'] = success_fit
 
         # FIXME wrap in dataclass
-        return windowed_fit_results, per_window_trs, final_rmsea, intervals_stats
+        return windowed_fit_results, per_window_trs, intervals_stats
 
 
     def fit_segment_params(
