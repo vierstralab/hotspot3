@@ -52,10 +52,10 @@ class ProcessorConfig:
     rmsea_tr: float = 0.05 # Threhold for good fit, 
 
     # Segmentation
-    babachi_min_segment_size: int = 10000
+    babachi_min_segment_size: int = 50001 # same as bg_window, can be changed
 
     babachi_segmentation_step: int = 500
-    babachi_boundary_penalty: int = 15
+    babachi_boundary_penalty: int = 20
 
     # FDR correction
     fdr_method: str = 'bh'
