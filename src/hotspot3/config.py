@@ -49,10 +49,10 @@ class ProcessorConfig:
     num_background_bins: int = 20
     num_signal_bins: int = 100
     min_obs_rmsea: int = 5 # Merge signal bins with less than this number of observations
-    rmsea_tr: float = 0.05 # Threhold for good fit
+    rmsea_tr: float = 0.05 # Threhold for good fit, 
 
     # Segmentation
-    babachi_min_segment_size: int = 5000
+    babachi_min_segment_size: int = 10000
 
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 20
