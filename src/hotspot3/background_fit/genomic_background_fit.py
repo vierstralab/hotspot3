@@ -132,17 +132,15 @@ class SegmentalFit(WithLoggerAndInterval):
         success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
 
         need_global_fit = ~success_fits & fit_res.enough_bg_mask
-        fit_res.r[need_global_fit] = fallback_fit_results.r
+        if np.any(need_global_fit):
+            fit_res.r[need_global_fit] = fallback_fit_results.r
 
-        if fallback_fit_results.rmsea > self.config.rmsea_tr: 
-            fit_res.p[need_global_fit] = fallback_fit_results.p
-        else:
             fit_res.p[need_global_fit] = w_fit.fit(
                 signal_at_segment,
                 per_window_trs=thresholds,
                 fallback_fit_results=fallback_fit_results
             ).p[need_global_fit]
-        self.logger.debug(f"{genomic_interval.to_ucsc()}: Fit per-bp negative-binomial model for {np.sum(success_fits):,}. Use global fit for {np.sum(need_global_fit):,} windows")
+        self.logger.debug(f"{genomic_interval.to_ucsc()}: Successfully fit per-bp negative-binomial model for {np.sum(success_fits):,} bp. Use segmental r for {np.sum(need_global_fit):,} bp")
         return fit_res
 
 
