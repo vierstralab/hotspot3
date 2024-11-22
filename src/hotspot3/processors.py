@@ -282,15 +282,14 @@ class GenomeProcessor(WithLogger):
         )
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
 
-        is_segment = per_region_params.eval('fit_type == "segment"')
-        per_region_params.loc[is_segment, 'background'] = upper_bg_quantile(
-            per_region_params.loc[is_segment, 'r'],
-            per_region_params.loc[is_segment, 'p']
+        per_region_params['background'] = upper_bg_quantile(
+            per_region_params['r'],
+            per_region_params['p']
         )
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
 
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
-        per_region_params = per_region_params.loc[is_segment, ['chrom', 'start', 'end', 'background']]
+        per_region_params = per_region_params.query('fit_type == "segment"')[['chrom', 'start', 'end', 'background']]
         per_region_params['background'] = normalize_density(
             per_region_params['background'],
             total_cutcounts
