@@ -21,7 +21,7 @@ class BottleneckWrapper(WithLogger):
 
     @wrap_masked
     @correct_offset
-    def centered_running_nanmean(self, array, window):
+    def centered_running_nanmean(self, array, window) -> np.ndarray:
         min_count = self.get_min_count(window)
         return bn.move_mean(array, window, min_count=min_count).astype(np.float32)
 

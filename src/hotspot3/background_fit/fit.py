@@ -633,20 +633,19 @@ class WindowBackgroundFit(BackgroundFit):
             agg_cutcounts: ma.MaskedArray,
             fallback_fit_results: FitResults
         ):
-        mean, var = self.sliding_mean_and_variance(agg_cutcounts, self.config.bg_window)
+
+        bg_window = self.config.bg_window
+        mean = self.centered_running_nanmean(agg_cutcounts, bg_window)
+        
+        mean = ma.masked_invalid(mean)
         enough_bg_mask = ~mean.mask
         
         if fallback_fit_results is not None:
             r = np.full_like(mean, fallback_fit_results.r, dtype=np.float32)
         else:
+            var = self.centered_running_nanvar(agg_cutcounts, bg_window)
+            var = ma.masked_invalid(var)
             r = self.r_from_mean_and_var(mean, var).filled(np.nan)
 
         p = self.p_from_mean_and_r(mean, r).filled(np.nan)
         return WindowedFitResults(p, r, enough_bg_mask=enough_bg_mask)
-
-    def sliding_mean_and_variance(self, array: ma.MaskedArray, window: int):
-        mean = self.centered_running_nanmean(array, window)
-        var = self.centered_running_nanvar(array, window)
-        mean = ma.masked_invalid(mean)
-        var = ma.masked_invalid(var)
-        return mean, var
