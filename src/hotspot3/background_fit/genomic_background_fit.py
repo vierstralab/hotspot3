@@ -1,6 +1,7 @@
 
 import numpy.ma as ma
 import numpy as np
+import pandas as pd
 from typing import List
 
 from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
@@ -13,14 +14,14 @@ from hotspot3.background_fit import check_valid_fit
 from hotspot3.utils import interpolate_nan
 
 
-class SegmentsFit(WithLoggerAndInterval):
-    def filter_signal_to_segment(self, agg_cutcounts: np.ndarray, segment: GenomicInterval=None) -> np.ndarray:
+class SegmentalFit(WithLoggerAndInterval):
+    def filter_signal_to_segment(self, agg_cutcounts: ma.MaskedArray, segment: GenomicInterval=None) -> ma.MaskedArray:
         if segment is None:
             segment = self.genomic_interval
         return agg_cutcounts[segment.start:segment.end]
 
 
-    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], fallback_fit_results: FitResults=None):
+    def fit_params(self, agg_cutcounts: ma.MaskedArray, bad_segments: List[GenomicInterval], fallback_fit_results: FitResults):
         fit_res = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float32)
         windowed_fit_results = WindowedFitResults(
             p=fit_res,
@@ -28,48 +29,49 @@ class SegmentsFit(WithLoggerAndInterval):
             enough_bg_mask=np.zeros(agg_cutcounts.shape[0], dtype=bool)
         )
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
-        
-        segment_fits: List[FitResults] = []
-        segments = bad_segments
-        types = []
-        success_fit = []
-        if fallback_fit_results is not None:
-            segment_fits.append(fallback_fit_results)
-            self.genomic_interval.BAD = None
-            segments = [self.genomic_interval, *segments]
-            types.append('global')
-            success_fit.append(True)
 
-        for segment_interval in bad_segments:
+        self.genomic_interval.BAD = None
+        segments = [self.genomic_interval, *bad_segments]
+        intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
+        fit_series = self.convert_fit_results_to_series(
+            fallback_fit_results,
+            agg_cutcounts.compressed().mean(),
+            fit_type='global',
+            success_fit=True
+        )
+        
+        intervals_stats.loc[0, fit_series.index] = fit_series
+        total_len = agg_cutcounts.count()
+
+        for i, segment_interval in enumerate(bad_segments, 1):
             start = int(segment_interval.start)
             end = int(segment_interval.end)        
-            types.append('segment')
-            segment_step = max(
-                20, 
-                round(self.config.chromosome_fit_step / agg_cutcounts.count() * len(segment_interval))
-            )
             signal_at_segment = self.filter_signal_to_segment(
                 agg_cutcounts,
                 segment_interval
             )
-            try:
-                g_fit = self.copy_with_params(
-                    GlobalBackgroundFit,
-                    name=segment_interval.to_ucsc()
-                )
 
+            g_fit = self.copy_with_params(
+                GlobalBackgroundFit,
+                name=segment_interval.to_ucsc()
+            )
+            try:
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
-                    step=segment_step,
+                    step=self.get_optimal_segment_step(total_len, len(segment_interval)),
                     fallback_fit_results=fallback_fit_results
                 )
-  
-                success_fit.append(True)
+                success_fit = True
             except NotEnoughDataForContig:
                 segment_fit_results = fallback_fit_results
-                success_fit.append(False)
+                success_fit = False
             
-            segment_fits.append(segment_fit_results)
+            intervals_stats.loc[i, fit_series.index] = self.convert_fit_results_to_series(
+                segment_fit_results,
+                signal_at_segment.compressed().mean(),
+                fit_type='segment',
+                success_fit=success_fit
+            )
 
             fit_res = self.fit_segment_params(
                 signal_at_segment,
@@ -84,24 +86,38 @@ class SegmentsFit(WithLoggerAndInterval):
 
             per_window_trs[start:end] = segment_fit_results.fit_threshold
 
-        intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
-        intervals_stats['r'] = [x.r for x in segment_fits]
-        intervals_stats['p'] = [x.p for x in segment_fits]
-        intervals_stats['rmsea'] = [x.rmsea for x in segment_fits]
-        intervals_stats['signal_tr'] = [x.fit_threshold for x in segment_fits]
-        intervals_stats['quantile_tr'] = [x.fit_quantile for x in segment_fits]
-        intervals_stats['fit_type'] = types
-        intervals_stats['success_fit'] = success_fit
-
-        # FIXME wrap in dataclass
         return windowed_fit_results, per_window_trs, intervals_stats
 
+    def get_optimal_segment_step(self, total_len, segment_len):
+        # Scale step according to the length of segment
+        return max(
+            20, 
+            round(self.config.chromosome_fit_step / total_len * segment_len)
+        )
+
+    def convert_fit_results_to_series(
+            self,
+            fit_results: FitResults,
+            mean: float,
+            fit_type: str,
+            success_fit: bool
+        ) -> pd.Series:
+        return pd.Series({
+            'r': fit_results.r,
+            'p': fit_results.p,
+            'rmsea': fit_results.rmsea,
+            'signal_tr': fit_results.fit_threshold,
+            'quantile_tr': fit_results.fit_quantile,
+            'mean': mean,
+            'fit_type': fit_type,
+            'success_fit': success_fit
+        })
 
     def fit_segment_params(
             self,
             signal_at_segment: ma.MaskedArray,
             thresholds: np.ndarray,
-            fallback_fit_results: FitResults=None,
+            fallback_fit_results: FitResults,
             genomic_interval: GenomicInterval=None
         ) -> WindowedFitResults:
         if genomic_interval is None:
