@@ -10,6 +10,8 @@ class FitResults:
     rmsea: np.ndarray = np.nan
     fit_quantile: np.ndarray = np.nan
     fit_threshold: np.ndarray = np.nan
+    n_signal: int = np.nan
+    n_total: int = np.nan
 
 
 @dataclasses.dataclass
@@ -26,6 +28,15 @@ class DataForFit:
     n_signal_bins: int
     agg_cutcounts: np.ndarray
     max_counts_with_flanks: np.ndarray
+
+
+@dataclasses.dataclass
+class RegressionResults:
+    slope: float
+    intercept: float
+    r2: float
+    inliers_mask: np.ndarray
+    outlier_distance: np.ndarray
 
 
 @dataclasses.dataclass

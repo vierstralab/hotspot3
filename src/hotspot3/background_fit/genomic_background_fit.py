@@ -33,15 +33,18 @@ class SegmentalFit(WithLoggerAndInterval):
         self.genomic_interval.BAD = None
         segments = [self.genomic_interval, *bad_segments]
         intervals_stats = genomic_intervals_to_df(segments).drop(columns=['chrom', 'name'])
+
+        total_len = agg_cutcounts.count()
+
         fit_series = self.convert_fit_results_to_series(
             fallback_fit_results,
             agg_cutcounts.compressed().mean(),
             fit_type='global',
-            success_fit=True
+            success_fit=True,
         )
         
         intervals_stats.loc[0, fit_series.index] = fit_series
-        total_len = agg_cutcounts.count()
+        
 
         for i, segment_interval in enumerate(bad_segments, 1):
             start = int(segment_interval.start)
@@ -108,6 +111,8 @@ class SegmentalFit(WithLoggerAndInterval):
             'rmsea': fit_results.rmsea,
             'signal_tr': fit_results.fit_threshold,
             'quantile_tr': fit_results.fit_quantile,
+            'total_bases': fit_results.n_total,
+            'signal_bases': fit_results.n_signal,
             'mean': mean,
             'fit_type': fit_type,
             'success_fit': success_fit

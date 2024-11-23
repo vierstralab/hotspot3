@@ -17,10 +17,12 @@ from hotspot3.connectors.babachi import BabachiWrapper
 
 from hotspot3.signal_smoothing import modwt_smooth, normalize_density
 from hotspot3.background_fit.genomic_background_fit import ChromosomeFit, SegmentalFit
+from hotspot3.background_fit.regression import SignalToNoiseFit
 from hotspot3.scoring.pvalue import PvalueEstimator
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 from hotspot3.utils import is_iterable, ensure_contig_exists
 from hotspot3.stats import upper_bg_quantile
+
 
 
 def parallel_func_error_handler(func):
@@ -281,11 +283,8 @@ class GenomeProcessor(WithLogger):
             save_path,
         )
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
-
-        per_region_params['background'] = upper_bg_quantile(
-            per_region_params['r'],
-            per_region_params['p']
-        )
+        
+        per_region_params = self.copy_with_params(SignalToNoiseFit).fit(per_region_params)
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
 
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)

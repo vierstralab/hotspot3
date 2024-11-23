@@ -236,7 +236,13 @@ class GlobalBackgroundFit(BackgroundFit):
         bin_edges = bin_edges[:, None]
         value_counts = self.value_counts_per_bin(agg_cutcounts[:, None], bin_edges)
         self.merge_signal_bins_for_rmsea_inplace(value_counts, bin_edges, n_signal_bins)
-        return DataForFit(bin_edges, value_counts, n_signal_bins, agg_cutcounts, max_counts_with_flanks)
+        return DataForFit(
+            bin_edges,
+            value_counts,
+            n_signal_bins,
+            agg_cutcounts,
+            max_counts_with_flanks
+        )
     
     def fit_all_thresholds(
             self,
@@ -246,7 +252,6 @@ class GlobalBackgroundFit(BackgroundFit):
         result = []
         for i in np.arange(data_for_fit.n_signal_bins)[::-1]:
             tr = data_for_fit.bin_edges[len(data_for_fit.bin_edges) - i - 1, 0]
-            #self.logger.debug(f"{self.name}: Attempting global fit at tr={tr}")
             try:
                 assumed_signal_mask = data_for_fit.max_counts_with_flanks >= tr
                 p, r, rmsea = self._fit_for_bg_mask(
@@ -255,11 +260,14 @@ class GlobalBackgroundFit(BackgroundFit):
                     assumed_signal_mask=assumed_signal_mask,
                     fallback_fit_results=fallback_fit_results
                 )
+                n_total = np.sum(~np.isnan(data_for_fit.agg_cutcounts))
+                n_signal = np.sum(assumed_signal_mask)
             except NotEnoughDataForContig:
                 continue
-            #FIXME: remove if slow
             q = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
-            result.append(FitResults(p, r, rmsea, q, tr))
+            result.append(
+                FitResults(p, r, rmsea, q, tr, n_signal=n_signal, n_total=n_total)
+            )
         return result
     
     @wrap_masked
@@ -278,7 +286,9 @@ class GlobalBackgroundFit(BackgroundFit):
             fallback_fit_results=fallback_fit_results,
         )
         q = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
-        return FitResults(p, r, rmsea, q, tr)
+        n_total = np.sum(~np.isnan(data_for_fit.agg_cutcounts))
+        n_signal = np.sum(assumed_signal_mask)
+        return FitResults(p, r, rmsea, q, tr, n_signal=n_signal, n_total=n_total)
     
     def _fit_for_bg_mask(
         self,
@@ -296,7 +306,7 @@ class GlobalBackgroundFit(BackgroundFit):
             n_params = 2
         p = self.p_from_mean_and_r(mean, r)
 
-        if not check_valid_fit(FitResults(p, r, 0, 0, 0)):
+        if not check_valid_fit(FitResults(p, r)):
             raise NotEnoughDataForContig
         
         value_counts = self.value_counts_per_bin(
