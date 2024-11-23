@@ -30,16 +30,18 @@ class WithLogger:
         # Setter allows updating the logger
         self._logger = logger
     
-    def copy_with_params(self, cls: Type[T]) -> T:
+    def copy_with_params(self, cls: Type[T], **kwargs) -> T:
         """
         Creates a new instance of the specified class `cls` with the same initialization parameters.
         """
         assert issubclass(cls, WithLogger), "cls should be a subclass of WithLogger"
-        return cls(
-            name=self.name,
+        data = dict(
             config=self.config,
-            logger=self.logger
+            logger=self.logger,
+            name=self.name
         )
+        data.update(kwargs)
+        return cls(**data)
 
 
 class WithLoggerAndInterval(WithLogger):

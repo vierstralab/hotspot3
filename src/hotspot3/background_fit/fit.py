@@ -40,13 +40,13 @@ class BackgroundFit(BottleneckWrapper):
     @wrap_masked
     def p_from_mean_and_r(self, mean: np.ndarray, r: np.ndarray, where=None):
         with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
-            p = np.array(mean / (mean + r), dtype=np.float32) # check if we return p or 1-p
+            p = np.array(mean / (mean + r), dtype=np.float16) # check if we return p or 1-p
         return p
     
     @wrap_masked
     def r_from_mean_and_var(self, mean: np.ndarray, var: np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore', all='ignore'):
-            r = np.array(mean ** 2 / (var - mean), dtype=np.float32)
+            r = np.array(mean ** 2 / (var - mean), dtype=np.float16)
         return r
     
     def value_counts_per_bin(self, array, bin_edges, where=None):
@@ -189,8 +189,7 @@ class GlobalBackgroundFit(BackgroundFit):
         Parameters:
             agg_cutcounts (np.ndarray): Array of aggregated cutcounts.
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
-        """
-        
+        """     
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
         result = self.fit_all_thresholds(data_for_fit, None)
         if len(result) == 0:
@@ -203,6 +202,11 @@ class GlobalBackgroundFit(BackgroundFit):
             best_fit_result,
             fallback_fit_results
         )
+        best_fit_result.n_total = agg_cutcounts.count()
+        best_fit_result.n_signal = self.get_signal_mask_for_tr(
+            agg_cutcounts,
+            best_fit_result.fit_threshold
+        ).sum()
 
         return best_fit_result
     
@@ -254,20 +258,18 @@ class GlobalBackgroundFit(BackgroundFit):
             tr = data_for_fit.bin_edges[len(data_for_fit.bin_edges) - i - 1, 0]
             try:
                 assumed_signal_mask = data_for_fit.max_counts_with_flanks >= tr
-                p, r, rmsea = self._fit_for_bg_mask(
+                step_fit = self._fit_for_bg_mask(
                     data_for_fit.agg_cutcounts,
                     bin_edges=data_for_fit.bin_edges,
                     assumed_signal_mask=assumed_signal_mask,
                     fallback_fit_results=fallback_fit_results
                 )
-                n_total = np.sum(~np.isnan(data_for_fit.agg_cutcounts))
-                n_signal = np.sum(assumed_signal_mask)
             except NotEnoughDataForContig:
                 continue
             q = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
-            result.append(
-                FitResults(p, r, rmsea, q, tr, n_signal=n_signal, n_total=n_total)
-            )
+            step_fit.fit_quantile = q
+            step_fit.fit_threshold = tr
+            result.append(step_fit)
         return result
     
     @wrap_masked
@@ -279,16 +281,15 @@ class GlobalBackgroundFit(BackgroundFit):
     ):
         assumed_signal_mask = data_for_fit.max_counts_with_flanks >= tr
 
-        p, r, rmsea = self._fit_for_bg_mask(
+        step_fit = self._fit_for_bg_mask(
             data_for_fit.agg_cutcounts,
             assumed_signal_mask,
             data_for_fit.bin_edges,
             fallback_fit_results=fallback_fit_results,
         )
-        q = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
-        n_total = np.sum(~np.isnan(data_for_fit.agg_cutcounts))
-        n_signal = np.sum(assumed_signal_mask)
-        return FitResults(p, r, rmsea, q, tr, n_signal=n_signal, n_total=n_total)
+        step_fit.fit_quantile = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
+        step_fit.fit_threshold = tr
+        return step_fit
     
     def _fit_for_bg_mask(
         self,
@@ -321,8 +322,7 @@ class GlobalBackgroundFit(BackgroundFit):
             bin_edges,
             value_counts,
         )[0]
-        return p, r, rmsea
-
+        return FitResults(p, r, rmsea)
 
 
 class StridedBackgroundFit(BackgroundFit):

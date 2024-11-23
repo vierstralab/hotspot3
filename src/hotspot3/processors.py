@@ -50,10 +50,9 @@ class GenomeProcessor(WithLogger):
     """
     def __init__(self, chrom_sizes_file=None, config=None, mappable_bases_file=None, chromosomes=None):
         super().__init__(config=config)
-        self.reader = self.copy_with_params(GenomeReader)
-        self.writer = self.copy_with_params(GenomeWriter)
         self.mappable_bases_file = mappable_bases_file
         self.chrom_sizes_file = chrom_sizes_file
+        self.reader = self.copy_with_params(GenomeReader)
 
         self.cpus = min(self.config.cpus, max(1, mp.cpu_count()))
 
@@ -64,7 +63,6 @@ class GenomeProcessor(WithLogger):
         
         chroms = [x for x in self.chrom_sizes.keys()]
         self.logger.debug(f"Chromosomes to process: {chroms}")
-
 
         chrom_intervals = [
             GenomicInterval(chrom, 0, length) 
@@ -78,6 +76,8 @@ class GenomeProcessor(WithLogger):
             key=lambda x: x.chrom_size,
             reverse=True
         )
+        self.writer = self.copy_with_params(GenomeWriter, chrom_sizes=self.chrom_sizes)
+
     
     def __getstate__(self):
         state = self.__dict__
@@ -233,13 +233,11 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['end'] = thresholds['start'] + self.config.bg_track_step
-        thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
-        self.writer.df_to_bigwig(
+
+        self.writer.thresholds_df_to_bw(
             thresholds,
             save_path,
-            self.chrom_sizes,
-            col='tr'
+            total_cutcounts
         )
     
     def extract_bg_quantile_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
@@ -253,16 +251,13 @@ class GenomeProcessor(WithLogger):
         )
         total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
         thresholds = self.merge_and_add_chromosome(thresholds).data_df
-        thresholds['end'] = thresholds['start'] + self.config.bg_track_step
-        thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
-        self.writer.df_to_bigwig(
+
+        self.writer.thresholds_df_to_bw(
             thresholds,
             save_path,
-            self.chrom_sizes,
-            col='tr'
+            total_cutcounts
         )
     
-
     def fit_background_model(
             self,
             cutcounts_file,
@@ -282,23 +277,28 @@ class GenomeProcessor(WithLogger):
             cutcounts_file,
             save_path,
         )
+
+        sn_fit = self.copy_with_params(SignalToNoiseFit)
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
-        
-        per_region_params = self.copy_with_params(SignalToNoiseFit).fit(per_region_params)
-        self.writer.df_to_tabix(per_region_params, per_region_stats_path)
+        per_region_params = sn_fit.fit(per_region_params)
+        is_outlier_segment = sn_fit.find_outliers(per_region_params)
+        per_region_params['refit_with_constraint'] = is_outlier_segment
+        if is_outlier_segment.sum() > 0:
+            self.logger.info(f"Found {is_outlier_segment.sum()} outlier segments. Refitting again with approximated signal/noise constraint.")
+            refit_params = self.parallel_by_chromosome(
+                ChromosomeProcessor.refit_outlier_segments,
+                cutcounts_file,
+                per_region_params.loc[is_outlier_segment],
+                save_path,
+            )
+            refit_params = self.merge_and_add_chromosome(refit_params).data_df
+            per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params      
 
-        total_cutcounts = self.reader.read_total_cutcounts(total_cutcounts_path)
-        per_region_params = per_region_params.query('fit_type == "segment"')[['chrom', 'start', 'end', 'background']]
-        per_region_params['background'] = normalize_density(
-            per_region_params['background'],
-            total_cutcounts
-        )
-
-        self.writer.df_to_bigwig(
+        self.writer.fit_stats_to_tabix_and_bw(
             per_region_params,
+            per_region_stats_path,
             per_region_stats_path_bw,
-            self.chrom_sizes,
-            col='background'
+            total_cutcounts=self.reader.read_total_cutcounts(total_cutcounts_path),
         )
         
 
@@ -445,13 +445,10 @@ class GenomeProcessor(WithLogger):
             smoothed_signal
         )
         density_data = self.merge_and_add_chromosome(density_data).data_df
-        density_data['end'] = density_data['start'] + self.config.density_track_step
         self.logger.debug(f"Converting density to bigwig")
-        self.writer.df_to_bigwig(
+        self.writer.density_to_bw(
             density_data,
             density_path,
-            self.chrom_sizes,
-            col='normalized_density'
         )
         
 
@@ -534,31 +531,57 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self.logger.debug(
             f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
         )
-
-        chrom_fit = self.copy_with_params(SegmentalFit)
-        fit_res, per_window_trs, per_interval_params = chrom_fit.fit_params(
+        segments_fit = self.copy_with_params(SegmentalFit)
+        fit_res, per_window_trs, per_interval_params = segments_fit.fit_segments(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,
             fallback_fit_results=global_fit_params
         )
-        if self.config.save_debug:
-            df = pd.DataFrame({
-                'sliding_r': fit_res.r,
-                'sliding_p': fit_res.p,
-                'enough_bg': fit_res.enough_bg_mask,
-                'tr': per_window_trs,
-                'initial_tr': per_window_trs_global,
-                'bad': segmentation.annotate_with_segments(agg_cutcounts.shape, bad_segments),
-            })
-        else:
-            df = pd.DataFrame({
-                'sliding_r': fit_res.r,
-                'sliding_p': fit_res.p,
-                'enough_bg': fit_res.enough_bg_mask,
-                'tr': per_window_trs,
-            })
+        per_interval_params = segments_fit.add_fallback_fit_stats(
+            agg_cutcounts,
+            global_fit_params,
+            per_interval_params,
+        )
+
+        df = self.writer.fit_results_to_df(fit_res, per_window_trs)
         self.write_to_parquet(df, save_path, compression_level=0)
         
+        return ProcessorOutputData(self.chrom_name, per_interval_params)
+
+
+    @parallel_func_error_handler
+    @ensure_contig_exists
+    def refit_outlier_segments(
+        self,
+        cutcounts_path,
+        bad_segments_df: pd.DataFrame,
+        parquet_path: str
+    ) -> ProcessorOutputData:
+        bad_segments = bad_segments_df.query(f'chrom == "{self.chrom_name}" & fit_type == "segment"')
+        if bad_segments.empty:
+            raise NotEnoughDataForContig
+        chrom_fit = self.reader.fit_stats_df_to_fit_results(
+            bad_segments_df
+        )
+        agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
+            cutcounts_path,
+            self.gp.mappable_bases_file
+        )
+        segments_fit = self.copy_with_params(SegmentalFit)
+        fit_res, per_window_trs, per_interval_params = segments_fit.fit_segments(
+            agg_cutcounts=agg_cutcounts,
+            bad_segments=bad_segments,
+            fallback_fit_results=chrom_fit
+        )
+        old_fit_res = self.reader.extract_fit_params(parquet_path)
+        self.writer.update_fit_params(old_fit_res, fit_res)
+
+        old_per_window_trs = self.reader.extract_trs(parquet_path)
+        self.writer.update_per_window_trs(old_per_window_trs, per_window_trs, fit_results=fit_res)
+        
+        df = self.writer.fit_results_to_df(fit_res, per_window_trs)
+        self.write_to_parquet(df, parquet_path, compression_level=0)
+
         return ProcessorOutputData(self.chrom_name, per_interval_params)
 
 

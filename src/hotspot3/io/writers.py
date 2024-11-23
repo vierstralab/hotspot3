@@ -8,11 +8,12 @@ import subprocess
 
 from genome_tools.helpers import df_to_tabix
 
-from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
+from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig, WindowedFitResults
 
 from hotspot3.io import to_parquet_high_compression, convert_to_score
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io.colors import get_bb_color
+from hotspot3.signal_smoothing import normalize_density
 
 
 class ChromWriter(WithLoggerAndInterval):
@@ -42,17 +43,52 @@ class ChromWriter(WithLoggerAndInterval):
             if os.path.exists(res_path):
                 shutil.rmtree(res_path)
             shutil.move(os.path.join(temp_path, f'chrom={chrom_name}'), path)
+    
+    def fit_results_to_df(self, fit_results: WindowedFitResults, per_window_trs: np.ndarray):
+        return pd.DataFrame({
+            'sliding_r': fit_results.r,
+            'sliding_p': fit_results.p,
+            'enough_bg': fit_results.enough_bg_mask,
+            'tr': per_window_trs,
+        })
+
+    def update_fit_params(self, fit_params: WindowedFitResults, fit_results: WindowedFitResults):
+        
+        fit_params.r = np.where(
+            fit_results.enough_bg_mask,
+            fit_results.r,
+            fit_params.r
+        )
+        fit_params.p = np.where(
+            fit_results.enough_bg_mask,
+            fit_results.p,
+            fit_params.p
+        )
+        fit_params.enough_bg_mask = np.where(
+            fit_results.enough_bg_mask,
+            fit_results.enough_bg_mask,
+            fit_params.enough_bg_mask
+        )
+        return fit_params
+
+    def update_per_window_trs(self, initial_trs: np.ndarray, trs: np.ndarray, fit_results: WindowedFitResults):
+        initial_trs[fit_results.enough_bg_mask] = trs[fit_results.enough_bg_mask]
+        return initial_trs
+
 
 
 class GenomeWriter(WithLogger):
 
+    def __init__(self, *args, chrom_sizes, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.chrom_sizes = chrom_sizes
 
     bed12_columns = ['chrom', 'start', 'end', 'id', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb', 'blockCount', 'blockSizes', 'blockStarts']
 
 
-    def df_to_bigwig(self, df: pd.DataFrame, outpath, chrom_sizes: dict, col='value'):
+    def df_to_bigwig(self, df: pd.DataFrame, outpath, col='value'):
         with pyBigWig.open(outpath, 'w') as bw:
-            bw.addHeader(list(chrom_sizes.items()))
+            bw.addHeader(list(self.chrom_sizes.items()))
             chroms = df['chrom'].to_list()
             starts = df['start'].to_list()
             ends = df['end'].to_list()
@@ -71,6 +107,46 @@ class GenomeWriter(WithLogger):
     
     def df_to_tabix(self, df, outpath):
         df_to_tabix(df, outpath)
+    
+
+    def thresholds_df_to_bw(self, thresholds: pd.DataFrame, save_path, total_cutcounts):
+        thresholds['end'] = thresholds['start'] + self.config.bg_track_step
+        thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
+        self.df_to_bigwig(
+            thresholds,
+            save_path,
+            col='tr'
+        )
+
+    def density_to_bw(self, density_data: pd.DataFrame, save_path):
+        density_data['end'] = density_data['start'] + self.config.density_track_step
+        self.logger.debug(f"Converting density to bigwig")
+        self.df_to_bigwig(
+            density_data,
+            save_path,
+            col='normalized_density'
+        )
+
+    def fit_stats_to_tabix_and_bw(
+            self,
+            fit_stats: pd.DataFrame,
+            outpath,
+            outpath_bw,
+            total_cutcounts,
+        ):
+        self.df_to_tabix(fit_stats, outpath)
+
+        fit_stats = fit_stats.query('fit_type == "segment"')[['chrom', 'start', 'end', 'background']]
+        fit_stats['background'] = normalize_density(
+            fit_stats['background'],
+            total_cutcounts
+        )
+
+        self.df_to_bigwig(
+            fit_stats,
+            outpath_bw,
+            col='background'
+        )
     
     def save_cutcounts(self, total_cutcounts, total_cutcounts_path):
         np.savetxt(total_cutcounts_path, [total_cutcounts], fmt='%d')

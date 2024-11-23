@@ -20,12 +20,17 @@ class SignalToNoiseFit(WithLogger):
         )
         is_segment_fit = fit_data['fit_type'] == 'segment'
 
-        bg_mean = fit_data[is_segment_fit].eval('log(r * p / (1 - p))').values[:, None]
-        mean = fit_data[is_segment_fit].eval('log(mean)').values
+        total_reads_background = fit_data[is_segment_fit].eval(
+            'r * p / (1 - p) * (n_total - n_signal)'
+        ).values[:, None]
+        total_reads = fit_data[is_segment_fit].eval('mean * n_total').values
         length = fit_data[is_segment_fit].eval('end - start').values
 
-
-        regression_results = self._fit(bg_mean, mean, length)
+        regression_results = self._fit(
+            total_reads_background,
+            total_reads,
+            length
+        )
 
         fit_data.loc[is_segment_fit, 'outlier_distance'] = regression_results.outlier_distance
         fit_data.loc[is_segment_fit, 'is_inlier'] = regression_results.inliers_mask
@@ -36,6 +41,9 @@ class SignalToNoiseFit(WithLogger):
         return fit_data
     
     def _fit(self, x, y_true, sample_weight):
+        x = np.log(x)
+        y_true = np.log(y_true)
+
         model = RANSACRegressor(random_state=0)
         model.fit(x, y_true, sample_weight=sample_weight)
 
@@ -60,3 +68,6 @@ class SignalToNoiseFit(WithLogger):
         outlier_distance = y_true - y_pred / inlier_std
 
         return RegressionResults(slope, intercept, r2, inliers_mask, outlier_distance)
+
+    def find_outliers(self, fit_data: pd.DataFrame) -> np.ndarray:
+        return fit_data.eval(f'outlier_distance >= {self.config.outlier_distance_threshold} & fit_type == "segment"').values

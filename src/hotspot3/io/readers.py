@@ -5,7 +5,7 @@ import pandas as pd
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 from genome_tools import GenomicInterval
 
-from hotspot3.models import NotEnoughDataForContig, WindowedFitResults
+from hotspot3.models import NotEnoughDataForContig, WindowedFitResults, FitResults
 from hotspot3.config import ProcessorConfig
 
 from hotspot3.connectors.bottleneck import BottleneckWrapper
@@ -93,6 +93,27 @@ class ChromReader(WithLoggerAndInterval):
             fit_params['sliding_r'].values,
             fit_params['enough_bg'].values
         )
+
+    def extract_trs(self, fit_params_parquet) -> np.ndarray:
+        trs = self.extract_from_parquet(
+            fit_params_parquet,
+            columns=['tr']
+        )
+        return trs['tr'].values
+
+    def read_and_update_fit_params(self, fit_params_parquet, fit_results: FitResults):
+        fit_params = self.extract_fit_params(fit_params_parquet)
+        fit_results.p[fit_params.enough_bg_mask] = fit_params.p[fit_params.enough_bg_mask]
+        fit_results.r[fit_params.enough_bg_mask] = fit_params.r[fit_params.enough_bg_mask]
+        return fit_results
+
+    
+    def fit_stats_df_to_fit_results(self, df: pd.DataFrame):
+        chrom_fit = df.query(f'chrom == "{self.chrom_name}" & fit_type == "global"')
+        assert len(chrom_fit) == 1, f"Expected one global fit for {self.chrom_name}, got {len(chrom_fit)}"
+        chrom_fit = chrom_fit.iloc[0][['p', 'r', 'rmsea', 'fit_quantile', 'fit_threshold']].to_dict()
+
+        return FitResults(**chrom_fit)
     
     def extract_fit_threholds(self, fit_params_parquet):
         threholds = self.extract_from_parquet(

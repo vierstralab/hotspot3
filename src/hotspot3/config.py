@@ -60,7 +60,9 @@ class ProcessorConfig:
     babachi_min_segment_size: int = 50001 # same as bg_window, can be changed
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 20
-    
+
+    # segment with higher std considered to be an outlier and will be refitted
+    outlier_distance_threshold: float = 5 # in standard deviations
 
     # FDR correction
     fdr_method: str = 'bh'
