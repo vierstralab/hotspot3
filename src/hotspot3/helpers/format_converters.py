@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from hotspot3.helpers.models import FitResults
+from hotspot3.helpers.models import FitResults, WindowedFitResults
 from hotspot3.helpers.colors import get_bb_color
 from hotspot3.helpers.stats import mean_from_r_p
 
@@ -46,6 +46,13 @@ def convert_fit_results_to_series(
         'success_fit': success_fit
     })
 
+def fit_results_to_df(fit_results: WindowedFitResults, per_window_trs: np.ndarray):
+    return pd.DataFrame({
+        'sliding_r': fit_results.r,
+        'sliding_p': fit_results.p,
+        'enough_bg': fit_results.enough_bg_mask,
+        'tr': per_window_trs,
+    })
 
 def peaks_to_bed12(peaks_df, fdr_tr):
     """

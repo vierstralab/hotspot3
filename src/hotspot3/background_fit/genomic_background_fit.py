@@ -54,8 +54,8 @@ class SegmentalFit(WithLoggerAndInterval):
                     total = uq * cts
                     valid_cts = uq[np.cumsum(total) / (total).sum() >= min_bg_tag_proportion]
                     if valid_cts.size == 0:
-                        self.logger.warning(f"{segment_interval.to_ucsc()}: Not enough background data")
-                        raise NotEnoughDataForContig
+                        self.logger.critical(f"{segment_interval.to_ucsc()}: Not enough background data")
+                        raise ValueError
                     min_quantile = g_fit.get_bg_quantile_from_tr(signal_at_segment, valid_cts[0])
                     g_fit.config.min_background_prop = min_quantile
 

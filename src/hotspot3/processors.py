@@ -10,7 +10,7 @@ from genome_tools.genomic_interval import GenomicInterval, df_to_genomic_interva
 from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig
 from hotspot3.helpers.utils import is_iterable, ensure_contig_exists
 from hotspot3.helpers.stats import upper_bg_quantile
-from hotspot3.helpers.format_converters import fit_stats_df_to_fallback_fit_results, peaks_to_bed12, hotspots_to_bed12
+from hotspot3.helpers.format_converters import fit_stats_df_to_fallback_fit_results, peaks_to_bed12, hotspots_to_bed12, fit_results_to_df
 
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io.readers import ChromReader, GenomeReader
@@ -295,6 +295,8 @@ class GenomeProcessor(WithLogger):
                 ProcessorOutputData(x[0], x[1]) 
                 for x in outlier_params.groupby('chrom', observed=True)
             ]
+            tmp_new_path = f"{save_path}.new"
+            self.writer.sanitize_path(tmp_new_path)
 
             refit_params = self.parallel_by_chromosome(
                 ChromosomeProcessor.refit_outlier_segments,
@@ -302,7 +304,10 @@ class GenomeProcessor(WithLogger):
                 bad_segments,
                 min_bg_tag_proportion,
                 save_path,
+                tmp_new_path
             )
+            self.writer.merge_partitioned_parquets(save_path, tmp_new_path)
+            
             refit_params = self.merge_and_add_chromosome(refit_params).data_df
             per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values      
 
@@ -555,7 +560,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             per_interval_params,
         )
 
-        df = self.writer.fit_results_to_df(fit_res, per_window_trs)
+        df = fit_results_to_df(fit_res, per_window_trs)
         self.write_to_parquet(df, save_path, compression_level=0)
         
         return ProcessorOutputData(self.chrom_name, per_interval_params)
@@ -568,7 +573,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         cutcounts_path,
         bad_segments: ProcessorOutputData,
         min_bg_tag_proportion: float,
-        parquet_path: str
+        parquet_path: str,
+        tmp_parquet_path: str
     ) -> ProcessorOutputData:
         if bad_segments is None:
             raise NotEnoughDataForContig
@@ -596,8 +602,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         old_per_window_trs = self.reader.extract_trs(parquet_path)
         self.writer.update_per_window_trs(old_per_window_trs, per_window_trs, fit_results=fit_res)
         
-        df = self.writer.fit_results_to_df(fit_res, per_window_trs)
-        self.write_to_parquet(df, parquet_path, compression_level=0)
+        df = fit_results_to_df(fit_res, per_window_trs)
+        self.write_to_parquet(df, tmp_parquet_path, compression_level=0)
 
         return ProcessorOutputData(self.chrom_name, per_interval_params)
 

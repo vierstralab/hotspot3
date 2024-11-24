@@ -40,16 +40,11 @@ class ChromWriter(WithLoggerAndInterval):
             )
             res_path = os.path.join(path, f'chrom={chrom_name}')
             if os.path.exists(res_path):
+                # mv_path = f'{temp_dir}/old'
+                # shutil.move(res_path, mv_path)
+                # shutil.rmtree(mv_path)
                 shutil.rmtree(res_path)
             shutil.move(os.path.join(temp_path, f'chrom={chrom_name}'), path)
-    
-    def fit_results_to_df(self, fit_results: WindowedFitResults, per_window_trs: np.ndarray):
-        return pd.DataFrame({
-            'sliding_r': fit_results.r,
-            'sliding_p': fit_results.p,
-            'enough_bg': fit_results.enough_bg_mask,
-            'tr': per_window_trs,
-        })
 
     def update_fit_params(self, fit_params: WindowedFitResults, fit_results: WindowedFitResults):
         
@@ -73,7 +68,6 @@ class ChromWriter(WithLoggerAndInterval):
     def update_per_window_trs(self, initial_trs: np.ndarray, trs: np.ndarray, fit_results: WindowedFitResults):
         initial_trs[fit_results.enough_bg_mask] = trs[fit_results.enough_bg_mask]
         return initial_trs
-
 
 
 class GenomeWriter(WithLogger):
@@ -155,3 +149,12 @@ class GenomeWriter(WithLogger):
                 subprocess.run(["bedToBigBed", temp_sorted_bed.name, chrom_sizes, outpath], check=True)
             except subprocess.CalledProcessError as e:
                 self.logger.warning(f"Error converting to BigBed: {e}")
+
+    def merge_partitioned_parquets(self, parquet_old, parquet_new):
+        for file in os.listdir(parquet_old):
+            new_path = os.path.join(parquet_new, file)
+            if not os.path.exists(new_path):
+                shutil.move(os.path.join(parquet_old, file), new_path)
+        
+        shutil.rmtree(parquet_old)
+        shutil.move(parquet_new, parquet_old)
