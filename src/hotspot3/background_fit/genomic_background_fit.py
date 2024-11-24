@@ -67,14 +67,6 @@ class SegmentalFit(WithLoggerAndInterval):
                 success_fit = True
             except NotEnoughDataForContig:
                 segment_fit_results = fallback_fit_results
-                if min_bg_tag_proportion is not None:
-                    self.logger.warning(f"{segment_interval.to_ucsc()}: Chromosome fit produces outliers. Fitting all the data")
-                    segment_fit_results = g_fit.fit_for_tr(
-                        signal_at_segment,
-                        np.inf
-                    )
-                    segment_fit_results.n_signal = 0
-                    segment_fit_results.n_total = signal_at_segment.count()
                 success_fit = False
             
             fit_series = convert_fit_results_to_series(
