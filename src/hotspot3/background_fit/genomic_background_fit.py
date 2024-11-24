@@ -101,8 +101,9 @@ class SegmentalFit(WithLoggerAndInterval):
         Workaround func to avoid future warnings about setting bool values to float (default) columns
         Initially sets value of first row to every row in the DataFrame
         """
-        if np.any(~fit_series.index.isin(intervals_stats.columns)):
-            for col in fit_series.index:
+        added_cols = fit_series.index.isin(intervals_stats.columns)
+        if np.any(~added_cols):
+            for col in fit_series.index[added_cols]:
                 intervals_stats[col] = fit_series[col]
 
     def add_fallback_fit_stats(
