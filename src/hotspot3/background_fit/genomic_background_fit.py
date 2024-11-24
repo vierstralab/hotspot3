@@ -12,7 +12,6 @@ from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDat
 from hotspot3.helpers.format_converters import convert_fit_results_to_series
 from hotspot3.background_fit import check_valid_fit
 from hotspot3.helpers.utils import interpolate_nan
-from hotspot3.helpers.stats import mean_from_r_p
 
 
 class SegmentalFit(WithLoggerAndInterval):
@@ -49,17 +48,17 @@ class SegmentalFit(WithLoggerAndInterval):
                 GlobalBackgroundFit,
                 name=segment_interval.to_ucsc()
             )
-            if min_bg_tag_proportion is not None:
-                uq, cts = np.unique(signal_at_segment, return_counts=True)
-                total = uq * cts
-                valid_cts = uq[np.cumsum(total) / (total).sum() >= min_bg_tag_proportion]
-                if valid_cts.size == 0:
-                    self.logger.warning(f"{segment_interval.to_ucsc()}: Not enough background data")
-                    raise NotEnoughDataForContig
-                min_quantile = g_fit.get_bg_quantile_from_tr(signal_at_segment, valid_cts[0])
-                g_fit.config.min_background_prop = min_quantile
-
             try:
+                if min_bg_tag_proportion is not None:
+                    uq, cts = np.unique(signal_at_segment, return_counts=True)
+                    total = uq * cts
+                    valid_cts = uq[np.cumsum(total) / (total).sum() >= min_bg_tag_proportion]
+                    if valid_cts.size == 0:
+                        self.logger.warning(f"{segment_interval.to_ucsc()}: Not enough background data")
+                        raise NotEnoughDataForContig
+                    min_quantile = g_fit.get_bg_quantile_from_tr(signal_at_segment, valid_cts[0])
+                    g_fit.config.min_background_prop = min_quantile
+
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
                     step=self.get_optimal_segment_step(total_len, len(segment_interval)),
@@ -68,6 +67,14 @@ class SegmentalFit(WithLoggerAndInterval):
                 success_fit = True
             except NotEnoughDataForContig:
                 segment_fit_results = fallback_fit_results
+                if min_bg_tag_proportion is not None:
+                    self.logger.warning(f"{segment_interval.to_ucsc()}: Chromosome fit produces outliers. Fitting all the data")
+                    segment_fit_results = g_fit.fit_for_tr(
+                        signal_at_segment,
+                        np.inf
+                    )
+                    segment_fit_results.n_signal = 0
+                    segment_fit_results.n_total = signal_at_segment.count()
                 success_fit = False
             
             fit_series = convert_fit_results_to_series(
