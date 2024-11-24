@@ -191,17 +191,22 @@ class GlobalBackgroundFit(BackgroundFit):
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
         """     
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
-        result = self.fit_all_thresholds(data_for_fit, None)
+        result = self.fit_all_thresholds(data_for_fit)
         if len(result) == 0:
-            raise NotEnoughDataForContig
-        
-        best_fit_result = min(result, key=lambda x: x.rmsea)
+            best_fit_result = self.fit_for_tr(
+                data_for_fit,
+                np.inf
+            )
+            if not check_valid_fit(best_fit_result):
+                raise NotEnoughDataForContig
+        else:
+            best_fit_result = min(result, key=lambda x: x.rmsea)
+            best_fit_result = self.fallback_suspicious_fit(
+                data_for_fit,
+                best_fit_result,
+                fallback_fit_results
+            )
 
-        best_fit_result = self.fallback_suspicious_fit(
-            data_for_fit,
-            best_fit_result,
-            fallback_fit_results
-        )
         best_fit_result.n_total = agg_cutcounts.count()
         best_fit_result.n_signal = self.get_signal_mask_for_tr(
             agg_cutcounts,
@@ -216,7 +221,6 @@ class GlobalBackgroundFit(BackgroundFit):
             best_fit_result: FitResults,
             fallback_fit_results: FitResults
         ):
-
         if not check_valid_fit(best_fit_result) and fallback_fit_results is not None:
             result = self.fit_all_thresholds(
                 data_for_fit,
