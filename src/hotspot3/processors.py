@@ -570,7 +570,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         if segments.empty:
             raise NotEnoughDataForContig
         chrom_fit = self.reader.fit_stats_df_to_fallback_fit_results(
-            bad_segments.data_df.query(f'fit_type == "global"')
+            bad_segments.data_df
         )
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
             cutcounts_path,
