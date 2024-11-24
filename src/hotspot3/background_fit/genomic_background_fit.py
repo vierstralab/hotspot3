@@ -12,6 +12,7 @@ from hotspot3.models import FitResults, WindowedFitResults, NotEnoughDataForCont
 
 from hotspot3.background_fit import check_valid_fit
 from hotspot3.utils import interpolate_nan
+from hotspot3.stats import mean_from_r_p
 
 
 class SegmentalFit(WithLoggerAndInterval):
@@ -24,7 +25,8 @@ class SegmentalFit(WithLoggerAndInterval):
             self,
             agg_cutcounts: ma.MaskedArray,
             bad_segments: List[GenomicInterval],
-            fallback_fit_results: FitResults
+            fallback_fit_results: FitResults,
+            min_bg_tag_proportion: float=None
         ):
         total_len = agg_cutcounts.count()
         fit_res = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
@@ -44,11 +46,20 @@ class SegmentalFit(WithLoggerAndInterval):
                 agg_cutcounts,
                 segment_interval
             )
-
             g_fit = self.copy_with_params(
                 GlobalBackgroundFit,
                 name=segment_interval.to_ucsc()
             )
+            if min_bg_tag_proportion is not None:
+                uq, cts = np.unique(signal_at_segment, return_counts=True)
+                total = uq * cts
+                valid_cts = uq[np.cumsum(total) / (total).sum() >= min_bg_tag_proportion]
+                if valid_cts.size == 0:
+                    self.logger.warning(f"{segment_interval.to_ucsc()}: Not enough background data")
+                    raise NotEnoughDataForContig
+                min_quantile = g_fit.get_bg_quantile_from_tr(signal_at_segment, valid_cts[0])
+                g_fit.config.min_background_prop = min_quantile
+
             try:
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
@@ -90,7 +101,9 @@ class SegmentalFit(WithLoggerAndInterval):
             fallback_fit_results: FitResults,
             segment_stats: pd.DataFrame
         ):
-        intervals_stats = genomic_intervals_to_df(self.genomic_interval).drop(columns=['chrom', 'name'])
+        intervals_stats = genomic_intervals_to_df(self.genomic_interval).drop(
+            columns=['chrom', 'name']
+        )
         fit_series = self.convert_fit_results_to_series(
             fallback_fit_results,
             agg_cutcounts.compressed().mean(),
@@ -116,14 +129,15 @@ class SegmentalFit(WithLoggerAndInterval):
             success_fit: bool
         ) -> pd.Series:
         return pd.Series({
-            'r': fit_results.r,
-            'p': fit_results.p,
+            'r_bg': fit_results.r,
+            'p_bg': fit_results.p,
             'rmsea': fit_results.rmsea,
             'signal_tr': fit_results.fit_threshold,
             'quantile_tr': fit_results.fit_quantile,
-            'total_bases': fit_results.n_total,
-            'signal_bases': fit_results.n_signal,
-            'mean': mean,
+            'bases_total': fit_results.n_total,
+            'bases_bg': fit_results.n_total - fit_results.n_signal,
+            'mean_total': mean,
+            'mean_bg': mean_from_r_p(fit_results.r, fit_results.p),
             'fit_type': fit_type,
             'success_fit': success_fit
         })

@@ -31,10 +31,10 @@ class DataForFit:
 
 
 @dataclasses.dataclass
-class RegressionResults:
-    slope: float
-    intercept: float
+class SPOTEstimationResults:
+    spot_score: float
     r2: float
+    r2_total: float
     inliers_mask: np.ndarray
     outlier_distance: np.ndarray
 

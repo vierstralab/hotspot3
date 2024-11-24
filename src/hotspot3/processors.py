@@ -277,18 +277,25 @@ class GenomeProcessor(WithLogger):
             cutcounts_file,
             save_path,
         )
+        per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
 
         sn_fit = self.copy_with_params(SignalToNoiseFit)
-        per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
-        per_region_params = sn_fit.fit(per_region_params)
+        per_region_params, spot_results = sn_fit.fit(per_region_params)
+        
         is_outlier_segment = sn_fit.find_outliers(per_region_params)
         per_region_params['refit_with_constraint'] = is_outlier_segment
         if is_outlier_segment.sum() > 0:
-            self.logger.info(f"Found {is_outlier_segment.sum()} outlier segments. Refitting again with approximated signal/noise constraint.")
+            self.logger.info(f"Found {is_outlier_segment.sum()} outlier segments. Refitting again with approximated signal/noise constraint. SPOT_score={spot_results.spot_score:.3f}")
+            outlier_params = per_region_params[
+                is_outlier_segment | (per_region_params['fit_type'] == 'global')
+            ]
+            min_bg_tag_proportion = (1 - spot_results.spot_score) / self.config.outlier_segment_threshold
+
             refit_params = self.parallel_by_chromosome(
                 ChromosomeProcessor.refit_outlier_segments,
                 cutcounts_file,
-                per_region_params.loc[is_outlier_segment],
+                [ProcessorOutputData(x[0], x[1]) for x in outlier_params.groupby('chrom')],
+                min_bg_tag_proportion,
                 save_path,
             )
             refit_params = self.merge_and_add_chromosome(refit_params).data_df
@@ -554,14 +561,15 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     def refit_outlier_segments(
         self,
         cutcounts_path,
-        bad_segments_df: pd.DataFrame,
+        bad_segments: ProcessorOutputData,
+        min_bg_tag_proportion: float,
         parquet_path: str
     ) -> ProcessorOutputData:
-        bad_segments = bad_segments_df.query(f'chrom == "{self.chrom_name}" & fit_type == "segment"')
-        if bad_segments.empty:
+        segments = bad_segments.data_df.query(f'fit_type == "segment"')
+        if segments.empty:
             raise NotEnoughDataForContig
         chrom_fit = self.reader.fit_stats_df_to_fit_results(
-            bad_segments_df
+            bad_segments.data_df.query(f'fit_type == "global"')
         )
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
             cutcounts_path,
@@ -570,8 +578,9 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         segments_fit = self.copy_with_params(SegmentalFit)
         fit_res, per_window_trs, per_interval_params = segments_fit.fit_segments(
             agg_cutcounts=agg_cutcounts,
-            bad_segments=bad_segments,
-            fallback_fit_results=chrom_fit
+            bad_segments=segments,
+            fallback_fit_results=chrom_fit,
+            min_bg_tag_proportion=min_bg_tag_proportion
         )
         old_fit_res = self.reader.extract_fit_params(parquet_path)
         self.writer.update_fit_params(old_fit_res, fit_res)
