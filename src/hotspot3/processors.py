@@ -291,10 +291,15 @@ class GenomeProcessor(WithLogger):
             ]
             min_bg_tag_proportion = (1 - spot_results.spot_score) / self.config.outlier_segment_threshold
 
+            bad_segments = [
+                ProcessorOutputData(x[0], x[1]) 
+                for x in outlier_params.groupby('chrom', observed=True)
+            ]
+
             refit_params = self.parallel_by_chromosome(
                 ChromosomeProcessor.refit_outlier_segments,
                 cutcounts_file,
-                [ProcessorOutputData(x[0], x[1]) for x in outlier_params.groupby('chrom')],
+                bad_segments,
                 min_bg_tag_proportion,
                 save_path,
             )
