@@ -102,9 +102,6 @@ class SegmentalFit(WithLoggerAndInterval):
         Initially sets value of first row to every row in the DataFrame
         """
         if np.any(~fit_series.index.isin(intervals_stats.columns)):
-            print('Reindex')
-            new_columns = intervals_stats.columns.union(fit_series.index)
-            intervals_stats = intervals_stats.reindex(columns=new_columns)
             for col in fit_series.index:
                 intervals_stats[col] = fit_series[col]
 
