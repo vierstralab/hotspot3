@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Iterable, List, cast
 import functools
 
-from genome_tools.genomic_interval import GenomicInterval
+from genome_tools.genomic_interval import GenomicInterval, df_to_genomic_intervals
 
 from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig
 from hotspot3.helpers.utils import is_iterable, ensure_contig_exists
@@ -569,6 +569,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         segments = bad_segments.data_df.query(f'fit_type == "segment"')
         if segments.empty:
             raise NotEnoughDataForContig
+        segments = df_to_genomic_intervals(segments, extra_columns=['BAD'])
         chrom_fit = fit_stats_df_to_fallback_fit_results(
             bad_segments.data_df
         )
