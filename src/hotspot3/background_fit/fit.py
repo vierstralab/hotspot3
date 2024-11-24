@@ -198,7 +198,7 @@ class GlobalBackgroundFit(BackgroundFit):
         """     
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
         result = self.fit_all_thresholds(data_for_fit)
-        if len(result) == 0:
+        if len(result) == 0: # No valid fits => fit all data
             best_fit_result = self.fit_for_tr(
                 data_for_fit,
                 np.inf

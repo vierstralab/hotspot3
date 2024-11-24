@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from hotspot3.helpers.models import FitResults, WindowedFitResults
+from hotspot3.helpers.models import FitResults, WindowedFitResults, SPOTEstimationData
 from hotspot3.helpers.colors import get_bb_color
 from hotspot3.helpers.stats import mean_from_r_p
 
@@ -13,18 +13,30 @@ def fit_stats_df_to_fallback_fit_results(df: pd.DataFrame):
     chrom_fit = df.query(f'fit_type == "global"')
     assert len(chrom_fit) == 1, f"Expected one global fit, got {len(chrom_fit)}"
     chrom_fit = chrom_fit[
-        ['p_bg', 'r_bg', 'rmsea', 'quantile_tr', 'signal_tr']
+        ['bg_p', 'bg_r', 'rmsea', 'bg_bases_prop', 'bg_tr']
     ].iloc[0].rename(
         {
-            'p_bg': 'p',
-            'r_bg': 'r',
-            'quantile_tr': 'fit_quantile',
-            'signal_tr': 'fit_threshold'
+            'bg_p': 'p',
+            'bg_r': 'r',
+            'bg_bases_prop': 'fit_quantile',
+            'bg_tr': 'fit_threshold'
         }
     ).to_dict()
 
     return FitResults(**chrom_fit)
 
+
+def get_spot_score_fit_data(fit_data: pd.DataFrame):
+    total_tags_background = fit_data.eval(
+        'bg_tags_mean * bg_bases'
+    ).values
+    total_tags = fit_data.eval('mappable_tags_mean * mappable_bases').values
+    weight = fit_data['mappable_bases'].values
+    return SPOTEstimationData(
+        total_tags=total_tags,
+        total_tags_background=total_tags_background,
+        weight=weight
+    )
 
 def convert_fit_results_to_series(
         fit_results: FitResults,

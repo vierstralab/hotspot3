@@ -29,14 +29,19 @@ class DataForFit:
     agg_cutcounts: np.ndarray
     max_counts_with_flanks: np.ndarray
 
+@dataclasses.dataclass
+class SPOTEstimationData:
+    total_tags: np.ndarray
+    total_tags_background: np.ndarray
+    weight: np.ndarray
 
 @dataclasses.dataclass
 class SPOTEstimationResults:
     spot_score: float
-    r2: float
-    r2_total: float
+    spot_score_std: float
     inliers_mask: np.ndarray
     outlier_distance: np.ndarray
+    segment_spots: np.ndarray
 
 
 @dataclasses.dataclass

@@ -40,9 +40,6 @@ class ChromWriter(WithLoggerAndInterval):
             )
             res_path = os.path.join(path, f'chrom={chrom_name}')
             if os.path.exists(res_path):
-                # mv_path = f'{temp_dir}/old'
-                # shutil.move(res_path, mv_path)
-                # shutil.rmtree(mv_path)
                 shutil.rmtree(res_path)
             shutil.move(os.path.join(temp_path, f'chrom={chrom_name}'), path)
 
@@ -118,7 +115,7 @@ class GenomeWriter(WithLogger):
             col='normalized_density'
         )
 
-    def fit_stats_to_tabix_and_bw(
+    def fit_stats_to_bw(
             self,
             fit_stats: pd.DataFrame,
             outpath,
@@ -127,7 +124,9 @@ class GenomeWriter(WithLogger):
         ):
         self.df_to_tabix(fit_stats, outpath)
 
-        fit_stats = fit_stats.query('fit_type == "segment"')[['chrom', 'start', 'end', 'background']]
+        fit_stats = fit_stats.query('fit_type == "segment"')[
+            ['chrom', 'start', 'end', 'background']
+        ]
         fit_stats['background'] = normalize_density(
             fit_stats['background'],
             total_cutcounts
@@ -156,5 +155,8 @@ class GenomeWriter(WithLogger):
             if not os.path.exists(new_path):
                 shutil.move(os.path.join(parquet_old, file), new_path)
         
-        shutil.rmtree(parquet_old)
+        if self.config.save_debug:
+            shutil.move(parquet_old, f"{parquet_old}.old")
+        else:
+            shutil.rmtree(parquet_old)
         shutil.move(parquet_new, parquet_old)

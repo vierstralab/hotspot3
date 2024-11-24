@@ -65,10 +65,23 @@ class SegmentalFit(WithLoggerAndInterval):
                     fallback_fit_results=fallback_fit_results
                 )
                 success_fit = True
+
+                fit_res = self.fit_segment_params(
+                    signal_at_segment,
+                    segment_fit_results.fit_threshold,
+                    fallback_fit_results=segment_fit_results,
+                    genomic_interval=segment_interval
+                )
             except NotEnoughDataForContig:
-                segment_fit_results = fallback_fit_results
+                segment_fit_results = FitResults()
+                fit_res = WindowedFitResults(
+                    p=np.full(signal_at_segment.shape[0], np.nan, dtype=np.float16),
+                    r=np.full(signal_at_segment.shape[0], np.nan, dtype=np.float16),
+                    enough_bg_mask=np.zeros(signal_at_segment.shape[0], dtype=bool)
+                )
                 success_fit = False
             
+            # TODO wrap in a function
             fit_series = convert_fit_results_to_series(
                 segment_fit_results,
                 signal_at_segment.compressed().mean(),
@@ -76,20 +89,12 @@ class SegmentalFit(WithLoggerAndInterval):
                 success_fit=success_fit
             )
             self.set_dtype(intervals_stats, fit_series)
-
             intervals_stats.loc[i, fit_series.index] = fit_series
-
-            fit_res = self.fit_segment_params(
-                signal_at_segment,
-                segment_fit_results.fit_threshold,
-                fallback_fit_results=segment_fit_results,
-                genomic_interval=segment_interval
-            )
+            ###
 
             windowed_fit_results.r[start:end] = fit_res.r
             windowed_fit_results.p[start:end] = fit_res.p
             windowed_fit_results.enough_bg_mask[start:end] = fit_res.enough_bg_mask
-
             per_window_trs[start:end] = segment_fit_results.fit_threshold
         
         return windowed_fit_results, per_window_trs, intervals_stats
