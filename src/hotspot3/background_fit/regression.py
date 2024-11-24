@@ -33,8 +33,8 @@ class SignalToNoiseFit(WithLogger):
 
         fit_data.loc[is_segment_fit, 'outlier_distance'] = spot_results.outlier_distance
         fit_data.loc[is_segment_fit, 'is_inlier'] = spot_results.inliers_mask
-        fit_data['fit_r2'] = spot_results.r2
-        fit_data['fit_r2_total'] = spot_results.r2_total
+        fit_data['r2_inliers'] = spot_results.r2
+        fit_data['r2_total'] = spot_results.r2_total
         fit_data['SPOT'] = spot_results.spot_score
         return fit_data, spot_results
     
