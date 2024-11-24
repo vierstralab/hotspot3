@@ -38,7 +38,7 @@ class SegmentalFit(WithLoggerAndInterval):
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
 
         intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
-        for i, segment_interval in enumerate(bad_segments, 1):
+        for i, segment_interval in enumerate(bad_segments):
             start = int(segment_interval.start)
             end = int(segment_interval.end)        
             signal_at_segment = self.filter_signal_to_segment(
