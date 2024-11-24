@@ -157,7 +157,7 @@ class GenomeReader(WithLogger):
 
     def read_chrom_sizes(self, chrom_sizes):
         return pd.read_table(
-            self.get_chrom_sizes_file(self, chrom_sizes),
+            self.get_chrom_sizes_file(chrom_sizes),
             header=None,
             names=['chrom', 'size']
         ).set_index('chrom')['size'].to_dict()
