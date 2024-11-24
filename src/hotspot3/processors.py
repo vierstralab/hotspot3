@@ -570,6 +570,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         min_bg_tag_proportion: float,
         parquet_path: str
     ) -> ProcessorOutputData:
+        if bad_segments is None:
+            raise NotEnoughDataForContig
         segments = bad_segments.data_df.query(f'fit_type == "segment"')
         if segments.empty:
             raise NotEnoughDataForContig
