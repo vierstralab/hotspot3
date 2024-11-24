@@ -63,7 +63,7 @@ def peaks_to_bed12(peaks_df, fdr_tr):
     return peaks_df[bed12_columns]
 
 
-def hotspots_to_bed12(self, hotspots_df, fdr_tr, significant_stretches):
+def hotspots_to_bed12(hotspots_df, fdr_tr, significant_stretches):
     """
     Convert hotspots to bed9 format.
     """
