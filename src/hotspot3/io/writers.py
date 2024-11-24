@@ -156,7 +156,7 @@ class GenomeWriter(WithLogger):
                 shutil.move(os.path.join(parquet_old, file), new_path)
         
         if self.config.save_debug:
-            shutil.move(parquet_old, f"{parquet_old}.old")
+            shutil.move(parquet_old, f"{parquet_old}.iter1")
         else:
             shutil.rmtree(parquet_old)
         shutil.move(parquet_new, parquet_old)

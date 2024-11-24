@@ -285,7 +285,7 @@ class GenomeProcessor(WithLogger):
         is_outlier_segment = sn_fit.find_outliers(per_region_params)
         per_region_params['refit_with_constraint'] = is_outlier_segment
         if self.config.save_debug:
-            self.writer.df_to_tabix(per_region_params, per_region_stats_path + '.old')
+            self.writer.df_to_tabix(per_region_params, per_region_stats_path + '.iter1')
 
         if is_outlier_segment.sum() > 0:
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier segments. Refitting again with approximated signal/noise constraint. SPOT_score={spot_results.spot_score:.3f}")
@@ -298,7 +298,7 @@ class GenomeProcessor(WithLogger):
                 ProcessorOutputData(x[0], x[1]) 
                 for x in outlier_params.groupby('chrom', observed=True)
             ]
-            tmp_new_path = f"{save_path}.new"
+            tmp_new_path = f"{save_path}.iter2"
             self.writer.sanitize_path(tmp_new_path)
 
             refit_params = self.parallel_by_chromosome(
