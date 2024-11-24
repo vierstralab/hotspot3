@@ -99,13 +99,13 @@ class SegmentalFit(WithLoggerAndInterval):
     def set_dtype(self, intervals_stats: pd.DataFrame, fit_series: pd.Series):
         """
         Workaround func to avoid future warnings about setting bool values to float (default) columns
+        Initially sets value of first row to every row in the DataFrame
         """
         if np.any(~fit_series.index.isin(intervals_stats.columns)):
-            print('Reindexing')
             new_columns = intervals_stats.columns.union(fit_series.index)
             intervals_stats = intervals_stats.reindex(columns=new_columns)
             for col in fit_series.index:
-                intervals_stats[col] = pd.Series(pd.NA, dtype=fit_series[col].dtype)
+                intervals_stats[col] = fit_series[col]
 
     def add_fallback_fit_stats(
             self,
