@@ -38,7 +38,6 @@ class SegmentalFit(WithLoggerAndInterval):
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
 
         intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
-
         for i, segment_interval in enumerate(bad_segments, 1):
             start = int(segment_interval.start)
             end = int(segment_interval.end)        
@@ -77,6 +76,8 @@ class SegmentalFit(WithLoggerAndInterval):
                 fit_type='segment',
                 success_fit=success_fit
             )
+            self.set_dtype(intervals_stats, fit_series)
+
             intervals_stats.loc[i, fit_series.index] = fit_series
 
             fit_res = self.fit_segment_params(
@@ -94,6 +95,16 @@ class SegmentalFit(WithLoggerAndInterval):
         
         return windowed_fit_results, per_window_trs, intervals_stats
 
+
+    def set_dtype(self, intervals_stats: pd.DataFrame, fit_series: pd.Series):
+        """
+        Workaround func to avoid future warnings about setting bool values to float (default) columns
+        """
+        if np.any(~fit_series.index.isin(intervals_stats.columns)):
+            intervals_stats = intervals_stats.reindex(fit_series.index, axis=1)
+            for col in fit_series.index:
+                if col not in intervals_stats.columns:
+                    intervals_stats[col] = pd.Series(dtype=fit_series[col].dtype)
 
     def add_fallback_fit_stats(
             self,
