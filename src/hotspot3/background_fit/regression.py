@@ -25,9 +25,10 @@ class SignalToNoiseFit(WithLogger):
 
         fit_data.loc[is_segment_fit, 'outlier_distance'] = spot_results.outlier_distance
         fit_data.loc[is_segment_fit, 'is_inlier'] = spot_results.inliers_mask
+        fit_data.loc[is_segment_fit, 'segment_SPOT'] = spot_results.segment_spots
+
         fit_data['SPOT'] = spot_results.spot_score
         fit_data['SPOT_std'] = spot_results.spot_score_std
-        fit_data['segment_SPOT'] = spot_results.segment_spots
         return fit_data, spot_results
     
     def calc_outlier_distance(self, total_tags, total_tags_background, spot):
