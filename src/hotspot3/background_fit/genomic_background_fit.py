@@ -10,7 +10,7 @@ from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
 from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDataForContig
 from hotspot3.helpers.format_converters import convert_fit_results_to_series
-from hotspot3.background_fit import check_valid_fit
+from hotspot3.background_fit import check_valid_nb_params
 from hotspot3.helpers.utils import interpolate_nan
 
 
@@ -149,7 +149,7 @@ class SegmentalFit(WithLoggerAndInterval):
         )
 
         fit_res = w_fit.fit(signal_at_segment, per_window_trs=thresholds)
-        success_fits = check_valid_fit(fit_res) & fit_res.enough_bg_mask
+        success_fits = check_valid_nb_params(fit_res) & fit_res.enough_bg_mask
 
         need_global_fit = ~success_fits & fit_res.enough_bg_mask
         if np.any(need_global_fit):
@@ -176,7 +176,7 @@ class ChromosomeFit(WithLoggerAndInterval):
 
         g_fit = self.copy_with_params(GlobalBackgroundFit)
         global_fit_results = g_fit.fit(agg_cutcounts, step=step)
-        if not check_valid_fit(global_fit_results):
+        if not check_valid_nb_params(global_fit_results):
             raise NotEnoughDataForContig
         strided_fit = self.copy_with_params(StridedBackgroundFit)
         fit_threshold = strided_fit.find_thresholds_at_chrom_quantile(

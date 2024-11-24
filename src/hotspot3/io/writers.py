@@ -46,24 +46,24 @@ class ChromWriter(WithLoggerAndInterval):
                 shutil.rmtree(res_path)
             shutil.move(os.path.join(temp_path, f'chrom={chrom_name}'), path)
 
-    def update_fit_params(self, fit_params: WindowedFitResults, fit_results: WindowedFitResults):
+    def update_fit_params(self, old_fit_results: WindowedFitResults, fit_results: WindowedFitResults):
         
-        fit_params.r = np.where(
+        old_fit_results.r = np.where(
             fit_results.enough_bg_mask,
             fit_results.r,
-            fit_params.r
+            old_fit_results.r
         )
-        fit_params.p = np.where(
+        old_fit_results.p = np.where(
             fit_results.enough_bg_mask,
             fit_results.p,
-            fit_params.p
+            old_fit_results.p
         )
-        fit_params.enough_bg_mask = np.where(
+        old_fit_results.enough_bg_mask = np.where(
             fit_results.enough_bg_mask,
             fit_results.enough_bg_mask,
-            fit_params.enough_bg_mask
+            old_fit_results.enough_bg_mask
         )
-        return fit_params
+        return old_fit_results
 
     def update_per_window_trs(self, initial_trs: np.ndarray, trs: np.ndarray, fit_results: WindowedFitResults):
         initial_trs[fit_results.enough_bg_mask] = trs[fit_results.enough_bg_mask]

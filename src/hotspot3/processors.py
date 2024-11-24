@@ -597,12 +597,16 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             min_bg_tag_proportion=min_bg_tag_proportion
         )
         old_fit_res = self.reader.extract_fit_params(parquet_path)
-        self.writer.update_fit_params(old_fit_res, fit_res)
+        old_fit_res = self.writer.update_fit_params(old_fit_res, fit_res)
 
         old_per_window_trs = self.reader.extract_trs(parquet_path)
-        self.writer.update_per_window_trs(old_per_window_trs, per_window_trs, fit_results=fit_res)
+        old_per_window_trs = self.writer.update_per_window_trs(
+            old_per_window_trs,
+            per_window_trs,
+            fit_results=fit_res
+        )
         
-        df = fit_results_to_df(fit_res, per_window_trs)
+        df = fit_results_to_df(old_fit_res, old_per_window_trs)
         self.write_to_parquet(df, tmp_parquet_path, compression_level=0)
 
         return ProcessorOutputData(self.chrom_name, per_interval_params)

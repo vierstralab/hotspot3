@@ -33,15 +33,15 @@ def convert_fit_results_to_series(
         success_fit: bool
     ) -> pd.Series:
     return pd.Series({
-        'r_bg': fit_results.r,
-        'p_bg': fit_results.p,
+        'bg_r': fit_results.r,
+        'bg_p': fit_results.p,
         'rmsea': fit_results.rmsea,
-        'signal_tr': fit_results.fit_threshold,
-        'quantile_tr': fit_results.fit_quantile,
-        'bases_total': fit_results.n_total,
-        'bases_bg': fit_results.n_total - fit_results.n_signal,
-        'mean_total': mean,
-        'mean_bg': mean_from_r_p(fit_results.r, fit_results.p),
+        'bg_tr': fit_results.fit_threshold,
+        'mappable_bases': fit_results.n_total,
+        'bg_bases': fit_results.n_total - fit_results.n_signal,
+        'bg_bases_prop': fit_results.fit_quantile,
+        'mappable_tags_mean': mean,
+        'bg_tags_mean': mean_from_r_p(fit_results.r, fit_results.p),
         'fit_type': fit_type,
         'success_fit': success_fit
     })

@@ -82,5 +82,5 @@ def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
     return rmsea
 
 
-def check_valid_fit(fit: Union[WindowedFitResults, FitResults]):
+def check_valid_nb_params(fit: Union[WindowedFitResults, FitResults]):
     return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 

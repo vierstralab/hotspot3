@@ -14,7 +14,7 @@ from typing import List
 from hotspot3.helpers.models import NotEnoughDataForContig, FitResults, WindowedFitResults, DataForFit
 from hotspot3.config import ProcessorConfig
 from hotspot3.connectors.bottleneck import BottleneckWrapper
-from hotspot3.background_fit import calc_rmsea, check_valid_fit, rolling_view_with_nan_padding
+from hotspot3.background_fit import calc_rmsea, check_valid_nb_params, rolling_view_with_nan_padding
 from hotspot3.helpers.utils import wrap_masked
 
 
@@ -165,7 +165,13 @@ class BackgroundFit(BottleneckWrapper):
             axis=0,
             where=valid_bins
         ) - n_params - 1
-        return calc_rmsea(value_counts_per_bin, expected_counts, bg_sum_mappable, df, where=valid_bins)
+        return calc_rmsea(
+            value_counts_per_bin,
+            expected_counts,
+            bg_sum_mappable,
+            df,
+            where=valid_bins
+        )
 
     def get_bg_quantile_from_tr(self, agg_cutcounts: np.ndarray, tr: float):
         with np.errstate(invalid='ignore'):
@@ -197,15 +203,10 @@ class GlobalBackgroundFit(BackgroundFit):
                 data_for_fit,
                 np.inf
             )
-            if not check_valid_fit(best_fit_result):
+            if not check_valid_nb_params(best_fit_result):
                 raise NotEnoughDataForContig
         else:
             best_fit_result = min(result, key=lambda x: x.rmsea)
-            best_fit_result = self.fallback_suspicious_fit(
-                data_for_fit,
-                best_fit_result,
-                fallback_fit_results
-            )
 
         best_fit_result.n_total = agg_cutcounts.count()
         best_fit_result.n_signal = self.get_signal_mask_for_tr(
@@ -213,25 +214,6 @@ class GlobalBackgroundFit(BackgroundFit):
             best_fit_result.fit_threshold
         ).sum()
 
-        return best_fit_result
-    
-    def fallback_suspicious_fit(
-            self,
-            data_for_fit: DataForFit,
-            best_fit_result: FitResults,
-            fallback_fit_results: FitResults
-        ):
-        if not check_valid_fit(best_fit_result) and fallback_fit_results is not None:
-            result = self.fit_all_thresholds(
-                data_for_fit,
-                fallback_fit_results
-            )
-            best_fit_result = min(result, key=lambda x: x.rmsea)
-        if not np.isfinite(best_fit_result.rmsea):
-            best_fit_result = self.fit_for_tr(
-                data_for_fit,
-                np.inf
-            )
         return best_fit_result
     
     def prepare_data_for_fit(
@@ -316,7 +298,7 @@ class GlobalBackgroundFit(BackgroundFit):
             n_params = 2
         p = self.p_from_mean_and_r(mean, r)
 
-        if not check_valid_fit(FitResults(p, r)):
+        if not check_valid_nb_params(FitResults(p, r)):
             raise NotEnoughDataForContig
         
         value_counts = self.value_counts_per_bin(
@@ -331,6 +313,8 @@ class GlobalBackgroundFit(BackgroundFit):
             bin_edges,
             value_counts,
         )[0]
+        if not np.isfinite(rmsea):
+            raise NotEnoughDataForContig
         return FitResults(p, r, rmsea)
 
 
