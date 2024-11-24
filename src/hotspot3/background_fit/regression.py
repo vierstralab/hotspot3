@@ -65,6 +65,7 @@ class SignalToNoiseFit(WithLogger):
             np.log(total_tags),
             np.log(total_tags_background) + b,
         )[0] ** 2
+        self.logger.info(f"Signal to noise fit results: SPOT={spot_score:.2f}, R2={r2:.2f}")
         return SPOTEstimationResults(spot_score, r2, r2_total, inliers_mask, outlier_distance)
 
     def find_outliers(self, fit_data: pd.DataFrame) -> np.ndarray:
