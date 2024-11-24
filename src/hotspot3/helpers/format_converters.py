@@ -12,11 +12,13 @@ def fit_stats_df_to_fallback_fit_results(df: pd.DataFrame):
     chrom_fit = df.query(f'fit_type == "global"')
     assert len(chrom_fit) == 1, f"Expected one global fit, got {len(chrom_fit)}"
     chrom_fit = chrom_fit[
-        ['p_bg', 'r_bg', 'rmsea', 'signal_quantile', 'signal_tr']
+        ['p_bg', 'r_bg', 'rmsea', 'quantile_tr', 'signal_tr']
     ].iloc[0].rename(
         {
             'p_bg': 'p',
             'r_bg': 'r',
+            'quantile_tr': 'fit_quantile',
+            'signal_tr': 'fit_threshold'
         }
     ).to_dict()
 
