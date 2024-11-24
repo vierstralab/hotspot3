@@ -118,12 +118,9 @@ class GenomeWriter(WithLogger):
     def fit_stats_to_bw(
             self,
             fit_stats: pd.DataFrame,
-            outpath,
             outpath_bw,
             total_cutcounts,
         ):
-        self.df_to_tabix(fit_stats, outpath)
-
         fit_stats = fit_stats.query('fit_type == "segment"')[
             ['chrom', 'start', 'end', 'background']
         ]
