@@ -304,8 +304,7 @@ class GenomeProcessor(WithLogger):
                 save_path,
             )
             refit_params = self.merge_and_add_chromosome(refit_params).data_df
-            print(refit_params, per_region_params.loc[is_outlier_segment])
-            per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params      
+            per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values      
 
         self.writer.fit_stats_to_tabix_and_bw(
             per_region_params,
