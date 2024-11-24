@@ -6,7 +6,7 @@ import pandas as pd
 from io import StringIO
 
 from hotspot3.io.logging import WithLogger
-from hotspot3.models import NotEnoughDataForContig
+from hotspot3.helpers.models import NotEnoughDataForContig
 
 
 def run_bam2bed(*args):

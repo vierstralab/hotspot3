@@ -8,11 +8,11 @@ from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_
 
 from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
-from hotspot3.models import FitResults, WindowedFitResults, NotEnoughDataForContig
-
+from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDataForContig
+from hotspot3.helpers.format_converters import convert_fit_results_to_series
 from hotspot3.background_fit import check_valid_fit
-from hotspot3.utils import interpolate_nan
-from hotspot3.stats import mean_from_r_p
+from hotspot3.helpers.utils import interpolate_nan
+from hotspot3.helpers.stats import mean_from_r_p
 
 
 class SegmentalFit(WithLoggerAndInterval):
@@ -70,7 +70,7 @@ class SegmentalFit(WithLoggerAndInterval):
                 segment_fit_results = fallback_fit_results
                 success_fit = False
             
-            fit_series = self.convert_fit_results_to_series(
+            fit_series = convert_fit_results_to_series(
                 segment_fit_results,
                 signal_at_segment.compressed().mean(),
                 fit_type='segment',
@@ -116,7 +116,7 @@ class SegmentalFit(WithLoggerAndInterval):
             columns=['chrom', 'name']
         )
         intervals_stats['BAD'] = 0
-        fit_series = self.convert_fit_results_to_series(
+        fit_series = convert_fit_results_to_series(
             fallback_fit_results,
             agg_cutcounts.compressed().mean(),
             fit_type='global',
@@ -133,27 +133,6 @@ class SegmentalFit(WithLoggerAndInterval):
             20, 
             round(self.config.chromosome_fit_step / total_len * segment_len)
         )
-
-    def convert_fit_results_to_series(
-            self,
-            fit_results: FitResults,
-            mean: float,
-            fit_type: str,
-            success_fit: bool
-        ) -> pd.Series:
-        return pd.Series({
-            'r_bg': fit_results.r,
-            'p_bg': fit_results.p,
-            'rmsea': fit_results.rmsea,
-            'signal_tr': fit_results.fit_threshold,
-            'quantile_tr': fit_results.fit_quantile,
-            'bases_total': fit_results.n_total,
-            'bases_bg': fit_results.n_total - fit_results.n_signal,
-            'mean_total': mean,
-            'mean_bg': mean_from_r_p(fit_results.r, fit_results.p),
-            'fit_type': fit_type,
-            'success_fit': success_fit
-        })
 
     def fit_segment_params(
             self,

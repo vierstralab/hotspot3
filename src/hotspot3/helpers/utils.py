@@ -3,7 +3,7 @@ import numpy as np
 import functools
 import numpy.ma as ma
 
-from hotspot3.models import NotEnoughDataForContig
+from hotspot3.helpers.models import NotEnoughDataForContig
 
 
 def ensure_contig_exists(func):

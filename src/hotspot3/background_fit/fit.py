@@ -11,11 +11,11 @@ import numpy as np
 from scipy.special import betainc
 from typing import List
 
-from hotspot3.models import NotEnoughDataForContig, FitResults, WindowedFitResults, DataForFit
+from hotspot3.helpers.models import NotEnoughDataForContig, FitResults, WindowedFitResults, DataForFit
 from hotspot3.config import ProcessorConfig
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.background_fit import calc_rmsea, check_valid_fit, rolling_view_with_nan_padding
-from hotspot3.utils import wrap_masked
+from hotspot3.helpers.utils import wrap_masked
 
 
 class BackgroundFit(BottleneckWrapper):

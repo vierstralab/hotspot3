@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Union
-from hotspot3.models import WindowedFitResults, FitResults
+from hotspot3.helpers.models import WindowedFitResults, FitResults
 
 
 def rolling_view_with_nan_padding(arr, points_in_window=501, interpolation_step=1000):

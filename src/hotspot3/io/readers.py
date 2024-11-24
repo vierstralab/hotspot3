@@ -5,7 +5,7 @@ import pandas as pd
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 from genome_tools import GenomicInterval
 
-from hotspot3.models import NotEnoughDataForContig, WindowedFitResults, FitResults
+from hotspot3.helpers.models import NotEnoughDataForContig, WindowedFitResults, FitResults
 from hotspot3.config import ProcessorConfig
 
 from hotspot3.connectors.bottleneck import BottleneckWrapper
@@ -55,6 +55,7 @@ class ChromReader(WithLoggerAndInterval):
 
         return cutcounts
     
+
     def extract_aggregated_cutcounts(self, cutcounts_file):
         cutcounts = self.extract_cutcounts(cutcounts_file).astype(np.float32)
         window = self.config.window
@@ -106,21 +107,6 @@ class ChromReader(WithLoggerAndInterval):
         fit_results.p[fit_params.enough_bg_mask] = fit_params.p[fit_params.enough_bg_mask]
         fit_results.r[fit_params.enough_bg_mask] = fit_params.r[fit_params.enough_bg_mask]
         return fit_results
-
-    
-    def fit_stats_df_to_fallback_fit_results(self, df: pd.DataFrame):
-        chrom_fit = df.query(f'chrom == "{self.chrom_name}" & fit_type == "global"')
-        assert len(chrom_fit) == 1, f"Expected one global fit for {self.chrom_name}, got {len(chrom_fit)}"
-        chrom_fit = chrom_fit[
-            ['p_bg', 'r_bg', 'rmsea', 'signal_quantile', 'signal_tr']
-        ].iloc[0].rename(
-            {
-                'p_bg': 'p',
-                'r_bg': 'r',
-            }
-        ).to_dict()
-
-        return FitResults(**chrom_fit)
     
     def extract_fit_threholds(self, fit_params_parquet):
         threholds = self.extract_from_parquet(
@@ -163,12 +149,15 @@ class GenomeReader(WithLogger):
         # file is always sorted within chromosomes
         ends = [*starts[1:], total_len]
         return chrom_pos_mapping, starts, ends
+    
+    def get_chrom_sizes_file(self, chrom_sizes_file):
+        if chrom_sizes_file is None:
+            raise NotImplementedError("Chromosome sizes file is not embedded yet")
+        return chrom_sizes_file
 
     def read_chrom_sizes(self, chrom_sizes):
-        if chrom_sizes is None:
-            raise NotImplementedError("hg38 chromosome sizes are not embedded yet. Please provide a chromosome sizes file.")
         return pd.read_table(
-            chrom_sizes,
+            self.get_chrom_sizes_file(self, chrom_sizes),
             header=None,
             names=['chrom', 'size']
         ).set_index('chrom')['size'].to_dict()

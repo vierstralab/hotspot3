@@ -3,8 +3,8 @@ from scipy.stats import pearsonr
 import numpy as np
 
 from hotspot3.io.logging import WithLogger
-from hotspot3.models import SPOTEstimationResults
-from hotspot3.stats import upper_bg_quantile, weighted_median
+from hotspot3.helpers.models import SPOTEstimationResults
+from hotspot3.helpers.stats import upper_bg_quantile, weighted_median
 
 
 class SignalToNoiseFit(WithLogger):

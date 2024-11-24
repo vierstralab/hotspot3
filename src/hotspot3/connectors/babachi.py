@@ -4,7 +4,7 @@ from typing import List
 
 from genome_tools.genomic_interval import GenomicInterval
 
-from hotspot3.models import FitResults
+from hotspot3.helpers.models import FitResults
 from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 

@@ -2,7 +2,7 @@ import bottleneck as bn
 import numpy as np
 
 from hotspot3.io.logging import WithLogger
-from hotspot3.utils import wrap_masked, correct_offset
+from hotspot3.helpers.utils import wrap_masked, correct_offset
 
 
 class BottleneckWrapper(WithLogger):

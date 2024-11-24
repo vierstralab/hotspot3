@@ -7,7 +7,10 @@ import functools
 
 from genome_tools.genomic_interval import GenomicInterval
 
-from hotspot3.models import ProcessorOutputData, NotEnoughDataForContig
+from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig
+from hotspot3.helpers.utils import is_iterable, ensure_contig_exists
+from hotspot3.helpers.stats import upper_bg_quantile
+from hotspot3.helpers.format_converters import fit_stats_df_to_fallback_fit_results, peaks_to_bed12, hotspots_to_bed12
 
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io.readers import ChromReader, GenomeReader
@@ -20,9 +23,6 @@ from hotspot3.background_fit.genomic_background_fit import ChromosomeFit, Segmen
 from hotspot3.background_fit.regression import SignalToNoiseFit
 from hotspot3.scoring.pvalue import PvalueEstimator
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
-from hotspot3.utils import is_iterable, ensure_contig_exists
-from hotspot3.stats import upper_bg_quantile
-
 
 
 def parallel_func_error_handler(func):
@@ -389,7 +389,7 @@ class GenomeProcessor(WithLogger):
         hotspots = hotspots[['chrom', 'start', 'end', 'id', 'max_neglog10_fdr']]
         self.writer.df_to_tabix(hotspots, save_path)
 
-        hotspots = self.writer.hotspots_to_bed12(hotspots, fdr_tr, signif_stretches)
+        hotspots = hotspots_to_bed12(hotspots, fdr_tr, signif_stretches)
         self.writer.df_to_bigbed(hotspots, self.chrom_sizes_file, save_path_bb)
 
 
@@ -436,7 +436,7 @@ class GenomeProcessor(WithLogger):
         )
         self.writer.df_to_tabix(peaks, save_path)
 
-        peaks = self.writer.peaks_to_bed12(peaks, fdr_tr)
+        peaks = peaks_to_bed12(peaks, fdr_tr)
         self.writer.df_to_bigbed(peaks, self.chrom_sizes_file, save_path_bb)
 
 
@@ -569,7 +569,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         segments = bad_segments.data_df.query(f'fit_type == "segment"')
         if segments.empty:
             raise NotEnoughDataForContig
-        chrom_fit = self.reader.fit_stats_df_to_fallback_fit_results(
+        chrom_fit = fit_stats_df_to_fallback_fit_results(
             bad_segments.data_df
         )
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(

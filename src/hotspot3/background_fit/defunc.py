@@ -1,9 +1,11 @@
-from hotspot3.background_fit.fit import StridedBackgroundFit as StridedFit
-from hotspot3.models import FitResults, WindowedFitResults, DataForFit
-from hotspot3.utils import wrap_masked
 import numpy as np
 import numpy.ma as ma
 import dataclasses
+
+from hotspot3.background_fit.fit import StridedBackgroundFit as StridedFit
+from hotspot3.helpers.models import FitResults, WindowedFitResults, DataForFit
+from hotspot3.helpers.utils import wrap_masked
+
 
 class StridedBackgroundFit(StridedFit):
 

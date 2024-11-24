@@ -2,9 +2,11 @@ import numpy as np
 import scipy.stats as st
 import gc
 from scipy.special import logsumexp, betainc, hyp2f1, betaln
-from hotspot3.models import WindowedFitResults, FitResults
 from typing import Union
 import pandas as pd
+
+
+from hotspot3.helpers.models import WindowedFitResults, FitResults
 
 
 # Calculate p-values and FDR
