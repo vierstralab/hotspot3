@@ -224,7 +224,7 @@ class GlobalBackgroundFit(BackgroundFit):
             )
             best_fit_result = min(result, key=lambda x: x.rmsea)
         if not np.isfinite(best_fit_result.rmsea):
-            result = self.fit_for_tr(
+            best_fit_result = self.fit_for_tr(
                 data_for_fit,
                 np.inf
             )
