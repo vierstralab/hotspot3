@@ -51,7 +51,11 @@ class SignalToNoiseFit(WithLogger):
         inliers_mask = outlier_distance < self.config.outlier_segment_threshold
         self.logger.info(f"Signal to noise fit results: SPOT={spot_score:.2f}, SPOT_std={spot_score_std:.2f}")
         return SPOTEstimationResults(
-            spots=segment_spots, spot_score=spot_score,spot_score_std=spot_score_std, inliers_mask=inliers_mask, outlier_distance=outlier_distance, segment_spots=segment_spots
+            spot_score=spot_score,
+            spot_score_std=spot_score_std,
+            inliers_mask=inliers_mask,
+            outlier_distance=outlier_distance,
+            segment_spots=segment_spots
         )
 
     def find_outliers(self, fit_data: pd.DataFrame) -> np.ndarray:
