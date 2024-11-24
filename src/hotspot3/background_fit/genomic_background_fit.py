@@ -182,7 +182,7 @@ class SegmentalFit(WithLoggerAndInterval):
                 per_window_trs=thresholds,
                 fallback_fit_results=fallback_fit_results
             ).p[need_global_fit]
-        self.logger.debug(f"{genomic_interval.to_ucsc()}: Successfully fit per-bp negative-binomial model for {np.sum(success_fits):,} bp. Use segmental r for {np.sum(need_global_fit):,} bp")
+        self.logger.debug(f"{genomic_interval.to_ucsc()}: Successfully fit per-bp negative-binomial model for {np.sum(success_fits):,} bp. Use segment r for {np.sum(need_global_fit):,} bp")
         return fit_res
 
 

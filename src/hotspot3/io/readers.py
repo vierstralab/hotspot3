@@ -108,10 +108,17 @@ class ChromReader(WithLoggerAndInterval):
         return fit_results
 
     
-    def fit_stats_df_to_fit_results(self, df: pd.DataFrame):
+    def fit_stats_df_to_fallback_fit_results(self, df: pd.DataFrame):
         chrom_fit = df.query(f'chrom == "{self.chrom_name}" & fit_type == "global"')
         assert len(chrom_fit) == 1, f"Expected one global fit for {self.chrom_name}, got {len(chrom_fit)}"
-        chrom_fit = chrom_fit.iloc[0][['p', 'r', 'rmsea', 'fit_quantile', 'fit_threshold']].to_dict()
+        chrom_fit = chrom_fit.iloc[0][
+            ['p_bg', 'r_bg', 'rmsea', 'fit_quantile', 'fit_threshold']
+        ].rename(
+            {
+                'p_bg': 'p',
+                'r_bg': 'r',
+            }
+        ).to_dict()
 
         return FitResults(**chrom_fit)
     
