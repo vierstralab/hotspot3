@@ -121,6 +121,7 @@ class SegmentalFit(WithLoggerAndInterval):
             fit_type='global',
             success_fit=True,
         )
+        self.set_dtype(intervals_stats, fit_series)
         intervals_stats.loc[0, fit_series.index] = fit_series
         return pd.concat([intervals_stats, segment_stats], ignore_index=True)
 
