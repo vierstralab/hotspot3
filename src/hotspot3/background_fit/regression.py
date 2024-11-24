@@ -38,7 +38,7 @@ class SignalToNoiseFit(WithLogger):
         total_tags_background = spot_data.total_tags_background
         weight = spot_data.weight
 
-        segment_spots = total_tags_background / total_tags
+        segment_spots = 1 - total_tags_background / total_tags
         spot_score = weighted_median(segment_spots, weight)
         spot_score_std = np.sqrt(np.sum((segment_spots - spot_score) ** 2 * weight) / np.sum(weight))
 
