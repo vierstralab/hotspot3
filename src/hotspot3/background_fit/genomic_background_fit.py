@@ -112,7 +112,7 @@ class SegmentalFit(WithLoggerAndInterval):
             fallback_fit_results: FitResults,
             segment_stats: pd.DataFrame
         ):
-        intervals_stats = genomic_intervals_to_df(self.genomic_interval).drop(
+        intervals_stats = genomic_intervals_to_df([self.genomic_interval]).drop(
             columns=['chrom', 'name']
         )
         fit_series = self.convert_fit_results_to_series(
