@@ -1,9 +1,10 @@
 import pandas as pd
+import numpy as np
 
 from hotspot3.helpers.models import FitResults
 from hotspot3.helpers.colors import get_bb_color
 from hotspot3.helpers.stats import mean_from_r_p
-import numpy as np
+
 
 bed12_columns = ['chrom', 'start', 'end', 'id', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb', 'blockCount', 'blockSizes', 'blockStarts']
 
