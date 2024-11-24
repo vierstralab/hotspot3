@@ -115,6 +115,7 @@ class SegmentalFit(WithLoggerAndInterval):
         intervals_stats = genomic_intervals_to_df([self.genomic_interval]).drop(
             columns=['chrom', 'name']
         )
+        intervals_stats['BAD'] = None
         fit_series = self.convert_fit_results_to_series(
             fallback_fit_results,
             agg_cutcounts.compressed().mean(),
