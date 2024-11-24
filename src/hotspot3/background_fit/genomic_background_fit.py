@@ -101,10 +101,11 @@ class SegmentalFit(WithLoggerAndInterval):
         Workaround func to avoid future warnings about setting bool values to float (default) columns
         """
         if np.any(~fit_series.index.isin(intervals_stats.columns)):
-            intervals_stats = intervals_stats.reindex(fit_series.index, axis=1)
+            print('Reindexing')
+            new_columns = intervals_stats.columns.union(fit_series.index)
+            intervals_stats = intervals_stats.reindex(columns=new_columns)
             for col in fit_series.index:
-                if col not in intervals_stats.columns:
-                    intervals_stats[col] = pd.Series(dtype=fit_series[col].dtype)
+                intervals_stats[col] = intervals_stats[col].astype(fit_series[col].dtype)
 
     def add_fallback_fit_stats(
             self,
