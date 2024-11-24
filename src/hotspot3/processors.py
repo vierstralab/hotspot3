@@ -288,7 +288,7 @@ class GenomeProcessor(WithLogger):
             self.writer.df_to_tabix(per_region_params, per_region_stats_path + '.iter1')
 
         if is_outlier_segment.sum() > 0:
-            self.logger.info(f"Found {is_outlier_segment.sum()} outlier segments. Refitting again with approximated signal/noise constraint.")
+            self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments. Refitting with approximated signal/noise constraint.")
             outlier_params = per_region_params[
                 is_outlier_segment | (per_region_params['fit_type'] == 'global')
             ]
