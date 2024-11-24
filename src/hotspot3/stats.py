@@ -147,7 +147,7 @@ def upper_bg_quantile(r, p, quantile=0.005):
     p = np.asarray(p, dtype=np.float32)
     return st.nbinom(r, 1 - p).isf(quantile)
 
-def weighted_median(self, data, weights):
+def weighted_median(data, weights):
     sorted_indices = np.argsort(data)
     sorted_data = data[sorted_indices]
     sorted_weights = weights[sorted_indices]
