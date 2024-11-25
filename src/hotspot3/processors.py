@@ -284,6 +284,7 @@ class GenomeProcessor(WithLogger):
         
         is_outlier_segment = sn_fit.find_outliers(per_region_params)
         per_region_params['refit_with_constraint'] = is_outlier_segment
+
         if self.config.save_debug:
             self.writer.df_to_tabix(per_region_params, per_region_stats_path + '.iter1')
 

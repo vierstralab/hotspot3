@@ -17,15 +17,15 @@ class SignalToNoiseFit(WithLogger):
             fit_data['bg_r'],
             fit_data['bg_p']
         )
-        is_segment_fit = fit_data['fit_type'] == 'segment'
+        valid_segment_fit = fit_data.eval('fit_type == "segment" & success_fit')
 
-        spot_data = get_spot_score_fit_data(fit_data[is_segment_fit])
+        spot_data = get_spot_score_fit_data(fit_data[valid_segment_fit])
 
         spot_results = self.spot_score_and_outliers(spot_data)
 
-        fit_data.loc[is_segment_fit, 'outlier_distance'] = spot_results.outlier_distance
-        fit_data.loc[is_segment_fit, 'is_inlier'] = spot_results.inliers_mask
-        fit_data.loc[is_segment_fit, 'segment_SPOT'] = spot_results.segment_spots
+        fit_data.loc[valid_segment_fit, 'outlier_distance'] = spot_results.outlier_distance
+        fit_data.loc[valid_segment_fit, 'is_inlier'] = spot_results.inliers_mask
+        fit_data.loc[valid_segment_fit, 'segment_SPOT'] = spot_results.segment_spots
 
         fit_data['SPOT'] = spot_results.spot_score
         fit_data['SPOT_std'] = spot_results.spot_score_std
@@ -40,6 +40,7 @@ class SignalToNoiseFit(WithLogger):
         weight = spot_data.weight
 
         segment_spots = 1 - total_tags_background / total_tags
+        assert np.isfinite(segment_spots).all(), f"Segment spots contain NaNs or Infs, {segment_spots}"
         spot_score = weighted_median(segment_spots, weight)
         spot_score_std = np.sqrt(np.sum((segment_spots - spot_score) ** 2 * weight) / np.sum(weight))
 
