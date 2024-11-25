@@ -45,7 +45,6 @@ class SPOTEstimationResults:
     intercept: float
     inliers_mask: np.ndarray
     outlier_distance: np.ndarray
-    segment_spots: np.ndarray
 
 
 @dataclasses.dataclass
