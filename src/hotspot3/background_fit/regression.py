@@ -57,7 +57,8 @@ class SignalToNoiseFit(WithLogger):
 
         where = spot_data.valid_scores
         model.fit(X[where], y[where])
-        inliers = np.where(where, model.inlier_mask_, False)
+        inliers = np.zeros_like(where, dtype=bool)
+        inliers[where] = model.inlier_mask_
         slope, intercept = model.estimator_.coef_[0], model.estimator_.intercept_
         
         resid = y - model.predict(X)
