@@ -10,7 +10,7 @@ from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
 from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDataForContig
 from hotspot3.helpers.format_converters import convert_fit_results_to_series
-from hotspot3.background_fit import check_valid_nb_params
+from hotspot3.helpers.stats import check_valid_nb_params
 from hotspot3.helpers.utils import interpolate_nan
 
 
