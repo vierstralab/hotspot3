@@ -470,7 +470,6 @@ class GenomeProcessor(WithLogger):
             smoothed_signal
         )
         density_data = self.merge_and_add_chromosome(density_data).data_df
-        self.logger.debug(f"Converting density to bigwig")
         self.writer.density_to_bw(
             density_data,
             density_path,
