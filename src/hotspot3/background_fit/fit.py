@@ -89,7 +89,10 @@ class BackgroundFit(BottleneckWrapper):
         if min_bg_tr is None:
             min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
 
-        max_bg_tr = self.quantile_ignore_all_na(array, self.config.max_background_prop)
+        if self.config.max_background_prop <= self.config.min_background_prop:
+            max_bg_tr = min_bg_tr
+        else:
+            max_bg_tr = self.quantile_ignore_all_na(array, self.config.max_background_prop)
 
         if fallback_fit_results is not None:
             max_bg_tr = np.maximum(
