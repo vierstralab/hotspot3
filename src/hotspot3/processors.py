@@ -313,7 +313,11 @@ class GenomeProcessor(WithLogger):
             self.writer.merge_partitioned_parquets(save_path, tmp_new_path)
             
             refit_params = self.merge_and_add_chromosome(refit_params).data_df
-            per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values      
+            per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values
+
+            per_region_params, spot_results = sn_fit.fit(per_region_params)
+        
+        self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}")
 
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
         self.writer.fit_stats_to_bw(

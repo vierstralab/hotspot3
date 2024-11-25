@@ -36,7 +36,7 @@ class BottleneckWrapper(WithLogger):
     @wrap_masked
     def get_max_count_with_flanks(self, array: np.ndarray, flank_length: int=None):
         if flank_length is None:
-            flank_length = self.config.exclude_peak_flank_length
+            flank_length = self.config.exclude_peak_flank_fit
         return self.centered_running_nanmax(array, flank_length * 2 + 1)
     
     @wrap_masked

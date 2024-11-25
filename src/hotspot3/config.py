@@ -42,8 +42,11 @@ class ProcessorConfig:
     chromosome_fit_step: int = 1500
 
     # option to exclude peak flanks as well as peaks for fitting background
-    # not used be default
-    exclude_peak_flank_length: int = 0
+    # not used by default
+    exclude_peak_flank_fit: int = 0
+
+    # Remove peak flanks to reduce effect of peaks on scoring params from local window
+    exclude_peak_flank_scoring: int = 500
 
     # Remove obvious signal before segmentation
     signal_prop_sampling_step: int = 75
