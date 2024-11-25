@@ -316,7 +316,8 @@ class GenomeProcessor(WithLogger):
             per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values
 
             per_region_params, spot_results = sn_fit.fit(per_region_params)
-        
+        else:
+            self.logger.info('No outlier segments found.')
         self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}")
 
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
