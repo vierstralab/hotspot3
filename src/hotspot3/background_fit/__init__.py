@@ -80,7 +80,3 @@ def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
     rmsea = np.sqrt(np.maximum(G_sq - 1, 0) / (N - 1))
     rmsea = np.where(df >= min_df, rmsea, np.inf)
     return rmsea
-
-
-def check_valid_nb_params(fit: Union[WindowedFitResults, FitResults]):
-    return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 

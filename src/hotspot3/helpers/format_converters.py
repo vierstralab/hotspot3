@@ -31,11 +31,17 @@ def get_spot_score_fit_data(fit_data: pd.DataFrame):
         'bg_tags_mean * bg_bases'
     ).values
     total_tags = fit_data.eval('mappable_tags_mean * mappable_bases').values
-    weight = fit_data['mappable_bases'].values
+    total_bases = fit_data['mappable_bases'].values
+
+    spot_scores = np.clip(1 - total_tags_background / total_tags, 0, 1)
+    valid_scores = np.isfinite(spot_scores) & (spot_scores > 0) & (spot_scores < 1)
+    
     return SPOTEstimationData(
         total_tags=total_tags,
         total_tags_background=total_tags_background,
-        weight=weight
+        segment_spot_scores=spot_scores,
+        total_bases=total_bases,
+        valid_scores=valid_scores
     )
 
 def convert_fit_results_to_series(

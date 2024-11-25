@@ -33,12 +33,16 @@ class DataForFit:
 class SPOTEstimationData:
     total_tags: np.ndarray
     total_tags_background: np.ndarray
-    weight: np.ndarray
+    segment_spot_scores: np.ndarray
+    total_bases: np.ndarray
+    valid_scores: np.ndarray
 
 @dataclasses.dataclass
 class SPOTEstimationResults:
     spot_score: float
     spot_score_std: float
+    slope: float
+    intercept: float
     inliers_mask: np.ndarray
     outlier_distance: np.ndarray
     segment_spots: np.ndarray

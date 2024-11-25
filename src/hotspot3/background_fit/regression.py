@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import RANSACRegressor
+from scipy.special import logit, expit
 
 from hotspot3.io.logging import WithLogger
 from hotspot3.helpers.models import SPOTEstimationResults, SPOTEstimationData
-from hotspot3.helpers.stats import upper_bg_quantile, weighted_median
+from hotspot3.helpers.stats import upper_bg_quantile, weighted_median, weighted_std
 from hotspot3.helpers.format_converters import get_spot_score_fit_data
 
 
@@ -20,44 +22,58 @@ class SignalToNoiseFit(WithLogger):
         valid_segment_fit = fit_data.eval('fit_type == "segment" & success_fit')
 
         spot_data = get_spot_score_fit_data(fit_data[valid_segment_fit])
+        fit_data.loc[valid_segment_fit, 'segment_SPOT'] = spot_data.segment_spot_scores
 
-        spot_results = self.spot_score_and_outliers(spot_data)
+        spot_results = self.fit_spot_length_regression(spot_data)
 
+        # One value per segment
         fit_data.loc[valid_segment_fit, 'outlier_distance'] = spot_results.outlier_distance
         fit_data.loc[valid_segment_fit, 'is_inlier'] = spot_results.inliers_mask
-        fit_data.loc[valid_segment_fit, 'segment_SPOT'] = spot_results.segment_spots
-
+        
+        # One value for the dataset
+        fit_data['slope'] = spot_results.slope
+        fit_data['intercept'] = spot_results.intercept
         fit_data['SPOT'] = spot_results.spot_score
         fit_data['SPOT_std'] = spot_results.spot_score_std
+
         return fit_data, spot_results
     
-    def calc_outlier_distance(self, total_tags, total_tags_background, spot):
-        return total_tags / total_tags_background * (1 - spot)
+    def calc_dataset_spot_score(self, spot_data: SPOTEstimationData):
+        spot_scores = spot_data.segment_spot_scores[spot_data.valid_scores]
+        total_bases = spot_data.total_bases[spot_data.valid_scores]
+        spot_score = weighted_median(spot_scores, total_bases)
+        return spot_score
     
-    def spot_score_and_outliers(self, spot_data: SPOTEstimationData):
-        total_tags = spot_data.total_tags
-        total_tags_background = spot_data.total_tags_background
-        weight = spot_data.weight
+    def calc_spot_score_error(self, resid, spot_score, total_bases):
+        detrended_segment_spot = expit(resid + logit(spot_score))
+        return weighted_std(detrended_segment_spot, total_bases, spot_score)
+    
+    def fit_spot_length_regression(self, spot_data: SPOTEstimationData):
+        model = RANSACRegressor(random_state=42)
+        spot_score = self.calc_dataset_spot_score(spot_data)
 
-        segment_spots = 1 - total_tags_background / total_tags
-        assert np.isfinite(segment_spots).all(), f"Segment spots contain NaNs or Infs, {segment_spots}"
-        spot_score = weighted_median(segment_spots, weight)
-        spot_score_std = np.sqrt(np.sum((segment_spots - spot_score) ** 2 * weight) / np.sum(weight))
+        X = np.log(spot_data.total_bases)[:, None]
+        y = logit(spot_data.segment_spot_scores)
 
-        outlier_distance = self.calc_outlier_distance(
-            total_tags,
-            total_tags_background,
-            spot_score
-        )
+        where = spot_data.valid_scores
+        model.fit(X[where], y[where])
+        inliers = np.where(where, model.inlier_mask_, False)
+        slope, intercept = model.estimator_.coef_[0], model.estimator_.intercept_
         
-        inliers_mask = outlier_distance < self.config.outlier_segment_threshold
-        self.logger.info(f"Signal to noise fit results: SPOT={spot_score:.2f}, SPOT_std={spot_score_std:.2f}")
+        resid = y - model.predict(X)
+        outlier_dist = np.exp(resid)
+
+        spot_score_std = self.calc_spot_score_error(resid, spot_score, spot_data.total_bases)
+
+        self.logger.info(f"Signal to noise fit results: SPOT={spot_score:.2f}±{spot_score_std:.2f}")
+
         return SPOTEstimationResults(
             spot_score=spot_score,
             spot_score_std=spot_score_std,
-            inliers_mask=inliers_mask,
-            outlier_distance=outlier_distance,
-            segment_spots=segment_spots
+            inliers_mask=inliers,
+            slope=slope,
+            intercept=intercept,
+            outlier_distance=outlier_dist,  
         )
 
     def find_outliers(self, fit_data: pd.DataFrame) -> np.ndarray:

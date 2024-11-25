@@ -140,13 +140,19 @@ def calc_rmsea(obs, exp, N, df, min_df=1, stat='G_sq', where=None):
     return rmsea
 
 
-def check_valid_fit(fit: Union[WindowedFitResults, FitResults]):
+def check_valid_nb_params(fit: Union[WindowedFitResults, FitResults]):
     return (fit.r > 0.) & (fit.p > 0.) & (fit.p < 1.) 
+
 
 def upper_bg_quantile(r, p, quantile=0.005):
     r = np.asarray(r, dtype=np.float32)
     p = np.asarray(p, dtype=np.float32)
     return st.nbinom(r, 1 - p).isf(quantile)
+
+
+def mean_from_r_p(r, p):
+    return r * p / (1 - p)
+
 
 def weighted_median(data, weights):
     data = np.asarray(data)
@@ -158,5 +164,9 @@ def weighted_median(data, weights):
     median_index = np.searchsorted(cum_weights, 0.5 * cum_weights[-1])
     return sorted_data[median_index]
 
-def mean_from_r_p(r, p):
-    return r * p / (1 - p)
+
+def weighted_std(x, weights, mean):
+    weights = np.asarray(weights)
+    x = np.asarray(x)
+    variance = np.sum(weights * np.square(x - mean)) / np.sum(weights)
+    return np.sqrt(variance)
