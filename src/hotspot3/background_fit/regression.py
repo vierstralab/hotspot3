@@ -49,7 +49,7 @@ class SignalToNoiseFit(WithLogger):
         return weighted_std(detrended_segment_spot, total_bases, spot_score)
     
     def fit_spot_length_regression(self, spot_data: SPOTEstimationData):
-        model = RANSACRegressor(random_state=42)
+        model = RANSACRegressor(random_state=42, min_samples=0.2)
         spot_score = self.calc_dataset_spot_score(spot_data)
 
         X = np.log(spot_data.total_bases)[:, None]
