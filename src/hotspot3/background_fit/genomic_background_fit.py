@@ -54,7 +54,7 @@ class SegmentalFit(WithLoggerAndInterval):
                 if min_bg_tag_proportion is not None:
                     uq, cts = np.unique(signal_at_segment, return_counts=True)
                     total = uq * cts
-                    valid_cts = uq[np.cumsum(total) / (total).sum() >= min_bg_tag_proportion[i]]
+                    valid_cts = uq[np.cumsum(total) / np.sum(total) >= min_bg_tag_proportion[i]]
                     if valid_cts.size == 0:
                         self.logger.critical(f"{segment_interval.to_ucsc()}: Not enough background data")
                         raise ValueError

@@ -45,6 +45,7 @@ class SPOTEstimationResults:
     intercept: float
     inliers_mask: np.ndarray
     outlier_distance: np.ndarray
+    min_bg_tags_fraction: np.ndarray
 
 
 @dataclasses.dataclass

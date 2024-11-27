@@ -29,6 +29,7 @@ class SignalToNoiseFit(WithLogger):
         # One value per segment
         fit_data.loc[valid_segment_fit, 'outlier_distance'] = spot_results.outlier_distance
         fit_data.loc[valid_segment_fit, 'is_inlier'] = spot_results.inliers_mask
+        fit_data.loc[valid_segment_fit, 'min_bg_tag_proportion'] = spot_results.min_bg_tags_fraction
         
         # One value for the dataset
         fit_data['slope'] = spot_results.slope
@@ -61,7 +62,9 @@ class SignalToNoiseFit(WithLogger):
         inliers[where] = model.inlier_mask_
         slope, intercept = model.estimator_.coef_[0], model.estimator_.intercept_
         
-        resid = y - model.predict(X)
+        y_pred = model.predict(X)
+        resid = y - y_pred
+        min_bg_tags_fraction = 1 - expit(y_pred + np.log(self.config.outlier_segment_threshold))
         outlier_dist = np.exp(resid)
 
         spot_score_std = self.calc_spot_score_error(resid, spot_score, spot_data.total_bases)
@@ -74,7 +77,8 @@ class SignalToNoiseFit(WithLogger):
             inliers_mask=inliers,
             slope=slope,
             intercept=intercept,
-            outlier_distance=outlier_dist,  
+            outlier_distance=outlier_dist,
+            min_bg_tags_fraction=min_bg_tags_fraction
         )
 
     def find_outliers(self, fit_data: pd.DataFrame) -> np.ndarray:
