@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats as st
 import gc
-from scipy.special import logsumexp, betainc, hyp2f1, betaln
+from scipy.special import logsumexp, betainc, hyp2f1, betaln, logit, expit
 from typing import Union
 import pandas as pd
 
@@ -170,3 +170,10 @@ def weighted_std(x, weights, mean):
     x = np.asarray(x)
     variance = np.sum(weights * np.square(x - mean)) / np.sum(weights)
     return np.sqrt(variance)
+
+
+def get_min_bg_tag_proportion_from_fit(segment_spots, resid, max_outlier_distance):
+    y_true = logit(segment_spots)
+    y_pred = y_true - resid # detrended signal/background
+    max_spot = expit(y_pred + np.log(max_outlier_distance)) # max spot score to be a non-outlier
+    return 1 - max_spot # min proportion of background tags

@@ -9,7 +9,7 @@ from genome_tools.genomic_interval import GenomicInterval, df_to_genomic_interva
 
 from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig
 from hotspot3.helpers.utils import is_iterable, ensure_contig_exists
-from hotspot3.helpers.stats import upper_bg_quantile
+from hotspot3.helpers.stats import upper_bg_quantile, get_min_bg_tag_proportion_from_fit
 from hotspot3.helpers.format_converters import fit_stats_df_to_fallback_fit_results, peaks_to_bed12, hotspots_to_bed12, fit_results_to_df
 
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
@@ -293,7 +293,6 @@ class GenomeProcessor(WithLogger):
             outlier_params = per_region_params[
                 is_outlier_segment | (per_region_params['fit_type'] == 'global')
             ]
-            min_bg_tag_proportion = (1 - spot_results.spot_score) / self.config.outlier_segment_threshold
 
             bad_segments = [
                 ProcessorOutputData(x[0], x[1]) 
@@ -306,7 +305,6 @@ class GenomeProcessor(WithLogger):
                 ChromosomeProcessor.refit_outlier_segments,
                 cutcounts_file,
                 bad_segments,
-                min_bg_tag_proportion,
                 save_path,
                 tmp_new_path
             )
@@ -580,7 +578,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self,
         cutcounts_path,
         bad_segments: ProcessorOutputData,
-        min_bg_tag_proportion: float,
         parquet_path: str,
         tmp_parquet_path: str
     ) -> ProcessorOutputData:
@@ -589,6 +586,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         segments = bad_segments.data_df.query(f'fit_type == "segment"')
         if segments.empty:
             raise NotEnoughDataForContig
+        resid = np.log(segments['outlier_distance'].values)
+        segment_spots = segments['segment_SPOT'].values
         segments = df_to_genomic_intervals(segments, extra_columns=['BAD'])
         chrom_fit = fit_stats_df_to_fallback_fit_results(
             bad_segments.data_df
@@ -598,6 +597,11 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             self.gp.mappable_bases_file
         )
         segments_fit = self.copy_with_params(SegmentalFit)
+        min_bg_tag_proportion = get_min_bg_tag_proportion_from_fit(
+            segment_spots,
+            resid,
+            self.config.outlier_segment_threshold
+        )
         fit_res, per_window_trs, per_interval_params = segments_fit.fit_segments(
             agg_cutcounts=agg_cutcounts,
             bad_segments=segments,
