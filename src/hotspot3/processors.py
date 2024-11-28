@@ -265,31 +265,33 @@ class GenomeProcessor(WithLogger):
             save_path: str,
             per_region_stats_path,
             per_region_stats_path_bw
-            ):
+        ):
         """"
         Fit background model of cutcounts distribution and save fit parameters to parquet file.
         """
         self.logger.info('Estimating parameters of background model')
         
-        self.writer.sanitize_path(save_path)
         per_region_params = self.parallel_by_chromosome(
             ChromosomeProcessor.fit_background_model,
             cutcounts_file,
-            save_path,
         )
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
 
         sn_fit = self.copy_with_params(SignalToNoiseFit)
+        has_outlier_segments = True
+        iteration = 1
         per_region_params, spot_results = sn_fit.fit(per_region_params)
-        
-        is_outlier_segment = sn_fit.find_outliers(per_region_params)
-        per_region_params['refit_with_constraint'] = is_outlier_segment
 
-        if self.config.save_debug:
-            self.writer.df_to_tabix(per_region_params, per_region_stats_path + '.iter1')
+        while has_outlier_segments:
+            is_outlier_segment = sn_fit.find_outliers(per_region_params)
+            per_region_params['refit_with_constraint'] = is_outlier_segment
 
-        if is_outlier_segment.sum() > 0:
-            self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments. Refitting with approximated signal/noise constraint.")
+            has_outlier_segments = is_outlier_segment.sum() > 0
+            self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
+
+            if self.config.save_debug:
+                self.writer.df_to_tabix(per_region_params, per_region_stats_path + f'.iter{iteration}')
+
             outlier_params = per_region_params[
                 is_outlier_segment | (per_region_params['fit_type'] == 'global')
             ]
@@ -298,33 +300,37 @@ class GenomeProcessor(WithLogger):
                 ProcessorOutputData(x[0], x[1]) 
                 for x in outlier_params.groupby('chrom', observed=True)
             ]
-            tmp_new_path = f"{save_path}.iter2"
-            self.writer.sanitize_path(tmp_new_path)
 
             refit_params = self.parallel_by_chromosome(
                 ChromosomeProcessor.refit_outlier_segments,
                 cutcounts_file,
-                bad_segments,
-                save_path,
-                tmp_new_path
+                bad_segments
             )
-            self.writer.merge_partitioned_parquets(save_path, tmp_new_path)
-            
             refit_params = self.merge_and_add_chromosome(refit_params).data_df
             per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values
-
             per_region_params, spot_results = sn_fit.fit(per_region_params)
+            iteration += 1
         else:
-            self.logger.info('No outlier segments found.')
+            self.logger.info(f'No outlier segments found at iteration {iteration}.')
         self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}")
-
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
         self.writer.fit_stats_to_bw(
             per_region_params,
             per_region_stats_path_bw,
             total_cutcounts=self.reader.read_total_cutcounts(total_cutcounts_path),
         )
-        
+        self.logger.info('Estimating per-bp parameters of background model')
+        self.writer.sanitize_path(save_path)
+        all_segments = [
+            ProcessorOutputData(x[0], x[1]) 
+            for x in per_region_params.query('fit_type == "segment"').groupby('chrom', observed=True)
+        ]
+        self.parallel_by_chromosome(
+            ChromosomeProcessor.fit_per_bp_model,
+            cutcounts_file,
+            all_segments,
+            save_path
+        )
 
     def calc_pvals(self, cutcounts_file, fit_path: str, save_path: str):
         """
@@ -525,7 +531,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
 
     @parallel_func_error_handler
     @ensure_contig_exists
-    def fit_background_model(self, cutcounts_file, save_path) -> ProcessorOutputData:
+    def fit_background_model(self, cutcounts_file) -> ProcessorOutputData:
         """
         Fit background model to cutcounts and save fit parameters to parquet file.
         """
@@ -535,8 +541,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         )
         self.logger.debug(f'{self.chrom_name}: Estimating proportion of background vs signal')
         
-        s_fit = self.copy_with_params(ChromosomeFit)
-        per_window_trs_global, global_fit_params = s_fit.fit_segment_thresholds(agg_cutcounts)
+        chrom_fit = self.copy_with_params(ChromosomeFit)
+        per_window_trs_global, global_fit_params = chrom_fit.fit_segment_thresholds(agg_cutcounts)
         
         if global_fit_params.rmsea > self.config.rmsea_tr:
             self.logger.warning(f"{self.chrom_name}: Best RMSEA: {global_fit_params.rmsea:.3f}. Chromosome fit might be poorly approximated.")
@@ -555,7 +561,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
         )
         segments_fit = self.copy_with_params(SegmentalFit)
-        fit_res, per_window_trs, per_interval_params = segments_fit.fit_segments(
+        per_interval_params = segments_fit.fit_per_segment_bg_model(
             agg_cutcounts=agg_cutcounts,
             bad_segments=bad_segments,
             fallback_fit_results=global_fit_params
@@ -565,9 +571,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             global_fit_params,
             per_interval_params,
         )
-
-        df = fit_results_to_df(fit_res, per_window_trs)
-        self.write_to_parquet(df, save_path, compression_level=0)
         
         return ProcessorOutputData(self.chrom_name, per_interval_params)
 
@@ -578,44 +581,53 @@ class ChromosomeProcessor(WithLoggerAndInterval):
         self,
         cutcounts_path,
         bad_segments: ProcessorOutputData,
-        parquet_path: str,
-        tmp_parquet_path: str
     ) -> ProcessorOutputData:
         if bad_segments is None:
             raise NotEnoughDataForContig
         segments = bad_segments.data_df.query(f'fit_type == "segment"')
         if segments.empty:
             raise NotEnoughDataForContig
-        min_bg_tag_proportion = segments['min_bg_tag_proportion'].values
-        segments = df_to_genomic_intervals(segments, extra_columns=['BAD'])
+        
+        segment_intervals = df_to_genomic_intervals(segments, extra_columns=['BAD'])
         chrom_fit = fit_stats_df_to_fallback_fit_results(
-            bad_segments.data_df
+            bad_segments.data_df.query('fit_type == "global"')
         )
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
             cutcounts_path,
             self.gp.mappable_bases_file
         )
         segments_fit = self.copy_with_params(SegmentalFit)
-        fit_res, per_window_trs, per_interval_params = segments_fit.fit_segments(
+        per_interval_params = segments_fit.fit_per_segment_bg_model(
             agg_cutcounts=agg_cutcounts,
-            bad_segments=segments,
+            bad_segments=segment_intervals,
             fallback_fit_results=chrom_fit,
-            min_bg_tag_proportion=min_bg_tag_proportion
+            min_bg_tag_proportion=segments['min_bg_tag_proportion'].values
         )
-        old_fit_res = self.reader.extract_fit_params(parquet_path)
-        old_fit_res = self.writer.update_fit_params(old_fit_res, fit_res)
-
-        old_per_window_trs = self.reader.extract_trs(parquet_path)
-        old_per_window_trs = self.writer.update_per_window_trs(
-            old_per_window_trs,
-            per_window_trs,
-            fit_results=fit_res
-        )
-        
-        df = fit_results_to_df(old_fit_res, old_per_window_trs)
-        self.write_to_parquet(df, tmp_parquet_path, compression_level=0)
 
         return ProcessorOutputData(self.chrom_name, per_interval_params)
+    
+
+    @parallel_func_error_handler
+    @ensure_contig_exists
+    def fit_per_bp_model(
+        self,
+        cutcounts_path,
+        segment_fit_results: ProcessorOutputData,
+        save_path
+    ):
+        if segment_fit_results is None:
+            raise NotEnoughDataForContig
+        segments_fit = self.copy_with_params(SegmentalFit)
+        agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
+            cutcounts_path,
+            self.gp.mappable_bases_file
+        )
+        per_bp_params, fit_trs = segments_fit.per_bp_background_model_fit(
+            agg_cutcounts,
+            segment_fit_results.data_df
+        )
+        df = fit_results_to_df(per_bp_params, fit_trs)
+        self.write_to_parquet(df, save_path)
 
 
     @parallel_func_error_handler

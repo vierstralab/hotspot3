@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 from typing import List
 
-from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df
+from genome_tools.genomic_interval import GenomicInterval, genomic_intervals_to_df, df_to_genomic_intervals
 
 from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
 from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDataForContig
-from hotspot3.helpers.format_converters import convert_fit_results_to_series
+from hotspot3.helpers.format_converters import set_series_row_to_df, convert_fit_results_to_series, fit_stats_df_to_fallback_fit_results
 from hotspot3.helpers.stats import check_valid_nb_params
 from hotspot3.helpers.utils import interpolate_nan
 
@@ -20,7 +20,40 @@ class SegmentalFit(WithLoggerAndInterval):
             segment = self.genomic_interval
         return agg_cutcounts[segment.start:segment.end]
     
-    def fit_segments(
+    def per_bp_background_model_fit(
+            self,
+            agg_cutcounts: ma.MaskedArray,
+            segments: pd.DataFrame,
+            segment_fit_results: pd.DataFrame,
+        ):
+        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
+        windowed_fit_results = WindowedFitResults(
+            p=per_window_trs.copy(),
+            r=per_window_trs.copy(),
+            enough_bg_mask=np.zeros(agg_cutcounts.shape[0], dtype=bool)
+        )
+        segments_genomic_intervals = df_to_genomic_intervals(segments)
+
+        for i, segment_interval in enumerate(segments_genomic_intervals):
+            start = int(segment_interval.start)
+            end = int(segment_interval.end)
+            segment_fit_result = fit_stats_df_to_fallback_fit_results(segment_fit_results.iloc[[i]])
+            if not check_valid_nb_params(segment_fit_result):
+                continue
+            signal_at_segment = self.filter_signal_to_segment(agg_cutcounts, segment_interval)
+            fit_res = self.fit_segment_params(
+                signal_at_segment,
+                segment_fit_result.fit_threshold,
+                fallback_fit_results=segment_fit_result,
+                genomic_interval=segment_interval
+            )
+            windowed_fit_results.r[start:end] = fit_res.r
+            windowed_fit_results.p[start:end] = fit_res.p
+            windowed_fit_results.enough_bg_mask[start:end] = fit_res.enough_bg_mask
+            per_window_trs[start:end] = segment_fit_result.fit_threshold
+        return windowed_fit_results, per_window_trs
+    
+    def fit_per_segment_bg_model(
             self,
             agg_cutcounts: ma.MaskedArray,
             bad_segments: List[GenomicInterval],
@@ -28,24 +61,12 @@ class SegmentalFit(WithLoggerAndInterval):
             min_bg_tag_proportion: np.ndarray=None
         ):
         total_len = agg_cutcounts.count()
-        fit_res = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
-        windowed_fit_results = WindowedFitResults(
-            p=fit_res,
-            r=fit_res.copy(),
-            enough_bg_mask=np.zeros(agg_cutcounts.shape[0], dtype=bool)
-        )
-        per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
-
         intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
         if min_bg_tag_proportion is not None:
             assert len(min_bg_tag_proportion) == len(bad_segments), "min_bg_tag_proportion should have the same length as segments"
-        for i, segment_interval in enumerate(bad_segments):
-            start = int(segment_interval.start)
-            end = int(segment_interval.end)        
-            signal_at_segment = self.filter_signal_to_segment(
-                agg_cutcounts,
-                segment_interval
-            )
+        for i, segment_interval in enumerate(bad_segments):     
+            signal_at_segment = self.filter_signal_to_segment(agg_cutcounts, segment_interval)
+            segment_mean_signal = np.mean(signal_at_segment.compressed())
             g_fit = self.copy_with_params(
                 GlobalBackgroundFit,
                 name=segment_interval.to_ucsc()
@@ -58,8 +79,10 @@ class SegmentalFit(WithLoggerAndInterval):
                     if valid_cts.size == 0:
                         self.logger.critical(f"{segment_interval.to_ucsc()}: Not enough background data")
                         raise ValueError
-                    min_quantile = g_fit.get_bg_quantile_from_tr(signal_at_segment, valid_cts[0])
-                    g_fit.config.min_background_prop = min_quantile
+                    g_fit.config.min_background_prop = g_fit.get_bg_quantile_from_tr(
+                        signal_at_segment,
+                        valid_cts[0]
+                    )
 
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
@@ -68,49 +91,19 @@ class SegmentalFit(WithLoggerAndInterval):
                 )
                 success_fit = True
 
-                fit_res = self.fit_segment_params(
-                    signal_at_segment,
-                    segment_fit_results.fit_threshold,
-                    fallback_fit_results=segment_fit_results,
-                    genomic_interval=segment_interval
-                )
             except NotEnoughDataForContig:
                 segment_fit_results = FitResults()
-                fit_res = WindowedFitResults(
-                    p=np.full(signal_at_segment.shape[0], np.nan, dtype=np.float16),
-                    r=np.full(signal_at_segment.shape[0], np.nan, dtype=np.float16),
-                    enough_bg_mask=np.zeros(signal_at_segment.shape[0], dtype=bool)
-                )
                 success_fit = False
             
-            # TODO wrap in a function
             fit_series = convert_fit_results_to_series(
                 segment_fit_results,
-                signal_at_segment.compressed().mean(),
+                segment_mean_signal,
                 fit_type='segment',
                 success_fit=success_fit
             )
-            self.set_dtype(intervals_stats, fit_series)
-            intervals_stats.loc[i, fit_series.index] = fit_series
-            ###
+            set_series_row_to_df(intervals_stats, fit_series, i)
+        return intervals_stats
 
-            windowed_fit_results.r[start:end] = fit_res.r
-            windowed_fit_results.p[start:end] = fit_res.p
-            windowed_fit_results.enough_bg_mask[start:end] = fit_res.enough_bg_mask
-            per_window_trs[start:end] = segment_fit_results.fit_threshold
-        
-        return windowed_fit_results, per_window_trs, intervals_stats
-
-
-    def set_dtype(self, intervals_stats: pd.DataFrame, fit_series: pd.Series):
-        """
-        Workaround func to avoid future warnings about setting bool values to float (default) columns
-        Initially sets value of first row to every row in the DataFrame
-        """
-        added_cols = ~fit_series.index.isin(intervals_stats.columns)
-        if np.any(added_cols):
-            for col in fit_series.index[added_cols]:
-                intervals_stats[col] = fit_series[col]
 
     def add_fallback_fit_stats(
             self,
@@ -124,12 +117,11 @@ class SegmentalFit(WithLoggerAndInterval):
         intervals_stats['BAD'] = 0
         fit_series = convert_fit_results_to_series(
             fallback_fit_results,
-            agg_cutcounts.compressed().mean(),
+            np.mean(agg_cutcounts.compressed()),
             fit_type='global',
             success_fit=True,
         )
-        self.set_dtype(intervals_stats, fit_series)
-        intervals_stats.loc[0, fit_series.index] = fit_series
+        set_series_row_to_df(intervals_stats, fit_series, 0)
         return pd.concat([intervals_stats, segment_stats], ignore_index=True)
 
 

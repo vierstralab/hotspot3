@@ -9,10 +9,9 @@ from hotspot3.helpers.stats import mean_from_r_p
 bed12_columns = ['chrom', 'start', 'end', 'id', 'score', 'strand', 'thickStart', 'thickEnd', 'itemRgb', 'blockCount', 'blockSizes', 'blockStarts']
 
 
-def fit_stats_df_to_fallback_fit_results(df: pd.DataFrame):
-    chrom_fit = df.query(f'fit_type == "global"')
-    assert len(chrom_fit) == 1, f"Expected one global fit, got {len(chrom_fit)}"
-    chrom_fit = chrom_fit[
+def fit_stats_df_to_fallback_fit_results(fit_result_df: pd.DataFrame):
+    assert len(fit_result_df) == 1, f"Expected one fit, got {len(fit_result_df)}"
+    segment_fit_params = fit_result_df[
         ['bg_p', 'bg_r', 'rmsea', 'bg_bases_prop', 'bg_tr']
     ].iloc[0].rename(
         {
@@ -23,7 +22,7 @@ def fit_stats_df_to_fallback_fit_results(df: pd.DataFrame):
         }
     ).to_dict()
 
-    return FitResults(**chrom_fit)
+    return FitResults(**segment_fit_params)
 
 
 def get_spot_score_fit_data(fit_data: pd.DataFrame):
@@ -63,6 +62,23 @@ def convert_fit_results_to_series(
         'fit_type': fit_type,
         'success_fit': success_fit
     })
+
+def set_dtype(intervals_stats: pd.DataFrame, fit_series: pd.Series):
+    """
+    Workaround func to avoid future warnings about setting bool values to float (default) columns
+    Initially sets value of first row to every row in the DataFrame
+    """
+    added_cols = ~fit_series.index.isin(intervals_stats.columns)
+    if np.any(added_cols):
+        for col in fit_series.index[added_cols]:
+            intervals_stats[col] = fit_series[col]
+
+
+def set_series_row_to_df(df: pd.DataFrame, row: pd.Series, index):
+    set_dtype(df, row)
+    df.loc[index, row.index] = row
+    return df
+
 
 def fit_results_to_df(fit_results: WindowedFitResults, per_window_trs: np.ndarray):
     return pd.DataFrame({
