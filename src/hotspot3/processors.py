@@ -556,10 +556,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             per_window_trs_global,
             global_fit_params
         )
-
-        self.logger.debug(
-            f'{self.chrom_name}: Estimating per-bp parameters of background model for {len(bad_segments)} segments'
-        )
         segments_fit = self.copy_with_params(SegmentalFit)
         per_interval_params = segments_fit.fit_per_segment_bg_model(
             agg_cutcounts=agg_cutcounts,
