@@ -69,7 +69,7 @@ class SignalToNoiseFit(WithLogger):
 
         spot_score_std = self.calc_spot_score_error(resid, spot_score, spot_data.total_bases)
 
-        self.logger.info(f"Signal to noise fit results: SPOT={spot_score:.2f}±{spot_score_std:.2f}")
+        self.logger.info(f"Signal to noise fit: SPOT={spot_score:.2f}±{spot_score_std:.2f}")
 
         return SPOTEstimationResults(
             spot_score=spot_score,

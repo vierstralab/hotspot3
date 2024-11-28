@@ -281,6 +281,8 @@ class GenomeProcessor(WithLogger):
         has_outlier_segments = True
         iteration = 1
         per_region_params, spot_results = sn_fit.fit(per_region_params)
+
+        # keep track of all segments that have been refitted through the iterations
         refit_with_constraint = np.zeros(per_region_params.shape[0], dtype=bool)
 
         while has_outlier_segments:
