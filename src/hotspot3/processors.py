@@ -281,23 +281,20 @@ class GenomeProcessor(WithLogger):
         has_outlier_segments = True
         iteration = 1
         per_region_params, spot_results = sn_fit.fit(per_region_params)
+        per_region_params['refit_with_constraint'] = sn_fit.find_outliers(per_region_params)
 
         # keep track of all segments that have been refitted through the iterations
-        refit_with_constraint = np.zeros(per_region_params.shape[0], dtype=bool)
+        refit_with_constraint = per_region_params['refit_with_constraint'].values
 
         while has_outlier_segments:
-            is_outlier_segment = sn_fit.find_outliers(per_region_params)
-            per_region_params['refit_with_constraint'] = is_outlier_segment
-            refit_with_constraint |= is_outlier_segment
+            is_outlier_segment = per_region_params['refit_with_constraint']
 
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
 
             if self.config.save_debug:
                 self.writer.df_to_tabix(per_region_params, per_region_stats_path + f'.iter{iteration}')
 
-            outlier_params = per_region_params[
-                is_outlier_segment | (per_region_params['fit_type'] == 'global')
-            ]
+            outlier_params = per_region_params.query('refit_with_constraint | fit_type == "global"')
 
             bad_segments = [
                 ProcessorOutputData(x[0], x[1]) 
@@ -311,9 +308,15 @@ class GenomeProcessor(WithLogger):
             )
             refit_params = self.merge_and_add_chromosome(refit_params).data_df
             per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values
+
+            # Refit the model and check for outliers
             per_region_params, spot_results = sn_fit.fit(per_region_params)
+            per_region_params['refit_with_constraint'] = sn_fit.find_outliers(per_region_params)
+
+            refit_with_constraint |= per_region_params['refit_with_constraint']
+            has_outlier_segments = per_region_params['refit_with_constraint'].sum() > 0
+            
             iteration += 1
-            has_outlier_segments = is_outlier_segment.sum() > 0
         else:
             self.logger.info(f'No outlier segments found at iteration {iteration}.')
 
