@@ -43,24 +43,27 @@ def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.n
             - betaln(x, r, dtype=r.dtype)
         )
 
+def find_potentialy_significant_pvals(log_pval: np.ndarray, max_fdr):
+    non_nan_pvals = ~np.isnan(log_pval)
+    number_of_tests = np.sum(non_nan_pvals)
+    return non_nan_pvals & (log_pval >= -np.log10(max_fdr)), number_of_tests
 
 def fast_logfdr_below_threshold(log_pval: np.ndarray, max_fdr: float, fdr_method: str):
     result = np.full_like(log_pval, np.nan)
-    mask = ~np.isnan(log_pval)
-    not_nan_shape = np.sum(mask)
-    mask = mask & (log_pval >= -np.log10(max_fdr))
+    mask, m = find_potentialy_significant_pvals(log_pval, max_fdr)
 
+    # Convert to natural log
     log_pval = log_pval[mask]
     log_pval *= -np.log(10)
 
-    result[mask] = logfdr_from_logpvals(log_pval, method=fdr_method, m=not_nan_shape)
+    result[mask] = logfdr_from_logpvals(log_pval, method=fdr_method, m=m)
     result /= -np.log(10)
     return result
 
 
 def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
     """
-    Reimplementation of scipy.stats.false_discovery_control to work with neglog-transformed p-values.
+    Reimplementation of scipy.stats.false_discovery_control to work with log-transformed p-values.
     Accepts log-transformed p-values and returns log-transformed FDR values.
     NOTE: Not log10-transformed and not negated!
 

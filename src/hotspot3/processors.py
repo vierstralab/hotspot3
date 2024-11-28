@@ -286,7 +286,9 @@ class GenomeProcessor(WithLogger):
         refit_with_constraint = per_region_params['refit_with_constraint'].values
         has_outlier_segments = per_region_params['refit_with_constraint'].sum() > 0
 
-        while has_outlier_segments:
+        for iteration in range(1, self.config.max_outlier_iterations + 1):
+            if not has_outlier_segments:
+                break
             is_outlier_segment = per_region_params['refit_with_constraint']
 
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
@@ -780,7 +782,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @parallel_func_error_handler
     @ensure_contig_exists
     def write_to_parquet(self, data_df, path, compression_level=22):
-        self.writer.parallel_write_to_parquet(
+        self.writer.parallel_write_chromdata_to_parquet(
             data_df,
             path,
             chrom_names=[x for x in self.gp.chrom_sizes.keys()],

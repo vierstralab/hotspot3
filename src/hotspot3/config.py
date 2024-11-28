@@ -65,6 +65,7 @@ class ProcessorConfig:
     babachi_boundary_penalty: int = 20
 
     outlier_segment_threshold: float = 5
+    max_outlier_iterations: int = 5
 
     # FDR correction
     fdr_method: str = 'bh'

@@ -10,14 +10,14 @@ from genome_tools.helpers import df_to_tabix
 
 from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig, WindowedFitResults
 
-from hotspot3.io import to_parquet_high_compression
+from hotspot3.io import to_parquet_high_compression, parallel_write_partitioned_parquet
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.signal_smoothing import normalize_density
 
 
 class ChromWriter(WithLoggerAndInterval):
 
-    def parallel_write_to_parquet(self, data_df, path, chrom_names, compression_level=22):
+    def parallel_write_chromdata_to_parquet(self, data_df, path, chrom_names, compression_level=22):
         """
         Workaround for writing parquet files for chromosomes in parallel.
         """
@@ -30,18 +30,15 @@ class ChromWriter(WithLoggerAndInterval):
             [chrom_name] * data_df.shape[0],
             categories=chrom_names
         )
-        os.makedirs(path, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=self.config.tmp_dir) as temp_dir:
-            temp_path = os.path.join(temp_dir, f'{chrom_name}.temp.parquet')
-            to_parquet_high_compression(
-                data_df,
-                temp_path,
-                compression_level=compression_level
-            )
-            res_path = os.path.join(path, f'chrom={chrom_name}')
-            if os.path.exists(res_path):
-                shutil.rmtree(res_path)
-            shutil.move(os.path.join(temp_path, f'chrom={chrom_name}'), path)
+        parallel_write_partitioned_parquet(
+            data_df,
+            chrom_name,
+            'chrom',
+            path,
+            tmp_dir=self.config.tmp_dir,
+            compression_level=compression_level
+        )
+
 
     def update_fit_params(self, old_fit_results: WindowedFitResults, fit_results: WindowedFitResults):
         
