@@ -24,7 +24,6 @@ class SegmentalFit(WithLoggerAndInterval):
             self,
             agg_cutcounts: ma.MaskedArray,
             segments: pd.DataFrame,
-            segment_fit_results: pd.DataFrame,
         ):
         per_window_trs = np.full(agg_cutcounts.shape[0], np.nan, dtype=np.float16)
         windowed_fit_results = WindowedFitResults(
@@ -37,7 +36,7 @@ class SegmentalFit(WithLoggerAndInterval):
         for i, segment_interval in enumerate(segments_genomic_intervals):
             start = int(segment_interval.start)
             end = int(segment_interval.end)
-            segment_fit_result = fit_stats_df_to_fallback_fit_results(segment_fit_results.iloc[[i]])
+            segment_fit_result = fit_stats_df_to_fallback_fit_results(segments.iloc[i])
             if not check_valid_nb_params(segment_fit_result):
                 continue
             signal_at_segment = self.filter_signal_to_segment(agg_cutcounts, segment_interval)
