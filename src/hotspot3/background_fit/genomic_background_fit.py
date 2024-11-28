@@ -64,8 +64,8 @@ class SegmentalFit(WithLoggerAndInterval):
         intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
         if min_bg_tag_proportion is not None:
             assert len(min_bg_tag_proportion) == len(bad_segments), "min_bg_tag_proportion should have the same length as segments"
+        self.logger.debug(f"{self.name}: Fitting background model for {len(bad_segments)} segments")
         for i, segment_interval in enumerate(bad_segments):
-            self.logger.debug(f"{segment_interval.to_ucsc()}: Fitting background model")
             signal_at_segment = self.filter_signal_to_segment(agg_cutcounts, segment_interval)
             segment_mean_signal = np.mean(signal_at_segment.compressed())
             g_fit = self.copy_with_params(
