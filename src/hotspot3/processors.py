@@ -281,12 +281,13 @@ class GenomeProcessor(WithLogger):
         has_outlier_segments = True
         iteration = 1
         per_region_params, spot_results = sn_fit.fit(per_region_params)
+        refit_with_constraint = np.zeros(per_region_params.shape[0], dtype=bool)
 
         while has_outlier_segments:
             is_outlier_segment = sn_fit.find_outliers(per_region_params)
             per_region_params['refit_with_constraint'] = is_outlier_segment
+            refit_with_constraint |= is_outlier_segment
 
-            has_outlier_segments = is_outlier_segment.sum() > 0
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
 
             if self.config.save_debug:
@@ -310,9 +311,12 @@ class GenomeProcessor(WithLogger):
             per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values
             per_region_params, spot_results = sn_fit.fit(per_region_params)
             iteration += 1
+            has_outlier_segments = is_outlier_segment.sum() > 0
         else:
             self.logger.info(f'No outlier segments found at iteration {iteration}.')
-        self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}")
+
+        per_region_params['refit_with_constraint'] = refit_with_constraint
+        self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}. Refitted {refit_with_constraint.sum()} segments.")
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
         self.writer.fit_stats_to_bw(
             per_region_params,
