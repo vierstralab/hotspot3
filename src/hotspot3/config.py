@@ -39,7 +39,7 @@ class ProcessorConfig:
     min_background_prop: float = 0.6
     max_background_prop: float = 0.995
 
-    chromosome_fit_step: int = 5000
+    chromosome_fit_step: int = 1500
 
     # option to exclude peak flanks as well as peaks for fitting background
     # not used by default

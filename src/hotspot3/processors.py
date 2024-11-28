@@ -278,13 +278,13 @@ class GenomeProcessor(WithLogger):
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
 
         sn_fit = self.copy_with_params(SignalToNoiseFit)
-        has_outlier_segments = True
         iteration = 1
         per_region_params, spot_results = sn_fit.fit(per_region_params)
         per_region_params['refit_with_constraint'] = sn_fit.find_outliers(per_region_params)
 
         # keep track of all segments that have been refitted through the iterations
         refit_with_constraint = per_region_params['refit_with_constraint'].values
+        has_outlier_segments = per_region_params['refit_with_constraint'].sum() > 0
 
         while has_outlier_segments:
             is_outlier_segment = per_region_params['refit_with_constraint']
