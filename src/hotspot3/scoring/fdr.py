@@ -65,7 +65,6 @@ class SampleFDRCorrection(FDRCorrection):
             save_path,
             cpus=self.config.cpus
         )
-        shutil.rmtree(mask_path)
     
     def read_fdrs_for_chrom(self, fdr_path, chrom):
         return read_partioned_parquet(
