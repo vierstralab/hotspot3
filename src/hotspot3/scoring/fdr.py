@@ -69,8 +69,8 @@ class SampleFDRCorrection(FDRCorrection):
     def read_fdrs_for_chrom(self, fdr_path, chrom):
         return read_partioned_parquet(
             fdr_path,
-            partition_col=['chrom', 'sample_id'],
-            partition_val=[chrom, self.name],
+            partition_cols=['chrom', 'sample_id'],
+            partition_vals=[chrom, self.name],
             columns=['log10_fdr']
         )['log10_fdr'].values
 
