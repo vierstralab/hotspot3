@@ -1,6 +1,7 @@
 import dataclasses
 import pandas as pd
 import numpy as np
+from typing import List
 
 
 @dataclasses.dataclass
@@ -49,13 +50,30 @@ class SPOTEstimationResults:
 
 
 @dataclasses.dataclass
+class FDRData:
+    potentially_signif_pvals: np.ndarray
+    n_tests: int
+
+@dataclasses.dataclass
+class SampleFDRdata(FDRData):
+    sample_id: str
+    chrom_pos_mapping: tuple
+
+
+
+@dataclasses.dataclass
+class MultiSampleFDRData(FDRData):
+    sample_id_correspondance: pd.DataFrame
+    chrom_pos_mappings: List[tuple]
+
+
+@dataclasses.dataclass
 class ProcessorOutputData:
     """
     Dataclass for storing the output of ChromosomeProcessor and GenomeProcessor methods.
     """
     id: str
     data_df: pd.DataFrame
-
 
 class NotEnoughDataForContig(Exception):
     """Exception raised when a required contig is not present."""

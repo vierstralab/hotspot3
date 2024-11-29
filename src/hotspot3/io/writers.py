@@ -10,7 +10,7 @@ from genome_tools.helpers import df_to_tabix
 
 from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig, WindowedFitResults
 
-from hotspot3.io import to_parquet_high_compression, parallel_write_partitioned_parquet
+from hotspot3.io import parallel_write_partitioned_parquet
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.signal_smoothing import normalize_density
 
@@ -32,36 +32,12 @@ class ChromWriter(WithLoggerAndInterval):
         )
         parallel_write_partitioned_parquet(
             data_df,
-            chrom_name,
-            'chrom',
-            path,
+            field_names=[chrom_name],
+            partition_cols=['chrom'],
+            path=path,
             tmp_dir=self.config.tmp_dir,
             compression_level=compression_level
         )
-
-
-    def update_fit_params(self, old_fit_results: WindowedFitResults, fit_results: WindowedFitResults):
-        
-        old_fit_results.r = np.where(
-            fit_results.enough_bg_mask,
-            fit_results.r,
-            old_fit_results.r
-        )
-        old_fit_results.p = np.where(
-            fit_results.enough_bg_mask,
-            fit_results.p,
-            old_fit_results.p
-        )
-        old_fit_results.enough_bg_mask = np.where(
-            fit_results.enough_bg_mask,
-            fit_results.enough_bg_mask,
-            old_fit_results.enough_bg_mask
-        )
-        return old_fit_results
-
-    def update_per_window_trs(self, initial_trs: np.ndarray, trs: np.ndarray, fit_results: WindowedFitResults):
-        initial_trs[fit_results.enough_bg_mask] = trs[fit_results.enough_bg_mask]
-        return initial_trs
 
 
 class GenomeWriter(WithLogger):

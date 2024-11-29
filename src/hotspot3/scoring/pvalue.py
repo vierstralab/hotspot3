@@ -50,8 +50,5 @@ class PvalueEstimator(WithLogger):
         result /= -np.log(10).astype(result.dtype)
         return result, None
 
-    def log10_fdr_from_log10pvals(self, pvals: np.ndarray, max_fdr: float) -> np.ndarray:
-        return fast_logfdr_below_threshold(pvals, max_fdr, fdr_method=self.config.fdr_method)
-    
     def fix_inf_pvals(self, pvals):
         return fix_inf_pvals(pvals)

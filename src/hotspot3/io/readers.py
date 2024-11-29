@@ -114,10 +114,6 @@ class ChromReader(WithLoggerAndInterval):
             columns=['chrom', 'tr']
         )
         return threholds
-
-    def extract_fdr_track(self, fdr_path):
-        log10_fdrs = self.extract_from_parquet(fdr_path, columns=['log10_fdr'])['log10_fdr'].values
-        return log10_fdrs
     
     def extract_significant_bases(self, fdrs, fdr_threshold, min_signif_bases=1):
         signif_bases = fdrs >= -np.log10(fdr_threshold)

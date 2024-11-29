@@ -22,6 +22,7 @@ from hotspot3.signal_smoothing import modwt_smooth, normalize_density
 from hotspot3.background_fit.genomic_background_fit import ChromosomeFit, SegmentalFit
 from hotspot3.background_fit.regression import SignalToNoiseFit
 from hotspot3.scoring.pvalue import PvalueEstimator
+from hotspot3.scoring.fdr import SampleFDRCorrection
 from hotspot3.peak_calling import find_stretches, find_varwidth_peaks
 
 
@@ -48,8 +49,9 @@ class GenomeProcessor(WithLogger):
 
         - config: ProcessorConfig object containing parameters.
     """
-    def __init__(self, chrom_sizes_file=None, config=None, mappable_bases_file=None, chromosomes=None):
+    def __init__(self, sample_id, chrom_sizes_file=None, config=None, mappable_bases_file=None, chromosomes=None):
         super().__init__(config=config)
+        self.sample_id = sample_id
         self.mappable_bases_file = mappable_bases_file
         self.chrom_sizes_file = chrom_sizes_file
         self.reader = self.copy_with_params(GenomeReader)
@@ -368,32 +370,14 @@ class GenomeProcessor(WithLogger):
             - max_fdr: Maximum FDR to calculate.
         """
         self.logger.info('Calculating per-bp FDRs')
-        
-        chrom_pos_mapping = self.reader.read_chrom_pos_mapping(pvals_path)
-
-        pval_est = PvalueEstimator(config=self.config, logger=self.logger)
-        result = pval_est.log10_fdr_from_log10pvals(
-            self.reader.read_pval_from_parquet(pvals_path),
+        self.copy_with_params(
+            SampleFDRCorrection,
+            name=self.sample_id
+        ).fdr_correct_pvals(
+            pvals_path,
             max_fdr,
+            save_path
         )
-
-        result = [
-            ProcessorOutputData(
-                chrom, 
-                pd.DataFrame({'log10_fdr': result[start:end]})
-            )
-            for chrom, start, end
-            in zip(*chrom_pos_mapping)
-        ]
-        self.logger.debug('Saving per-bp FDRs')
-        self.writer.sanitize_path(save_path)
-        self.parallel_by_chromosome(
-            ChromosomeProcessor.write_to_parquet,
-            result,
-            save_path,
-            0
-        )
-
 
     def call_hotspots(self, fdr_path, sample_id, save_path, save_path_bb, fdr_tr):
         """
@@ -683,7 +667,11 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @parallel_func_error_handler
     @ensure_contig_exists
     def call_hotspots(self, fdr_path, fdr_threshold=0.05) -> ProcessorOutputData:
-        log10_fdrs = self.reader.extract_fdr_track(fdr_path)
+        
+        log10_fdrs = self.copy_with_params(
+            SampleFDRCorrection,
+            name=self.gp.sample_id
+        ).read_fdrs_for_chrom(fdr_path, self.chrom_name)
         self.logger.debug(f"{self.chrom_name}: Calling hotspots")
         
         # TODO: move logic to a peak calling class
@@ -724,7 +712,10 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             smoothed_signal_path,
             columns=['smoothed', 'normalized_density']
         )
-        log10_fdrs = self.reader.extract_fdr_track(fdr_path)
+        log10_fdrs = self.copy_with_params(
+            SampleFDRCorrection,
+            name=self.gp.sample_id
+        ).read_fdrs_for_chrom(fdr_path, self.chrom_name)
         self.logger.debug(f"{self.chrom_name}: Calling peaks at FDR={fdr_threshold}")
         
         # TODO: move logic to a peak calling class

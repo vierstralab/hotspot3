@@ -21,6 +21,7 @@ def main() -> None:
         tmp_dir=args.tempdir,
     )
     genome_processor = GenomeProcessor(
+        sample_id=args.id,
         chrom_sizes_file=args.chrom_sizes,
         mappable_bases_file=args.mappable_bases,
         chromosomes=args.chromosomes,
@@ -29,6 +30,7 @@ def main() -> None:
     precomp_pvals = args.pvals_parquet
     cutcounts_path = args.cutcounts
     smoothed_signal_path = args.signal_parquet
+    precomp_fdrs = args.fdrs_parquet
     sample_id = args.id
 
     debug_dir = f"{args.outdir}/debug/"
@@ -60,7 +62,7 @@ def main() -> None:
                 total_cutcounts_path=total_cutcounts_path
             )
 
-        if precomp_pvals is None:
+        if precomp_pvals is None and precomp_fdrs is None:
             fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
 
             per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
@@ -94,9 +96,10 @@ def main() -> None:
                 total_cutcounts_path,
                 background_bw_path
             )
-            
-    precomp_fdrs = f"{debug_dir_prefix}.fdrs.parquet"
-    genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
+    
+    if precomp_fdrs is None:
+        precomp_fdrs = f"{debug_dir_prefix}.fdrs.parquet"
+        genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
 
     root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
     for fdr in args.fdrs:
@@ -202,6 +205,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     parser.add_argument("--cutcounts", help="Path to pre-calculated cutcounts tabix file. Skip extracting cutcounts from bam file", default=None)
     parser.add_argument("--signal_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips modwt signal smoothing", default=None)
     parser.add_argument("--pvals_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp p-values. Skips p-value calculation", default=None)
+    parser.add_argument("--fdrs_parquet", help="Path to pre-calculated fdrs. Can correct for several sampels using multiple_samples_fdr.py", default=None)
 
     parser.add_argument("--chromosomes", help="List of chromosomes to process. Used for debug", nargs='+', default=None)
 

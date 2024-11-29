@@ -61,7 +61,7 @@ def fast_logfdr_below_threshold(log_pval: np.ndarray, max_fdr: float, fdr_method
     return result
 
 
-def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
+def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None) -> np.ndarray:
     """
     Reimplementation of scipy.stats.false_discovery_control to work with log-transformed p-values.
     Accepts log-transformed p-values and returns log-transformed FDR values.
