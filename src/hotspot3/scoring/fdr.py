@@ -50,13 +50,15 @@ class SampleFDRCorrection(FDRCorrection):
 
         mask_path = f"{save_path}.mask"
         self.writer.sanitize_path(mask_path)
-        self.logger.debug(f"{self.name}: Extracting pvals")
+        self.logger.debug(f"{self.name}: Extracting raw P-values")
         fdr_data = self.extract_data_for_sample(pvals_path, max_fdr, mask_path)
 
+        self.logger.debug(f"{self.name}: Computing FDR")
         result = self.compute_fdr(fdr_data)
         result = self.cast_to_original_shape(result, mask_path)
 
         self.writer.sanitize_path(save_path)
+        self.logger.debug(f"{self.name}: Saving FDRs to parquet")
         self.write_fdr_partitioned_by_sample_and_chrom(
             result,
             fdr_data.chrom_pos_mapping,
