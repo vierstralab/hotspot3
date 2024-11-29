@@ -90,7 +90,7 @@ class BackgroundFit(BottleneckWrapper):
             min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
 
         if self.config.max_background_prop <= self.config.min_background_prop:
-            max_bg_tr = min_bg_tr
+            max_bg_tr = min_bg_tr + 1
         else:
             max_bg_tr = self.quantile_ignore_all_na(array, self.config.max_background_prop)
 
