@@ -42,14 +42,9 @@ class ChromWriter(WithLoggerAndInterval):
 
 class GenomeWriter(WithLogger):
 
-    def __init__(self, *args, chrom_sizes, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.chrom_sizes = chrom_sizes
-
-
-    def df_to_bigwig(self, df: pd.DataFrame, outpath, col='value'):
+    def df_to_bigwig(self, df: pd.DataFrame, outpath: str, chrom_sizes: dict, col='value'):
         with pyBigWig.open(outpath, 'w') as bw:
-            bw.addHeader(list(self.chrom_sizes.items()))
+            bw.addHeader(list(chrom_sizes.items()))
             chroms = df['chrom'].to_list()
             starts = df['start'].to_list()
             ends = df['end'].to_list()
@@ -70,21 +65,23 @@ class GenomeWriter(WithLogger):
         df_to_tabix(df, outpath)
     
 
-    def thresholds_df_to_bw(self, thresholds: pd.DataFrame, save_path, total_cutcounts):
+    def thresholds_df_to_bw(self, thresholds: pd.DataFrame, save_path, total_cutcounts, chrom_sizes):
         thresholds['end'] = thresholds['start'] + self.config.bg_track_step
         thresholds['tr'] = normalize_density(thresholds['tr'], total_cutcounts)
         self.df_to_bigwig(
             thresholds,
             save_path,
+            chrom_sizes=chrom_sizes,
             col='tr'
         )
 
-    def density_to_bw(self, density_data: pd.DataFrame, save_path):
+    def density_to_bw(self, density_data: pd.DataFrame, save_path, chrom_sizes):
         density_data['end'] = density_data['start'] + self.config.density_track_step
         self.logger.debug(f"Converting density to bigwig")
         self.df_to_bigwig(
             density_data,
             save_path,
+            chrom_sizes=chrom_sizes,
             col='normalized_density'
         )
 

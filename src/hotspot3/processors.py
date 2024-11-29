@@ -78,7 +78,7 @@ class GenomeProcessor(WithLogger):
             key=lambda x: x.chrom_size,
             reverse=True
         )
-        self.writer = self.copy_with_params(GenomeWriter, chrom_sizes=self.chrom_sizes)
+        self.writer = self.copy_with_params(GenomeWriter)
 
     
     def __getstate__(self):
@@ -239,7 +239,8 @@ class GenomeProcessor(WithLogger):
         self.writer.thresholds_df_to_bw(
             thresholds,
             save_path,
-            total_cutcounts
+            total_cutcounts,
+            chrom_sizes=self.chrom_sizes
         )
     
     def extract_bg_quantile_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
@@ -257,7 +258,8 @@ class GenomeProcessor(WithLogger):
         self.writer.thresholds_df_to_bw(
             thresholds,
             save_path,
-            total_cutcounts
+            total_cutcounts,
+            chrom_sizes=self.chrom_sizes
         )
     
     def fit_background_model(
@@ -473,6 +475,7 @@ class GenomeProcessor(WithLogger):
         self.writer.density_to_bw(
             density_data,
             density_path,
+            chrom_sizes=self.chrom_sizes
         )
         
 
