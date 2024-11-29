@@ -18,7 +18,6 @@ import gc
 from concurrent.futures import ProcessPoolExecutor
 
 
-
 class FDRCorrection(WithLogger):
 
     def __init__(self, name, config: ProcessorConfig=None, logger: Logger=None):
@@ -51,6 +50,7 @@ class SampleFDRCorrection(FDRCorrection):
 
         mask_path = f"{save_path}.mask"
         self.writer.sanitize_path(mask_path)
+        self.logger.debug(f"{self.name}: Extracting pvals")
         fdr_data = self.extract_data_for_sample(pvals_path, max_fdr, mask_path)
 
         result = self.compute_fdr(fdr_data)
@@ -82,7 +82,7 @@ class SampleFDRCorrection(FDRCorrection):
         log_pvals = log_pvals[mask]
         mask = pd.DataFrame({
             'tested_pos': mask,
-            'sample_id': pd.Categorical(self.name, categories=all_ids),
+            'sample_id': pd.Categorical([self.name] * len(mask), categories=all_ids),
         })
         
         self.write_partitioned_by_sample_df_to_parquet(mask, save_path)
