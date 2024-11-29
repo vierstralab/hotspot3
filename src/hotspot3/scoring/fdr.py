@@ -60,8 +60,8 @@ class SampleFDRCorrection(FDRCorrection):
         self.writer.sanitize_path(save_path)
         self.logger.debug(f"{self.name}: Saving FDRs to parquet")
         self.write_fdr_partitioned_by_sample_and_chrom(
-            result,
             fdr_data.chrom_pos_mapping,
+            result,
             save_path,
             cpus=self.config.cpus
         )
