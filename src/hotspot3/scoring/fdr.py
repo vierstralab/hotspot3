@@ -51,11 +51,11 @@ class SampleFDRCorrection(FDRCorrection):
         mask_path = f"{save_path}.mask"
         self.writer.sanitize_path(mask_path)
         self.logger.debug(f"{self.name}: Extracting raw P-values")
-        fdr_data = self.extract_data_for_sample(pvals_path, max_fdr, mask_path)
+        fdr_data, mask = self.extract_data_for_sample(pvals_path, max_fdr, mask_path, return_mask=True)
 
         self.logger.debug(f"{self.name}: Computing FDR")
         result = self.compute_fdr(fdr_data)
-        result = self.cast_to_original_shape(result, mask_path)
+        result = self.cast_to_original_shape(result, mask)
 
         self.writer.sanitize_path(save_path)
         self.logger.debug(f"{self.name}: Saving FDRs to parquet")
@@ -76,7 +76,7 @@ class SampleFDRCorrection(FDRCorrection):
         )['log10_fdr'].values
 
 
-    def extract_data_for_sample(self, pvals_path, fdr, save_path, all_ids=None):
+    def extract_data_for_sample(self, pvals_path, fdr, save_path, all_ids=None, return_mask=False):
         if all_ids is None:
             all_ids = [self.name]
         log_pvals = self.reader.read_pval_from_parquet(pvals_path)
@@ -86,10 +86,14 @@ class SampleFDRCorrection(FDRCorrection):
             'tested_pos': mask,
             'sample_id': pd.Categorical([self.name] * len(mask), categories=all_ids),
         })
-        
-        self.write_partitioned_by_sample_df_to_parquet(mask, save_path)
         chrom_pos_mapping = self.reader.read_chrom_pos_mapping(pvals_path)
-        return SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
+        data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
+
+        if return_mask:
+            return data, mask
+        self.write_partitioned_by_sample_df_to_parquet(mask, save_path)
+        return data
+            
     
     def write_partitioned_by_sample_df_to_parquet(self, df: pd.DataFrame, save_path):
         parallel_write_partitioned_parquet(
@@ -108,8 +112,9 @@ class SampleFDRCorrection(FDRCorrection):
             columns=['tested_pos']
         )['tested_pos'].values
     
-    def cast_to_original_shape(self, result: np.ndarray, mask_path) -> np.ndarray:
-        mask = self.extract_mask_for_sample(mask_path)
+    def cast_to_original_shape(self, result: np.ndarray, mask) -> np.ndarray:
+        if isinstance(mask, str):
+            mask = self.extract_mask_for_sample(mask)
         res = np.full(mask.shape[0], np.nan)
         res[mask] = result
         return res
