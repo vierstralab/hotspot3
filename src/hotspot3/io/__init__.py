@@ -54,7 +54,7 @@ def get_src_and_dest_partioned_parquet(src, dest, partition_cols, field_names):
         f'{partition_col}={name}' 
         for partition_col, name in zip(partition_cols, field_names)
     ]
-    parquet_file = [x[2] for x in os.walk(os.path.join(src, *names)) if x[2].endswith('.parquet')]
+    parquet_file = [x for x in os.listdir(os.path.join(src, *names)) if x.endswith('.parquet')]
     assert len(parquet_file) == 1
     parquet_file = parquet_file[0]
     return os.path.join(src, *names, parquet_file), os.path.join(dest, *names, parquet_file)
