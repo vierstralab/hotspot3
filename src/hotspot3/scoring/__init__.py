@@ -43,7 +43,7 @@ def logpval_for_dtype_hyp2f(x: np.ndarray, r: np.ndarray, p: np.ndarray) -> np.n
             - betaln(x, r, dtype=r.dtype)
         )
 
-def find_potentialy_significant_pvals(log_pval: np.ndarray, max_fdr):
+def find_potentialy_significant_pvals(log_pval: np.ndarray, max_fdr: float):
     non_nan_pvals = ~np.isnan(log_pval)
     number_of_tests = np.sum(non_nan_pvals)
     return non_nan_pvals & (log_pval >= -np.log10(max_fdr)), number_of_tests

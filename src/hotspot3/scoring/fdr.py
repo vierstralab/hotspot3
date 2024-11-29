@@ -82,15 +82,16 @@ class SampleFDRCorrection(FDRCorrection):
         log_pvals = self.reader.read_pval_from_parquet(pvals_path)
         mask, n_tests = find_potentialy_significant_pvals(log_pvals, fdr)
         log_pvals = log_pvals[mask]
+
+        chrom_pos_mapping = self.reader.read_chrom_pos_mapping(pvals_path)
+        data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
+        if return_mask:
+            return data, mask
+
         mask = pd.DataFrame({
             'tested_pos': mask,
             'sample_id': pd.Categorical([self.name] * len(mask), categories=all_ids),
         })
-        chrom_pos_mapping = self.reader.read_chrom_pos_mapping(pvals_path)
-        data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
-
-        if return_mask:
-            return data, mask
         self.write_partitioned_by_sample_df_to_parquet(mask, save_path)
         return data
             
@@ -104,7 +105,7 @@ class SampleFDRCorrection(FDRCorrection):
             tmp_dir=self.config.tmp_dir,
         )
     
-    def extract_mask_for_sample(self, mask_path):
+    def extract_mask_for_sample(self, mask_path) -> np.ndarray:
         return read_partioned_parquet(
             mask_path,
             partition_col=['sample_id'],
