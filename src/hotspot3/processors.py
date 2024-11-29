@@ -332,6 +332,7 @@ class GenomeProcessor(WithLogger):
         self.writer.fit_stats_to_bw(
             per_region_params,
             per_region_stats_path_bw,
+            chrom_sizes=self.chrom_sizes,
             total_cutcounts=self.reader.read_total_cutcounts(total_cutcounts_path),
         )
         self.logger.info('Estimating per-bp parameters of background model')

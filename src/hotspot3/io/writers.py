@@ -90,6 +90,7 @@ class GenomeWriter(WithLogger):
             fit_stats: pd.DataFrame,
             outpath_bw,
             total_cutcounts,
+            chrom_sizes
         ):
         fit_stats = fit_stats.query('fit_type == "segment"')[
             ['chrom', 'start', 'end', 'background']
@@ -102,6 +103,7 @@ class GenomeWriter(WithLogger):
         self.df_to_bigwig(
             fit_stats,
             outpath_bw,
+            chrom_sizes=chrom_sizes,
             col='background'
         )
     
