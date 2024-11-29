@@ -163,7 +163,7 @@ class SampleFDRCorrection(FDRCorrection):
         return pd.DataFrame({
             'log10_fdr': fdrs[start:end],
             'chrom': chrom,
-            'sample_id': pd.Categorical(self.name, categories=all_ids)
+            'sample_id': pd.Categorical([self.name] * (end - start), categories=all_ids)
         })
 
 
