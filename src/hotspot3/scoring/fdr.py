@@ -144,6 +144,7 @@ class SampleFDRCorrection(FDRCorrection):
         if cpus == 1:
             for gi in chrom_pos_mapping:
                 chrom_df = self.df_from_fdrs(fdrs, gi, all_ids)
+                print(chrom_df)
                 parallel_write_partitioned_parquet(
                     chrom_df,
                     field_names=[gi.chrom, self.name],
@@ -168,6 +169,7 @@ class SampleFDRCorrection(FDRCorrection):
         
     def df_from_fdrs(self, fdrs, genomic_interval: GenomicInterval, all_ids: List[str]) -> pd.DataFrame:
         sample_id_codes = np.full(len(genomic_interval), all_ids.index(self.name), dtype=np.int16)
+        
         chrom_categories = list(self.chrom_sizes.keys())
         chrom_codes = np.full(
             len(genomic_interval),
