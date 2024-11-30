@@ -73,7 +73,7 @@ def read_partioned_parquet(filename, partition_cols, partition_vals, columns=Non
             columns=columns
         )
 
-def check_chrom_exists(parquet_root, chrom, sample_id):
+def check_chrom_exists(parquet_root, chrom):
     """
     Check if a specific chromosome and sample_id partition exists in a Parquet dataset.
 
@@ -85,5 +85,5 @@ def check_chrom_exists(parquet_root, chrom, sample_id):
     Returns:
         bool: True if the partition exists, False otherwise.
     """
-    target_path = os.path.join(parquet_root, f"chrom={chrom}", f"sample_id={sample_id}")
+    target_path = os.path.join(parquet_root, f"chrom={chrom}")
     return os.path.exists(target_path)

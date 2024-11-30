@@ -144,12 +144,11 @@ class GenomeReader(WithLogger):
         self,
         pvals_path,
         chrom_sizes: dict=None,
-        sample_id=None
     ) -> List[GenomicInterval]:
         if chrom_sizes is not None:
             chroms = sorted([
                 x for x in chrom_sizes.keys() 
-                if check_chrom_exists(pvals_path, x, sample_id)
+                if check_chrom_exists(pvals_path, x)
             ])
             chrom_sizes = [0] + [chrom_sizes[y] for y in chroms]
             index_of_chrom = np.cumsum(chrom_sizes)

@@ -89,7 +89,6 @@ class SampleFDRCorrection(FDRCorrection):
         chrom_pos_mapping = self.reader.read_chrom_pos_mapping(
             pvals_path,
             chrom_sizes=self.chrom_sizes,
-            sample_id=self.name
         )
         data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
         if return_mask:
