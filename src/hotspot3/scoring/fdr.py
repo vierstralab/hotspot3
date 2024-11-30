@@ -116,7 +116,7 @@ class SampleFDRCorrection(FDRCorrection):
     def cast_to_original_shape(self, result: np.ndarray, mask) -> np.ndarray:
         if isinstance(mask, str):
             mask = self.extract_mask_for_sample(mask)
-        res = np.full(mask.shape[0], np.nan)
+        res = np.full(mask.shape[0], np.nan, dtype=result.dtype)
         res[mask] = result
         return res
     
