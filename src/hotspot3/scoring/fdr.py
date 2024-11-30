@@ -33,7 +33,8 @@ class FDRCorrection(WithLogger):
             potentially_signif_pvals,
             method=self.config.fdr_method,
             m=fdr_data.n_tests
-        ).astype(np.float16) / -np.log(10)
+        ).astype(np.float16)
+        logfdr /= -np.log(10)
         
         return logfdr
     
