@@ -72,19 +72,24 @@ class SegmentalFit(WithLoggerAndInterval):
                 name=segment_interval.to_ucsc()
             )
             try:
+                step = self.get_optimal_segment_step(total_len, len(segment_interval))
                 if min_bg_tag_proportion is not None:
+                    signal_with_step = signal_at_segment[::step].compressed()
                     valid_count = threhold_from_bg_tag_proportion(
-                        signal_at_segment.compressed(),
-                        min_bg_tag_proportion[i]
+                        signal_with_step,
+                        min_bg_tag_proportion[i],
                     )
-                    g_fit.config.min_background_prop = g_fit.get_bg_quantile_from_tr(
-                        signal_at_segment,
-                        valid_count
+                    g_fit.config.min_background_prop = min(
+                        g_fit.get_bg_quantile_from_tr(
+                            signal_with_step,
+                            valid_count
+                        ), 
+                        g_fit.config.max_background_prop
                     )
 
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
-                    step=self.get_optimal_segment_step(total_len, len(segment_interval)),
+                    step,
                     fallback_fit_results=fallback_fit_results
                 )
                 success_fit = True

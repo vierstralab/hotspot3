@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats as st
 import gc
-from scipy.special import logsumexp, betainc, hyp2f1, betaln, logit, expit
+from scipy.special import logsumexp, betainc, hyp2f1, betaln
 from typing import Union
 import pandas as pd
 
@@ -171,10 +171,11 @@ def weighted_std(x, weights, mean):
     variance = np.sum(weights * np.square(x - mean)) / np.sum(weights)
     return np.sqrt(variance)
 
-def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion) -> float:
+def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion: float) -> float:
     uq, cts = np.unique(signal_at_segment, return_counts=True)
     total = uq * cts
-    valid_cts = uq[np.cumsum(total) / np.sum(total) >= min_bg_tag_proportion]
+    cdf = np.cumsum(total) / np.sum(total)
+    valid_cts = uq[cdf >= min_bg_tag_proportion]
     if valid_cts.size == 0:
         raise ValueError(f"Not enough background data")
     return valid_cts[0]

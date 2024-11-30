@@ -207,8 +207,15 @@ class GlobalBackgroundFit(BackgroundFit):
                 data_for_fit,
                 np.inf
             )
-            if not check_valid_nb_params(best_fit_result):
-                raise NotEnoughDataForContig
+            if not check_valid_nb_params(best_fit_result): # mean > var, low signal 
+                if fallback_fit_results is not None: # use chrom fit r
+                    result = self.fit_all_thresholds(
+                        data_for_fit,
+                        fallback_fit_results=fallback_fit_results
+                    ) # cannot fail since relies only on mean
+                    best_fit_result = min(result, key=lambda x: x.rmsea)
+                else:
+                    raise NotEnoughDataForContig
         else:
             best_fit_result = min(result, key=lambda x: x.rmsea)
 
