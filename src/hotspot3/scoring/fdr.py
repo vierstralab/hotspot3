@@ -16,12 +16,15 @@ import shutil
 from logging import Logger
 import gc
 from concurrent.futures import ProcessPoolExecutor
+from typing import List
+from genome_tools import GenomicInterval
 
 
 class FDRCorrection(WithLogger):
 
-    def __init__(self, name, config: ProcessorConfig=None, logger: Logger=None):
+    def __init__(self, name, config: ProcessorConfig=None, logger: Logger=None, *, chrom_sizes: dict=None):
         super().__init__(config, logger, name)
+        self.chrom_sizes = chrom_sizes
         self.reader = self.copy_with_params(GenomeReader)
         self.writer = self.copy_with_params(GenomeWriter)
 
@@ -83,7 +86,11 @@ class SampleFDRCorrection(FDRCorrection):
         mask, n_tests = find_potentialy_significant_pvals(log_pvals, fdr)
         log_pvals = log_pvals[mask]
 
-        chrom_pos_mapping = self.reader.read_chrom_pos_mapping(pvals_path)
+        chrom_pos_mapping = self.reader.read_chrom_pos_mapping(
+            pvals_path,
+            chrom_sizes=self.chrom_sizes,
+            sample_id=self.name
+        )
         data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
         if return_mask:
             return data, mask
@@ -116,13 +123,13 @@ class SampleFDRCorrection(FDRCorrection):
     def cast_to_original_shape(self, result: np.ndarray, mask) -> np.ndarray:
         if isinstance(mask, str):
             mask = self.extract_mask_for_sample(mask)
-        res = np.full(mask.shape[0], np.nan, dtype=result.dtype)
+        res = np.full(mask.shape, np.nan, dtype=result.dtype)
         res[mask] = result
         return res
     
     def write_fdr_partitioned_by_sample_and_chrom(
             self,
-            chrom_pos_mapping,
+            chrom_pos_mapping: List[GenomicInterval],
             fdrs: np.ndarray,
             save_path,
             all_ids=None,
@@ -135,11 +142,11 @@ class SampleFDRCorrection(FDRCorrection):
             cpus = self.config.cpus
 
         if cpus == 1:
-            for chrom, start, end in zip(*chrom_pos_mapping):
-                chrom_df = self.df_from_fdrs(fdrs, chrom, start, end, all_ids)
+            for gi in chrom_pos_mapping:
+                chrom_df = self.df_from_fdrs(fdrs, gi, all_ids)
                 parallel_write_partitioned_parquet(
                     chrom_df,
-                    field_names=[chrom, self.name],
+                    field_names=[gi.chrom, self.name],
                     partition_cols=['chrom', 'sample_id'],
                     path=save_path,
                     tmp_dir=self.config.tmp_dir
@@ -147,23 +154,30 @@ class SampleFDRCorrection(FDRCorrection):
         else:
             params = [
                 (
-                    self.df_from_fdrs(fdrs, chrom, start, end, all_ids),
-                    (chrom, self.name),
+                    self.df_from_fdrs(fdrs, gi, all_ids),
+                    (gi.chrom, self.name),
                     ['chrom', 'sample_id'],
                     save_path,
                     self.config.tmp_dir
                 )
-                for chrom, start, end in zip(*chrom_pos_mapping)
+                for gi in chrom_pos_mapping
             ]
             params = [list(x) for x in zip(*params)]
             with ProcessPoolExecutor(cpus) as executor:
                 [x for x in executor.map(parallel_write_partitioned_parquet, *params)]
         
-    def df_from_fdrs(self, fdrs, chrom, start, end, all_ids):
+    def df_from_fdrs(self, fdrs, genomic_interval: GenomicInterval, all_ids: List[str]) -> pd.DataFrame:
+        sample_id_codes = np.full(len(genomic_interval), all_ids.index(self.name), dtype=np.int16)
+        chrom_categories = list(self.chrom_sizes.keys())
+        chrom_codes = np.full(
+            len(genomic_interval),
+            chrom_categories.index(genomic_interval.chrom),
+            dtype=np.int16
+        )
         return pd.DataFrame({
-            'log10_fdr': fdrs[start:end],
-            'chrom': chrom,
-            'sample_id': pd.Categorical([self.name] * (end - start), categories=all_ids)
+            'log10_fdr': fdrs[genomic_interval.start:genomic_interval.end],
+            'chrom': pd.Categorical.from_codes(chrom_codes, categories=chrom_categories),
+            'sample_id': pd.Categorical.from_codes(sample_id_codes, categories=all_ids)
         })
 
 

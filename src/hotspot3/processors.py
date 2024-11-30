@@ -375,11 +375,12 @@ class GenomeProcessor(WithLogger):
         self.logger.info('Calculating per-bp FDRs')
         self.copy_with_params(
             SampleFDRCorrection,
-            name=self.sample_id
+            name=self.sample_id,
+            chrom_sizes=self.chrom_sizes
         ).fdr_correct_pvals(
             pvals_path,
             max_fdr,
-            save_path
+            save_path,
         )
 
     def call_hotspots(self, fdr_path, sample_id, save_path, save_path_bb, fdr_tr):

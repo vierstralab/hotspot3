@@ -2,6 +2,7 @@ import dataclasses
 import pandas as pd
 import numpy as np
 from typing import List
+from genome_tools import GenomicInterval
 
 
 @dataclasses.dataclass
@@ -57,14 +58,13 @@ class FDRData:
 @dataclasses.dataclass
 class SampleFDRdata(FDRData):
     sample_id: str
-    chrom_pos_mapping: tuple
-
+    chrom_pos_mapping: List[GenomicInterval]
 
 
 @dataclasses.dataclass
 class MultiSampleFDRData(FDRData):
     sample_id_correspondance: pd.DataFrame
-    chrom_pos_mappings: List[tuple]
+    chrom_pos_mappings: List[List[GenomicInterval]]
 
 
 @dataclasses.dataclass

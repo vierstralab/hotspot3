@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
+from typing import List
 
 from genome_tools.data.extractors import TabixExtractor, ChromParquetExtractor
 from genome_tools import GenomicInterval
@@ -12,6 +13,8 @@ from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.connectors.bam2bed import BamFileCutsExtractor
 
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
+from hotspot3.io import check_chrom_exists
+
 
 
 class ChromReader(WithLoggerAndInterval):
@@ -136,15 +139,31 @@ class GenomeReader(WithLogger):
     def read_pval_from_parquet(self, pvals_path):
         return self.read_full_parquet(pvals_path, column='log10_pval').values
     
-    def read_chrom_pos_mapping(self, pvals_path):
-        chrom_pos_mapping = self.read_full_parquet(pvals_path, column='chrom')
-
-        total_len = chrom_pos_mapping.shape[0]
-        chrom_pos_mapping = chrom_pos_mapping.drop_duplicates()
-        starts = chrom_pos_mapping.index
-        # file is always sorted within chromosomes
-        ends = [*starts[1:], total_len]
-        return chrom_pos_mapping, starts, ends
+    # kinda redundant when chrom sizes are present
+    def read_chrom_pos_mapping(
+        self,
+        pvals_path,
+        chrom_sizes: dict=None,
+        sample_id=None
+    ) -> List[GenomicInterval]:
+        if chrom_sizes is not None:
+            chroms = sorted([
+                x for x in chrom_sizes.keys() 
+                if check_chrom_exists(pvals_path, x, sample_id)
+            ])
+            chrom_sizes = [0] + [chrom_sizes[y] for y in chroms]
+            index_of_chrom = np.cumsum(chrom_sizes)
+            starts = index_of_chrom[:-1]
+            ends = index_of_chrom[1:]
+        else:
+            chroms = self.read_full_parquet(pvals_path, column='chrom')
+            total_len = chroms.shape[0]
+            chroms = chroms.drop_duplicates()
+            starts = chroms.index
+            # file is always sorted within chromosomes
+            ends = [*starts[1:], total_len]
+        return [GenomicInterval(chrom, start, end) for chrom, start, end in zip(chroms, starts, ends)]
+    
     
     def get_chrom_sizes_file(self, chrom_sizes_file):
         if chrom_sizes_file is None:

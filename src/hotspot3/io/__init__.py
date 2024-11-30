@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import shutil
 import tempfile
+import pyarrow.parquet as pq
 
 
 def to_parquet_high_compression(df: pd.DataFrame, outpath, compression_level=22, partition_cols=None, **kwargs):
@@ -71,3 +72,18 @@ def read_partioned_parquet(filename, partition_cols, partition_vals, columns=Non
             engine='pyarrow',
             columns=columns
         )
+
+def check_chrom_exists(parquet_root, chrom, sample_id):
+    """
+    Check if a specific chromosome and sample_id partition exists in a Parquet dataset.
+
+    Parameters:
+        parquet_root (str): Path to the root of the Parquet dataset.
+        chrom (str): Chromosome name, e.g., "chr21".
+        sample_id (str): Sample ID, e.g., "AG62503".
+
+    Returns:
+        bool: True if the partition exists, False otherwise.
+    """
+    target_path = os.path.join(parquet_root, f"chrom={chrom}", f"sample_id={sample_id}")
+    return os.path.exists(target_path)
