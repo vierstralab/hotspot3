@@ -170,3 +170,11 @@ def weighted_std(x, weights, mean):
     x = np.asarray(x)
     variance = np.sum(weights * np.square(x - mean)) / np.sum(weights)
     return np.sqrt(variance)
+
+def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion) -> float:
+    uq, cts = np.unique(signal_at_segment, return_counts=True)
+    total = uq * cts
+    valid_cts = uq[np.cumsum(total) / np.sum(total) >= min_bg_tag_proportion]
+    if valid_cts.size == 0:
+        raise ValueError(f"Not enough background data")
+    return valid_cts[0]

@@ -10,7 +10,7 @@ from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
 from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDataForContig
 from hotspot3.helpers.format_converters import set_series_row_to_df, convert_fit_results_to_series, fit_stats_df_to_fallback_fit_results
-from hotspot3.helpers.stats import check_valid_nb_params
+from hotspot3.helpers.stats import check_valid_nb_params, threhold_from_bg_tag_proportion
 from hotspot3.helpers.utils import interpolate_nan
 
 
@@ -73,15 +73,13 @@ class SegmentalFit(WithLoggerAndInterval):
             )
             try:
                 if min_bg_tag_proportion is not None:
-                    uq, cts = np.unique(signal_at_segment, return_counts=True)
-                    total = uq * cts
-                    valid_cts = uq[np.cumsum(total) / np.sum(total) >= min_bg_tag_proportion[i]]
-                    if valid_cts.size == 0:
-                        self.logger.critical(f"{segment_interval.to_ucsc()}: Not enough background data")
-                        raise ValueError
+                    valid_count = threhold_from_bg_tag_proportion(
+                        signal_at_segment.compressed(),
+                        min_bg_tag_proportion[i]
+                    )
                     g_fit.config.min_background_prop = g_fit.get_bg_quantile_from_tr(
                         signal_at_segment,
-                        valid_cts[0]
+                        valid_count
                     )
 
                 segment_fit_results = g_fit.fit(
