@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import shutil
 import tempfile
-import pyarrow.parquet as pq
+from hotspot3.helpers.models import NotEnoughDataForContig
 
 
 def to_parquet_high_compression(df: pd.DataFrame, outpath, compression_level=22, partition_cols=None, **kwargs):
@@ -63,6 +63,8 @@ def get_src_and_dest_partioned_parquet(src, dest, partition_cols, field_names):
 
 def read_partioned_parquet(filename, partition_cols, partition_vals, columns=None):
     assert len(partition_cols) == len(partition_vals)
+    if not check_partition_exists(filename, partition_cols, partition_vals):
+        raise NotEnoughDataForContig
     return pd.read_parquet(
             filename,
             filters=[
@@ -72,6 +74,25 @@ def read_partioned_parquet(filename, partition_cols, partition_vals, columns=Non
             engine='pyarrow',
             columns=columns
         )
+
+
+def check_partition_exists(parquet_root, partition_cols, partition_vals):
+    """
+    Check if a specific partition exists in a Parquet dataset.
+
+    Parameters:
+        parquet_root (str): Path to the root of the Parquet dataset.
+        partition_cols (List[str]): List of partition column names.
+        partition_vals (List[str]): List of partition values.
+
+    Returns:
+        bool: True if the partition exists, False otherwise.
+    """
+    target_path = os.path.join(parquet_root, *[
+        f"{col}={val}" for col, val in zip(partition_cols, partition_vals)
+    ])
+    return os.path.exists(target_path)
+
 
 def check_chrom_exists(parquet_root, chrom):
     """
@@ -85,5 +106,4 @@ def check_chrom_exists(parquet_root, chrom):
     Returns:
         bool: True if the partition exists, False otherwise.
     """
-    target_path = os.path.join(parquet_root, f"chrom={chrom}")
-    return os.path.exists(target_path)
+    return check_partition_exists(parquet_root, ["chrom"], [chrom])

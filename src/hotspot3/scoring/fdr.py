@@ -7,7 +7,7 @@ from hotspot3.io.writers import GenomeWriter
 from hotspot3.io import parallel_write_partitioned_parquet, read_partioned_parquet
 
 from hotspot3.scoring import find_potentialy_significant_pvals, logfdr_from_logpvals
-from hotspot3.helpers.models import SampleFDRdata, MultiSampleFDRData, FDRData
+from hotspot3.helpers.models import SampleFDRdata, MultiSampleFDRData, FDRData, NotEnoughDataForContig
 from hotspot3.config import ProcessorConfig
 
 import numpy as np
@@ -71,6 +71,8 @@ class SampleFDRCorrection(FDRCorrection):
         )
     
     def read_fdrs_for_chrom(self, fdr_path, chrom):
+        if not check_chrom_exists(fdr_path, chrom):
+            raise NotEno
         return read_partioned_parquet(
             fdr_path,
             partition_cols=['chrom', 'sample_id'],

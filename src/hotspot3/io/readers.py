@@ -144,22 +144,22 @@ class GenomeReader(WithLogger):
         pvals_path,
         chrom_sizes: dict=None,
     ) -> List[GenomicInterval]:
-        # if chrom_sizes is not None:
-        #     chroms = sorted([
-        #         x for x in chrom_sizes.keys() 
-        #         if check_chrom_exists(pvals_path, x)
-        #     ])
-        #     chrom_sizes = [0] + [chrom_sizes[y] for y in chroms]
-        #     index_of_chrom = np.cumsum(chrom_sizes)
-        #     starts = index_of_chrom[:-1]
-        #     ends = index_of_chrom[1:]
-    # else: 
-        chroms = self.read_full_parquet(pvals_path, column='chrom')
-        total_len = chroms.shape[0]
-        chroms = chroms.drop_duplicates()
-        starts = chroms.index
-        # file is always sorted within chromosomes
-        ends = [*starts[1:], total_len]
+        if chrom_sizes is not None:
+            chroms = sorted([
+                x for x in chrom_sizes.keys() 
+                if check_chrom_exists(pvals_path, x)
+            ])
+            chrom_sizes = [0] + [chrom_sizes[y] for y in chroms]
+            index_of_chrom = np.cumsum(chrom_sizes)
+            starts = index_of_chrom[:-1]
+            ends = index_of_chrom[1:]
+        else: 
+            chroms = self.read_full_parquet(pvals_path, column='chrom')
+            total_len = chroms.shape[0]
+            chroms = chroms.drop_duplicates()
+            starts = chroms.index
+            # file is always sorted within chromosomes
+            ends = [*starts[1:], total_len]
         return [GenomicInterval(chrom, start, end) for chrom, start, end in zip(chroms, starts, ends)]
     
     
