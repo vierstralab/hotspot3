@@ -143,7 +143,6 @@ class SampleFDRCorrection(FDRCorrection):
         if cpus == 1:
             for gi in chrom_pos_mapping:
                 chrom_df = self.df_from_fdrs(fdrs, gi, all_ids)
-                print(chrom_df)
                 parallel_write_partitioned_parquet(
                     chrom_df,
                     field_names=[gi.chrom, self.name],
