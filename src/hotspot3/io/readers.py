@@ -139,7 +139,6 @@ class GenomeReader(WithLogger):
     def read_pval_from_parquet(self, pvals_path):
         return self.read_full_parquet(pvals_path, column='log10_pval').values
     
-    # kinda redundant when chrom sizes are present
     def read_chrom_pos_mapping(
         self,
         pvals_path,
@@ -154,7 +153,7 @@ class GenomeReader(WithLogger):
             index_of_chrom = np.cumsum(chrom_sizes)
             starts = index_of_chrom[:-1]
             ends = index_of_chrom[1:]
-        else:
+        else: 
             chroms = self.read_full_parquet(pvals_path, column='chrom')
             total_len = chroms.shape[0]
             chroms = chroms.drop_duplicates()
