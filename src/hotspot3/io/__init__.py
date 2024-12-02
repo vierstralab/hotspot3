@@ -92,18 +92,3 @@ def check_partition_exists(parquet_root, partition_cols, partition_vals):
         f"{col}={val}" for col, val in zip(partition_cols, partition_vals)
     ])
     return os.path.exists(target_path)
-
-
-def check_chrom_exists(parquet_root, chrom):
-    """
-    Check if a specific chromosome and sample_id partition exists in a Parquet dataset.
-
-    Parameters:
-        parquet_root (str): Path to the root of the Parquet dataset.
-        chrom (str): Chromosome name, e.g., "chr21".
-        sample_id (str): Sample ID, e.g., "AG62503".
-
-    Returns:
-        bool: True if the partition exists, False otherwise.
-    """
-    return check_partition_exists(parquet_root, ["chrom"], [chrom])

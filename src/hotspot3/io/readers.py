@@ -13,7 +13,7 @@ from hotspot3.connectors.bottleneck import BottleneckWrapper
 from hotspot3.connectors.bam2bed import BamFileCutsExtractor
 
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
-from hotspot3.io import check_chrom_exists
+from hotspot3.io import check_partition_exists
 
 
 
@@ -147,7 +147,7 @@ class GenomeReader(WithLogger):
         if chrom_sizes is not None:
             chroms = sorted([
                 x for x in chrom_sizes.keys() 
-                if check_chrom_exists(pvals_path, x)
+                if check_partition_exists(pvals_path, ['chrom'], [x])
             ])
             chrom_sizes = [0] + [chrom_sizes[y] for y in chroms]
             index_of_chrom = np.cumsum(chrom_sizes)

@@ -71,8 +71,6 @@ class SampleFDRCorrection(FDRCorrection):
         )
     
     def read_fdrs_for_chrom(self, fdr_path, chrom):
-        if not check_chrom_exists(fdr_path, chrom):
-            raise NotEno
         return read_partioned_parquet(
             fdr_path,
             partition_cols=['chrom', 'sample_id'],
