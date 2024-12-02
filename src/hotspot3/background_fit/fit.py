@@ -370,7 +370,8 @@ class StridedBackgroundFit(BackgroundFit):
     
     def upcast(self, original_shape, subsampled_indices: np.ndarray, values: np.ndarray):
         upcasted = np.full(original_shape, np.nan, dtype=np.float16)
-        upcasted[subsampled_indices] = values
+        upcasted[subsampled_indices] = np.asarray(values, dtype=np.float16)
+        upcasted[~np.isfinite(upcasted)] = np.nan
         return upcasted
 
 

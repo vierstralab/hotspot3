@@ -2,6 +2,9 @@ import pandas as pd
 import os
 import shutil
 import tempfile
+from typing import List
+
+
 from hotspot3.helpers.models import NotEnoughDataForContig
 
 
@@ -76,7 +79,7 @@ def read_partioned_parquet(filename, partition_cols, partition_vals, columns=Non
         )
 
 
-def check_partition_exists(parquet_root, partition_cols, partition_vals):
+def check_partition_exists(parquet_root: str, partition_cols: List[str], partition_vals: List[str]):
     """
     Check if a specific partition exists in a Parquet dataset.
 
