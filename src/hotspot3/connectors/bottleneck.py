@@ -9,13 +9,13 @@ class BottleneckWrapper(WithLogger):
 
     @wrap_masked
     @correct_offset
-    def centered_running_nansum(self, array: np.ndarray, window: int):
+    def centered_running_nansum(self, array: np.ndarray, window: int) -> np.ndarray:
         min_count = self.get_min_count(window)
         return bn.move_sum(array, window, min_count=min_count).astype(np.float32)
 
     @wrap_masked
     @correct_offset
-    def centered_running_nanvar(self, array, window):
+    def centered_running_nanvar(self, array, window) -> np.ndarray:
         min_count = self.get_min_count(window)
         return bn.move_var(array, window, ddof=1, min_count=min_count).astype(np.float32)
 
@@ -27,7 +27,7 @@ class BottleneckWrapper(WithLogger):
 
     @wrap_masked
     @correct_offset
-    def centered_running_nanmax(self, array, window):
+    def centered_running_nanmax(self, array, window)  -> np.ndarray:
         return bn.move_max(array, window, min_count=1).astype(np.float32)
 
     def get_min_count(self, window):
