@@ -199,25 +199,15 @@ class GlobalBackgroundFit(BackgroundFit):
         Parameters:
             agg_cutcounts (np.ndarray): Array of aggregated cutcounts.
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
+            fallback_fit_results (FitResults): Fallback fit results to use if the fit has failed.
         """     
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
-        result = self.fit_all_thresholds(data_for_fit)
-        if len(result) == 0: # No valid fits => fit all data
-            best_fit_result = self.fit_for_tr(
-                data_for_fit,
-                np.inf
-            )
-            if not check_valid_nb_params(best_fit_result): # mean > var, low signal 
-                if fallback_fit_results is not None: # use chrom fit r
-                    result = self.fit_all_thresholds(
-                        data_for_fit,
-                        fallback_fit_results=fallback_fit_results
-                    ) # cannot fail since relies only on mean
-                    best_fit_result = min(result, key=lambda x: x.rmsea)
-                else:
-                    raise NotEnoughDataForContig
-        else:
-            best_fit_result = min(result, key=lambda x: x.rmsea)
+        best_fit_result = self.fit_and_choose_best(data_for_fit)
+        if not check_valid_nb_params(best_fit_result):
+            if fallback_fit_results is not None:
+                best_fit_result = self.fit_and_choose_best(data_for_fit, fallback_fit_results)
+            else:
+                raise NotEnoughDataForContig
 
         best_fit_result.n_total = agg_cutcounts.count()
         best_fit_result.n_signal = self.get_signal_mask_for_tr(
@@ -225,6 +215,19 @@ class GlobalBackgroundFit(BackgroundFit):
             best_fit_result.fit_threshold
         ).sum()
 
+        return best_fit_result
+    
+    def fit_and_choose_best(self, data_for_fit: DataForFit, fallback_fit_results: FitResults=None):
+        result = self.fit_all_thresholds(data_for_fit, fallback_fit_results)
+        if len(result) == 0: # No valid fits => fit all data
+            best_fit_result = self.fit_for_tr(
+                data_for_fit,
+                np.inf,
+                fallback_fit_results=fallback_fit_results,
+                calc_rmsea=False
+            )
+        else:
+            best_fit_result = min(result, key=lambda x: x.rmsea)
         return best_fit_result
     
     def prepare_data_for_fit(
@@ -279,7 +282,8 @@ class GlobalBackgroundFit(BackgroundFit):
             self,
             data_for_fit: DataForFit,
             tr: float,
-            fallback_fit_results: FitResults=None
+            fallback_fit_results: FitResults=None,
+            calc_rmsea=True
     ):
         assumed_signal_mask = data_for_fit.max_counts_with_flanks >= tr
 
@@ -288,6 +292,7 @@ class GlobalBackgroundFit(BackgroundFit):
             assumed_signal_mask,
             data_for_fit.bin_edges,
             fallback_fit_results=fallback_fit_results,
+            calc_rmsea=calc_rmsea
         )
         step_fit.fit_quantile = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
         step_fit.fit_threshold = tr
@@ -298,7 +303,8 @@ class GlobalBackgroundFit(BackgroundFit):
         agg_cutcounts,
         assumed_signal_mask,
         bin_edges,
-        fallback_fit_results: FitResults=None
+        fallback_fit_results: FitResults=None,
+        calc_rmsea=True
     ):
         mean, var = self.get_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
         if fallback_fit_results is not None:
@@ -317,15 +323,19 @@ class GlobalBackgroundFit(BackgroundFit):
             bin_edges,
             where=~assumed_signal_mask[:, None]
         )
-        rmsea = self.calc_rmsea_all_windows(
-            p,
-            r,
-            n_params,
-            bin_edges,
-            value_counts,
-        )[0]
-        if not np.isfinite(rmsea):
-            raise NotEnoughDataForContig
+        if calc_rmsea:
+            rmsea = self.calc_rmsea_all_windows(
+                p,
+                r,
+                n_params,
+                bin_edges,
+                value_counts,
+            )[0]
+            
+            if not np.isfinite(rmsea):
+                raise NotEnoughDataForContig
+        else:
+            rmsea = np.nan
         return FitResults(p, r, rmsea)
 
 
