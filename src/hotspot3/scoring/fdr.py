@@ -93,7 +93,7 @@ class SampleFDRCorrection(FDRCorrection):
         data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
         if return_mask:
             return data, mask
-
+        self.logger.debug(f"{self.name}: Saving mask to parquet")
         mask = pd.DataFrame({
             'tested_pos': mask,
             'sample_id': pd.Categorical([self.name] * len(mask), categories=all_ids),
