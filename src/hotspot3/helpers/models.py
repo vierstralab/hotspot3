@@ -1,7 +1,7 @@
 import dataclasses
 import pandas as pd
 import numpy as np
-from typing import List, Dict
+from typing import List, Dict, AnyStr
 from genome_tools import GenomicInterval
 
 
@@ -64,7 +64,7 @@ class SampleFDRdata(FDRData):
 @dataclasses.dataclass
 class MultiSampleFDRData(FDRData):
     sample_id_correspondance: pd.DataFrame
-    chrom_pos_mappings: Dict[List[GenomicInterval]]
+    chrom_pos_mappings: Dict[AnyStr, List[GenomicInterval]]
 
 
 @dataclasses.dataclass
