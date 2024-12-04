@@ -223,7 +223,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
                 for args in zip(all_args)
             }
 
-        results = {}
+        results = []
         chrom_pos_mappings = {}
         n_tests = 0
         sample_id_correspondance = pd.DataFrame(
@@ -243,7 +243,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
 
             chrom_pos_mappings[sample_id] = fdr_correction_data.chrom_pos_mapping
 
-            results[sample_id] = potentially_significant_pvals
+            results.append(potentially_significant_pvals)
 
         self.logger.debug(f"Data extracted for {len(paths)} samples")
      
@@ -265,7 +265,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
             save_path
         ):
         sample_id_correspondance = all_samples_fdr_data.sample_id_correspondance
-        for i, (sample_id, row) in enumerate(sample_id_correspondance.iterrows()):
+        for sample_id, row in sample_id_correspondance.iterrows():
             self.logger.debug(f"Writing FDR for {sample_id}")
             sample_correction = self.copy_with_params(
                 SampleFDRCorrection,
@@ -276,7 +276,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
             sample_fdrs = sample_correction.cast_to_original_shape(sample_fdrs, mask_path)
 
             sample_correction.write_fdr_partitioned_by_sample_and_chrom(
-                chrom_pos_mapping=all_samples_fdr_data.chrom_pos_mappings[i],
+                chrom_pos_mapping=all_samples_fdr_data.chrom_pos_mappings[sample_id],
                 fdrs=sample_fdrs,
                 save_path=save_path,
                 all_ids=self.name
