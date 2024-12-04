@@ -13,12 +13,13 @@ def parse_args():
     parser.add_argument('mapping_df', type=str)
     parser.add_argument('--fdr_cutoff', type=float, default=0.05)
     parser.add_argument('--chrom_sizes', type=str, default=None)
+    parser.add_argument('--cpus', type=int, default=10)
     parser.add_argument('save_path', type=str)
     return parser.parse_args()
 
 def main():
     args = parse_args()
-    config = ProcessorConfig(cpus=10)
+    config = ProcessorConfig(cpus=args.cpus)
     logger = setup_logger(level=logging.DEBUG)
     reader = GenomeReader(config=config, logger=logger)
     chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
