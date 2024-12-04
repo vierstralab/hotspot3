@@ -208,7 +208,8 @@ class MultiSampleFDRCorrection(FDRCorrection):
                 self.logger.debug(f"Extracting data for {sample_id}")
                 sample_correction = self.copy_with_params(
                     SampleFDRCorrection,
-                    name=sample_id
+                    name=sample_id,
+                    chrom_sizes=self.chrom_sizes
                 )
                 fdr_correction_data = sample_correction.extract_data_for_sample(
                     pvals_path,
@@ -249,6 +250,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
             sample_correction = self.copy_with_params(
                 SampleFDRCorrection,
                 name=sample_id,
+                chrom_sizes=self.chrom_sizes
             )
             sample_fdrs = logfdr[row['start_index']:row['end_index']]
             sample_fdrs = sample_correction.cast_to_original_shape(sample_fdrs, mask_path)
