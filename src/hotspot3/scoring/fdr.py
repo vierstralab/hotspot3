@@ -200,10 +200,10 @@ class MultiSampleFDRCorrection(FDRCorrection):
             pvals_path,
             fdr,
             all_ids=self.name,
-            save_path=save_path
+            save_path=save_path,
+            return_mask=False
         )
         return fdr_correction_data
-
 
     def extract_data_for_sample(self, paths: dict, fdr, save_path):
         results = {}
@@ -218,6 +218,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
 
         if self.config.cpus > 1:
             args = [(sample_id, pvals_path, fdr, save_path) for sample_id, pvals_path in paths.items()]
+            args = [list(x) for x in zip(*args)]
 
             with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
                 results_list = {
