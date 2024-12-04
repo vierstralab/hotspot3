@@ -215,26 +215,28 @@ class MultiSampleFDRCorrection(FDRCorrection):
         )
         current_index = 0
         self.writer.sanitize_path(save_path)
-        for sample_id, pvals_path in paths.items():
-            sample_correction = self.copy_with_params(
-                SampleFDRCorrection,
-                name=sample_id
-            )
-            fdr_correction_data = sample_correction.extract_data_for_sample(
-                pvals_path,
-                fdr,
-                all_ids=self.name,
-                save_path=save_path
-            )
-            potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
-            n_tests += fdr_correction_data.n_tests
 
-            sample_id_correspondance.loc[sample_id, 'start_index'] = current_index
-            current_index += len(potentially_significant_pvals)
-            sample_id_correspondance.loc[sample_id, 'end_index'] = current_index
-            chrom_pos_mappings.append(fdr_correction_data.chrom_pos_mapping)
+        if self.config.cpus > 0:
+            for sample_id, pvals_path in paths.items():
+                sample_correction = self.copy_with_params(
+                    SampleFDRCorrection,
+                    name=sample_id
+                )
+                fdr_correction_data = sample_correction.extract_data_for_sample(
+                    pvals_path,
+                    fdr,
+                    all_ids=self.name,
+                    save_path=save_path
+                )
+                potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
+                n_tests += fdr_correction_data.n_tests
+
+                sample_id_correspondance.loc[sample_id, 'start_index'] = current_index
+                current_index += len(potentially_significant_pvals)
+                sample_id_correspondance.loc[sample_id, 'end_index'] = current_index
+                chrom_pos_mappings.append(fdr_correction_data.chrom_pos_mapping)
    
-            results.append(potentially_significant_pvals)
+                results.append(potentially_significant_pvals)
         
         sample_id_correspondance = sample_id_correspondance.astype(int)
         potentially_significant_pvals = np.concatenate(results)
