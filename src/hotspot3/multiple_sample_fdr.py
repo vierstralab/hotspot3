@@ -24,7 +24,7 @@ def main():
     chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
     mapping_df = pd.read_table(args.mapping_df).set_index('id')['pvals_parquet']
     ms_fdr = MultiSampleFDRCorrection(
-        name=mapping_df.index,
+        name=mapping_df.index.tolist(),
         logger=logger,
         config=config,
         chrom_sizes=chrom_sizes
