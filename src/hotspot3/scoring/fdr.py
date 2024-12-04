@@ -231,8 +231,9 @@ class MultiSampleFDRCorrection(FDRCorrection):
             index=self.name,
         )
         current_index = 0
-        for sample_id, fdr_correction_data in sorted(results_list.items(), key=lambda x: x[0]):
+        for sample_id in self.name:
             self.logger.debug(f"Extracting data for {sample_id}")
+            fdr_correction_data = results_list[sample_id]
             potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
             n_tests += fdr_correction_data.n_tests
 
@@ -246,7 +247,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
 
         self.logger.debug(f"Data extracted for {len(paths)} samples")
      
-        potentially_significant_pvals = np.concatenate(results)
+        potentially_significant_pvals = np.concatenate([results[x] for x in self.name])
 
         sample_id_correspondance = sample_id_correspondance.astype(np.int64)
         return MultiSampleFDRData(
