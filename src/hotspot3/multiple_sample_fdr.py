@@ -1,21 +1,24 @@
 from hotspot3.scoring.fdr import MultiSampleFDRCorrection
 
-import sys
 import pandas as pd
+import argparse
 
 
-def main(mapping_df: pd.Series, fdr_cutoff: float, save_path: str):
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mapping_df', type=str)
+    parser.add_argument('--fdr_cutoff', type=float, default=0.05)
+    parser.add_argument('save_path', type=str)
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    mapping_df = pd.read_table(args.mapping_df).set_index('id')['pvals_parquet']
     ms_fdr = MultiSampleFDRCorrection(
         name=mapping_df.index,
     )
     ms_fdr.fdr_correct_pvals(
         paths=mapping_df.to_dict(),
-        fdr_cutoff=fdr_cutoff,
-        save_path=save_path
+        fdr_cutoff=args.fdr_cutoff,
+        save_path=args.save_path
     )
-
-if __name__ == "__main__":
-    mapping_df = pd.read_table(sys.argv[1]).set_index('id')['pvals_parquet']
-    fdr = float(sys.argv[2])
-    save_path = sys.argv[3]
-    main(mapping_df, fdr, save_path)

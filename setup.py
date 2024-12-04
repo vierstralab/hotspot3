@@ -26,6 +26,7 @@ setup(
         "console_scripts": [
             "hotspot3=hotspot3.main:main",
             "hotspot3-track-mem=hotspot3.track_memory:main",
+            "hotspot3-fdr=hotspot3.multiple_sample_fdr:main",
         ],
     },
     python_requires=">=3.7",
