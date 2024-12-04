@@ -97,11 +97,6 @@ class SampleFDRCorrection(FDRCorrection):
         self.logger.debug(f"{self.name}: Saving mask to parquet")
         
         np.save(save_path, mask)
-        mask = pd.DataFrame({
-            'tested_pos': mask,
-            'sample_id': pd.Categorical([self.name] * len(mask), categories=all_ids),
-        })
-        self.write_partitioned_by_sample_df_to_parquet(mask, save_path)
         return data
     
     def write_mask_data_to_np(self, mask, save_path):
