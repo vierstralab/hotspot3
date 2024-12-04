@@ -206,6 +206,22 @@ class MultiSampleFDRCorrection(FDRCorrection):
         return fdr_correction_data
 
     def extract_data_for_sample(self, paths: dict, fdr, save_path):
+        self.writer.sanitize_path(save_path)
+
+        all_args = [(sample_id, pvals_path, fdr, save_path) for sample_id, pvals_path in paths.items()]
+        all_args = [list(x) for x in zip(*all_args)]
+
+        if self.config.cpus > 1:
+            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
+                results_list = {
+                    x[0]: y for x, y in zip(all_args, executor.map(self.process_sample, *all_args))
+                }
+        else:
+            results_list = {
+                args[0]: self.process_sample(*args) 
+                for args in zip(all_args)
+            }
+
         results = {}
         chrom_pos_mappings = {}
         n_tests = 0
@@ -213,22 +229,8 @@ class MultiSampleFDRCorrection(FDRCorrection):
             {'start_index': pd.NA, 'end_index': pd.NA},
             index=self.name
         )
+        sample_id_correspondance = sample_id_correspondance.astype(int)
         current_index = 0
-        self.writer.sanitize_path(save_path)
-
-        if self.config.cpus > 1:
-            args = [(sample_id, pvals_path, fdr, save_path) for sample_id, pvals_path in paths.items()]
-            args = [list(x) for x in zip(*args)]
-
-            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
-                results_list = {
-                    x[0]: y for x, y in zip(args, executor.map(self.process_sample, *args))
-                }
-        else:
-            results_list = {
-                sample_id: self.process_sample(sample_id, pvals_path, fdr, save_path) 
-                for sample_id, pvals_path in paths.items()
-            }
         for sample_id, fdr_correction_data in sorted(results_list.items(), key=lambda x: x[0]):
             self.logger.debug(f"Extracting data for {sample_id}")
             potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
@@ -243,7 +245,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
             results[sample_id] = potentially_significant_pvals
 
         self.logger.debug(f"Data extracted for {len(paths)} samples")
-        sample_id_correspondance = sample_id_correspondance.astype(int)
+     
         potentially_significant_pvals = np.concatenate(results)
 
         return MultiSampleFDRData(
