@@ -217,7 +217,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
         self.writer.sanitize_path(save_path)
 
         if self.config.cpus > 1:
-            args = [(sample_id, pvals_path) for sample_id, pvals_path in paths.items()]
+            args = [(sample_id, pvals_path, fdr, save_path) for sample_id, pvals_path in paths.items()]
 
             with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
                 results_list = {
