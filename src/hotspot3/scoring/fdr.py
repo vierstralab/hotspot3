@@ -218,6 +218,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
 
         if self.config.cpus > 0:
             for sample_id, pvals_path in paths.items():
+                self.logger.debug(f"Extracting data for {sample_id}")
                 sample_correction = self.copy_with_params(
                     SampleFDRCorrection,
                     name=sample_id
@@ -237,7 +238,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
                 chrom_pos_mappings.append(fdr_correction_data.chrom_pos_mapping)
    
                 results.append(potentially_significant_pvals)
-        
+        self.logger.debug(f"Data extracted for {len(paths)} samples")
         sample_id_correspondance = sample_id_correspondance.astype(int)
         potentially_significant_pvals = np.concatenate(results)
 
