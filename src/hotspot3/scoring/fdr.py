@@ -175,6 +175,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
 
         mask_path = f"{save_path}.mask"
         self.writer.sanitize_path(mask_path)
+        self.logger.debug("Extracting data for FDR correction")
         all_samples_fdr_data = self.extract_data_for_sample(paths, fdr_cutoff, mask_path)
         
         logfdr = self.compute_fdr(all_samples_fdr_data)
