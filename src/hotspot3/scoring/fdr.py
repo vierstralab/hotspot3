@@ -214,7 +214,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
         if self.config.cpus > 1:
             with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
                 results_list = {
-                    x[0]: y for x, y in zip(paths.keys(), executor.map(self.process_sample, *all_args))
+                    x: y for x, y in zip(paths.keys(), executor.map(self.process_sample, *all_args))
                 }
         else:
             results_list = {
