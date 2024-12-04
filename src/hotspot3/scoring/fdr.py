@@ -228,7 +228,6 @@ class MultiSampleFDRCorrection(FDRCorrection):
         sample_id_correspondance = pd.DataFrame(
             {'start_index': pd.NA, 'end_index': pd.NA},
             index=self.name,
-            dtype=int
         )
         current_index = 0
         for sample_id, fdr_correction_data in sorted(results_list.items(), key=lambda x: x[0]):
@@ -248,6 +247,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
      
         potentially_significant_pvals = np.concatenate(results)
 
+        sample_id_correspondance = sample_id_correspondance.astype(np.int64)
         return MultiSampleFDRData(
             potentially_significant_pvals,
             n_tests,
