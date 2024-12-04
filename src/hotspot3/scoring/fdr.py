@@ -18,6 +18,7 @@ import gc
 from concurrent.futures import ProcessPoolExecutor
 from typing import List
 from genome_tools import GenomicInterval
+import os
 
 
 class FDRCorrection(WithLogger):
@@ -94,30 +95,21 @@ class SampleFDRCorrection(FDRCorrection):
         if return_mask:
             return data, mask
         self.logger.debug(f"{self.name}: Saving mask to parquet")
+        
+        np.save(save_path, mask)
         mask = pd.DataFrame({
             'tested_pos': mask,
             'sample_id': pd.Categorical([self.name] * len(mask), categories=all_ids),
         })
         self.write_partitioned_by_sample_df_to_parquet(mask, save_path)
         return data
-            
     
-    def write_partitioned_by_sample_df_to_parquet(self, df: pd.DataFrame, save_path):
-        parallel_write_partitioned_parquet(
-            df,
-            [self.name],
-            partition_cols=['sample_id'],
-            path=save_path,
-            tmp_dir=self.config.tmp_dir,
-        )
-    
+    def write_mask_data_to_np(self, mask, save_path):
+        os.makedirs(save_path, exist_ok=True)
+        np.save(os.path.join(save_path, f"{self.name}.npy"), mask)
+
     def extract_mask_for_sample(self, mask_path) -> np.ndarray:
-        return read_partioned_parquet(
-            mask_path,
-            partition_col=['sample_id'],
-            partition_val=[self.name],
-            columns=['tested_pos']
-        )['tested_pos'].values
+        return np.load(os.path.join(mask_path, f"{self.name}.npy"))
     
     def cast_to_original_shape(self, result: np.ndarray, mask) -> np.ndarray:
         if isinstance(mask, str):
@@ -261,7 +253,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
             self.logger.debug(f"Writing FDR for {sample_id}")
             sample_correction = self.copy_with_params(
                 SampleFDRCorrection,
-                identifier=sample_id,
+                name=sample_id,
             )
             sample_fdrs = logfdr[row['start_index']:row['end_index']]
             sample_fdrs = sample_correction.cast_to_original_shape(sample_fdrs, mask_path)
