@@ -7,7 +7,7 @@ from hotspot3.io.writers import GenomeWriter
 from hotspot3.io import parallel_write_partitioned_parquet, read_partioned_parquet
 
 from hotspot3.scoring import find_potentialy_significant_pvals, logfdr_from_logpvals
-from hotspot3.helpers.models import SampleFDRdata, MultiSampleFDRData, FDRData, NotEnoughDataForContig
+from hotspot3.helpers.models import SampleFDRdata, MultiSampleFDRData, FDRData
 from hotspot3.config import ProcessorConfig
 
 import numpy as np
@@ -191,10 +191,23 @@ class MultiSampleFDRCorrection(FDRCorrection):
         )
         shutil.rmtree(mask_path) # cleanup
 
+    
+    def process_sample(self, sample_id, pvals_path, fdr, save_path):
+        fdr_correction_data = SampleFDRCorrection(
+            name=sample_id,
+            chrom_sizes=self.chrom_sizes
+        ).extract_data_for_sample(
+            pvals_path,
+            fdr,
+            all_ids=self.name,
+            save_path=save_path
+        )
+        return fdr_correction_data
+
 
     def extract_data_for_sample(self, paths: dict, fdr, save_path):
-        results = []
-        chrom_pos_mappings = []
+        results = {}
+        chrom_pos_mappings = {}
         n_tests = 0
         sample_id_correspondance = pd.DataFrame(
             {'start_index': pd.NA, 'end_index': pd.NA},
@@ -203,29 +216,31 @@ class MultiSampleFDRCorrection(FDRCorrection):
         current_index = 0
         self.writer.sanitize_path(save_path)
 
-        if self.config.cpus > 0:
-            for sample_id, pvals_path in paths.items():
-                self.logger.debug(f"Extracting data for {sample_id}")
-                sample_correction = self.copy_with_params(
-                    SampleFDRCorrection,
-                    name=sample_id,
-                    chrom_sizes=self.chrom_sizes
-                )
-                fdr_correction_data = sample_correction.extract_data_for_sample(
-                    pvals_path,
-                    fdr,
-                    all_ids=self.name,
-                    save_path=save_path
-                )
-                potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
-                n_tests += fdr_correction_data.n_tests
+        if self.config.cpus > 1:
+            args = [(sample_id, pvals_path) for sample_id, pvals_path in paths.items()]
 
-                sample_id_correspondance.loc[sample_id, 'start_index'] = current_index
-                current_index += len(potentially_significant_pvals)
-                sample_id_correspondance.loc[sample_id, 'end_index'] = current_index
-                chrom_pos_mappings.append(fdr_correction_data.chrom_pos_mapping)
-   
-                results.append(potentially_significant_pvals)
+            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
+                results_list = {
+                    x[0]: y for x, y in zip(args, executor.map(self.process_sample, *args))
+                }
+        else:
+            results_list = {
+                sample_id: self.process_sample(sample_id, pvals_path, fdr, save_path) 
+                for sample_id, pvals_path in paths.items()
+            }
+        for sample_id, fdr_correction_data in sorted(results_list.items(), key=lambda x: x[0]):
+            self.logger.debug(f"Extracting data for {sample_id}")
+            potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
+            n_tests += fdr_correction_data.n_tests
+
+            sample_id_correspondance.loc[sample_id, 'start_index'] = current_index
+            current_index += len(potentially_significant_pvals)
+            sample_id_correspondance.loc[sample_id, 'end_index'] = current_index
+
+            chrom_pos_mappings[sample_id] = fdr_correction_data.chrom_pos_mapping
+
+            results[sample_id] = potentially_significant_pvals
+
         self.logger.debug(f"Data extracted for {len(paths)} samples")
         sample_id_correspondance = sample_id_correspondance.astype(int)
         potentially_significant_pvals = np.concatenate(results)
