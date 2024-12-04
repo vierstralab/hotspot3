@@ -227,9 +227,9 @@ class MultiSampleFDRCorrection(FDRCorrection):
         n_tests = 0
         sample_id_correspondance = pd.DataFrame(
             {'start_index': pd.NA, 'end_index': pd.NA},
-            index=self.name
+            index=self.name,
+            dtype=int
         )
-        sample_id_correspondance = sample_id_correspondance.astype(int)
         current_index = 0
         for sample_id, fdr_correction_data in sorted(results_list.items(), key=lambda x: x[0]):
             self.logger.debug(f"Extracting data for {sample_id}")
