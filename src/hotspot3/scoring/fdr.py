@@ -94,7 +94,7 @@ class SampleFDRCorrection(FDRCorrection):
         data = SampleFDRdata(log_pvals, n_tests, self.name, chrom_pos_mapping)
         if return_mask:
             return data, mask
-        self.logger.debug(f"{self.name}: Saving mask")
+        self.logger.info(f"{self.name}: Saving mask")
         
         self.write_mask_data_to_np(mask, save_path)
         return data

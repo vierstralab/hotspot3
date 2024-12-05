@@ -11,22 +11,21 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('mapping_df', type=str)
+    parser.add_argument('save_path', type=str)
     parser.add_argument('--fdr_cutoff', type=float, default=0.05)
     parser.add_argument('--chrom_sizes', type=str, default=None)
     parser.add_argument('--cpus', type=int, default=10)
-    parser.add_argument('save_path', type=str)
+
     return parser.parse_args()
 
 def main():
     args = parse_args()
     config = ProcessorConfig(cpus=args.cpus, logger_level=logging.DEBUG)
-    logger = setup_logger(level=config.logger_level)
-    reader = GenomeReader(config=config, logger=logger)
+    reader = GenomeReader(config=config)
     chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
     mapping_df = pd.read_table(args.mapping_df).set_index('id')['pvals_parquet']
     ms_fdr = MultiSampleFDRCorrection(
         name=mapping_df.index.tolist(),
-        logger=logger,
         config=config,
         chrom_sizes=chrom_sizes
     )
