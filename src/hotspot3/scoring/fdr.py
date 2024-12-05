@@ -215,33 +215,26 @@ class MultiSampleFDRCorrection(FDRCorrection):
         all_args = [list(x) for x in zip(*all_args)]
 
         if self.config.cpus > 1:
-            from multiprocessing import Pool
-            with Pool(self.config.cpus) as pool:
+            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
                 try:
                     results_list = {}
-                    results = pool.starmap(self.process_sample, zip(*all_args))
-                    for sample_id, result in zip(self.name, results):
-                        results_list[sample_id] = result
-            # with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
-            #     try:
-            #         results_list = {}
-            #         futures = {
-            #             executor.submit(self.process_sample, *args): sample_id
-            #             for sample_id, args in zip(self.name, zip(*all_args))
-            #         }
+                    futures = {
+                        executor.submit(self.process_sample, *args): sample_id
+                        for sample_id, args in zip(self.name, zip(*all_args))
+                    }
 
-            #         with tqdm(total=len(futures), desc="Processing Samples") as pbar:
-            #             for future in as_completed(futures):
-            #                 sample_id = futures[future]
-            #                 try:
-            #                     result = future.result()
-            #                     self.logger.debug(f"Data extracted for {sample_id}")
-            #                     results_list[sample_id] = result
-            #                 except Exception as e:
-            #                     self.logger.error(f"Error processing {sample_id}: {e}")
-            #                     raise e
-            #                 finally:
-            #                     pbar.update(1)
+                    with tqdm(total=len(futures), desc="Processing Samples") as pbar:
+                        for future in as_completed(futures):
+                            sample_id = futures[future]
+                            try:
+                                result = future.result()
+                                self.logger.debug(f"Data extracted for {sample_id}")
+                                results_list[sample_id] = result
+                            except Exception as e:
+                                self.logger.error(f"Error processing {sample_id}: {e}")
+                                raise e
+                            finally:
+                                pbar.update(1)
                 except Exception as e:
                     self.logger.critical(f"Exception occured, gracefully shutting down executor...")
                     self.logger.critical(e)
