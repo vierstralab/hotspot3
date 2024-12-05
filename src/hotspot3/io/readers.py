@@ -129,15 +129,16 @@ class ChromReader(WithLoggerAndInterval):
 
 class GenomeReader(WithLogger):
 
-    def read_full_parquet(self, pvals_path, column):
+    def read_full_parquet(self, pvals_path, column, **kwargs):
         return pd.read_parquet(
             pvals_path,
             engine='pyarrow', 
-            columns=[column]
+            columns=[column],
+            **kwargs
         )[column]
 
-    def read_pval_from_parquet(self, pvals_path):
-        return self.read_full_parquet(pvals_path, column='log10_pval').values
+    def read_pval_from_parquet(self, pvals_path, **kwargs):
+        return self.read_full_parquet(pvals_path, column='log10_pval', **kwargs).values
     
     def read_chrom_pos_mapping(
         self,
