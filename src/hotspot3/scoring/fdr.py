@@ -19,6 +19,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List
 from genome_tools import GenomicInterval
 import os
+from tqdm import tqdm
 
 
 class FDRCorrection(WithLogger):
@@ -221,17 +222,20 @@ class MultiSampleFDRCorrection(FDRCorrection):
                         executor.submit(self.process_sample, *args): sample_id
                         for sample_id, args in zip(self.name, zip(*all_args))
                     }
-        
-                    for future in as_completed(futures):
-                        sample_id = futures[future]
-                        try:
-                            result = future.result()
-                            if result is not None:
-                                self.logger.debug(f"Data extracted for {sample_id}")
-                                results_list[sample_id] = result
-                        except Exception as e:
-                            self.logger.error(f"Error processing {sample_id}: {e}")
-                            raise e  
+
+                    with tqdm(total=len(futures), desc="Processing Samples") as pbar:
+                        for future in as_completed(futures):
+                            sample_id = futures[future]
+                            try:
+                                result = future.result()
+                                if result is not None:
+                                    self.logger.debug(f"Data extracted for {sample_id}")
+                                    results_list[sample_id] = result
+                            except Exception as e:
+                                self.logger.error(f"Error processing {sample_id}: {e}")
+                                raise e
+                            finally:
+                                pbar.update(1)
                 except Exception as e:
                     self.logger.critical(f"Exception occured, gracefully shutting down executor...")
                     self.logger.critical(e)
