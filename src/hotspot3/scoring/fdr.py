@@ -213,7 +213,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
         all_args = [(sample_id, pvals_path, fdr, save_path) for sample_id, pvals_path in paths.items()]
         all_args = [list(x) for x in zip(*all_args)]
 
-        if self.config.cpus > 1:
+        if self.config.cpus < 0: # TMP HOTFIX to avoid parallelization
             with ThreadPoolExecutor(max_workers=self.config.cpus) as executor:
                 results_list = {
                     x: y for x, y in zip(paths.keys(), executor.map(self.process_sample, *all_args))

@@ -1,5 +1,4 @@
 from hotspot3.scoring.fdr import MultiSampleFDRCorrection
-from hotspot3.io.logging import setup_logger
 from hotspot3.config import ProcessorConfig
 from hotspot3.io.readers import GenomeReader
 
