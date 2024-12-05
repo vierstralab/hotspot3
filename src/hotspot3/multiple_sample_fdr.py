@@ -23,12 +23,11 @@ def main():
     reader = GenomeReader(config=config)
     chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
     mapping_df = pd.read_table(args.mapping_df).set_index('id')['pvals_parquet']
-    ms_fdr = MultiSampleFDRCorrection(
+    ms_fdr = reader.copy_with_params(
+        MultiSampleFDRCorrection,
         name=mapping_df.index.tolist(),
-        config=config,
         chrom_sizes=chrom_sizes
-    )
-    ms_fdr.fdr_correct_pvals(
+    ).fdr_correct_pvals(
         paths=mapping_df.to_dict(),
         fdr_cutoff=args.fdr_cutoff,
         save_path=args.save_path

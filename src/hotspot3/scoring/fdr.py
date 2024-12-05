@@ -210,14 +210,25 @@ class MultiSampleFDRCorrection(FDRCorrection):
     def extract_data_for_sample(self, paths: dict, fdr, save_path):
         self.writer.sanitize_path(save_path)
 
-        all_args = [(sample_id, pvals_path, fdr, save_path) for sample_id, pvals_path in paths.items()]
+        all_args = [(sample_id, paths[sample_id], fdr, save_path) for sample_id in self.name]
         all_args = [list(x) for x in zip(*all_args)]
 
-        if self.config.cpus < 0: # TMP HOTFIX to avoid parallelization
-            with ThreadPoolExecutor(max_workers=self.config.cpus) as executor:
-                results_list = {
-                    x: y for x, y in zip(paths.keys(), executor.map(self.process_sample, *all_args))
-                }
+        if self.config.cpus > 1:
+            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
+                try:
+                    results_list = {}
+                    for sample_id, result in zip(
+                        self.name,
+                        executor.map(self.process_sample, *all_args)
+                    ):
+                        if result is not None:
+                            self.logger.debug(f"Data extracted for {sample_id}")
+                            results_list[sample_id] = result
+                except Exception as e:
+                    self.logger.critical(f"Exception occured, gracefully shutting down executor...")
+                    self.logger.critical(e)
+                    raise e
+  
         else:
             results_list = {
                 args[0]: self.process_sample(*args) 
