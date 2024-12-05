@@ -139,7 +139,7 @@ class GenomeReader(WithLogger):
 
     def read_pval_from_parquet(self, pvals_path, **kwargs):
         import pyarrow.parquet as pq
-        return pq.read_table(pvals_path, columns=['log10_pval'], **kwargs)['log10_pval'].to_numpy()
+        return pq.read_table(pvals_path, columns=['log10_pval'], **kwargs).column('log10_pval').to_numpy()
         return self.read_full_parquet(pvals_path, column='log10_pval', **kwargs).values
     
     def read_chrom_pos_mapping(
