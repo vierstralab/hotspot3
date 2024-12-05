@@ -232,6 +232,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
             index=self.name,
         )
         current_index = 0
+        self.logger.info('Concatenating data for all samples')
         for sample_id in self.name:
             self.logger.debug(f"Extracting data for {sample_id}")
             fdr_correction_data = results_list[sample_id]
