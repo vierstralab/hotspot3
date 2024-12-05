@@ -199,7 +199,9 @@ class MultiSampleFDRCorrection(FDRCorrection):
     def process_sample(self, sample_id, pvals_path, fdr, save_path):
         fdr_correction_data = SampleFDRCorrection(
             name=sample_id,
-            chrom_sizes=self.chrom_sizes
+            chrom_sizes=self.chrom_sizes,
+            logger=self.logger,
+            config=self.config
         ).extract_data_for_sample(
             pvals_path,
             fdr,

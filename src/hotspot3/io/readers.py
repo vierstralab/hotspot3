@@ -15,6 +15,7 @@ from hotspot3.connectors.bam2bed import BamFileCutsExtractor
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io import check_partition_exists
 
+import pyarrow.parquet as pq
 
 
 class ChromReader(WithLoggerAndInterval):
@@ -138,9 +139,7 @@ class GenomeReader(WithLogger):
         )[column]
 
     def read_pval_from_parquet(self, pvals_path, **kwargs):
-        import pyarrow.parquet as pq
         return pq.read_table(pvals_path, columns=['log10_pval'], **kwargs).column('log10_pval').to_numpy()
-        return self.read_full_parquet(pvals_path, column='log10_pval', **kwargs).values
     
     def read_chrom_pos_mapping(
         self,
