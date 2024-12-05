@@ -15,7 +15,7 @@ from hotspot3.connectors.bam2bed import BamFileCutsExtractor
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io import check_partition_exists
 
-import dask.dataframe as dd
+import pyarrow.parquet as pq
 
 
 class ChromReader(WithLoggerAndInterval):
@@ -139,12 +139,7 @@ class GenomeReader(WithLogger):
         )[column]
 
     def read_pval_from_parquet(self, pvals_path, **kwargs):
-        return dd.read_parquet(
-            pvals_path,
-            engine='pyarrow',
-            columns=['log10_pval'],
-            dtype_backend='pyarrow',
-            **kwargs)['log10_pval'].compute()
+        return pd.read_parquet(pvals_path, engine='fastparquet', columns=['log10_pval'], **kwargs)['log10_pval'].values
     
     def read_chrom_pos_mapping(
         self,
