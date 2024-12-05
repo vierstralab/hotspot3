@@ -84,7 +84,7 @@ class SampleFDRCorrection(FDRCorrection):
     def extract_data_for_sample(self, pvals_path, fdr, save_path, all_ids=None, return_mask=False):
         if all_ids is None:
             all_ids = [self.name]
-        log_pvals = self.reader.read_pval_from_parquet(pvals_path, use_threads=True, memory_map=True)
+        log_pvals = self.reader.read_pval_from_parquet(pvals_path, use_threads=True)
         mask, n_tests = find_potentialy_significant_pvals(log_pvals, fdr)
         log_pvals = log_pvals[mask]
 
@@ -256,7 +256,6 @@ class MultiSampleFDRCorrection(FDRCorrection):
         current_index = 0
         self.logger.info('Concatenating data for all samples')
         for sample_id in self.name:
-            self.logger.debug(f"Extracting data for {sample_id}")
             fdr_correction_data = results_list[sample_id]
             potentially_significant_pvals = fdr_correction_data.potentially_signif_pvals
             n_tests += fdr_correction_data.n_tests
