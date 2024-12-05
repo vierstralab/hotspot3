@@ -20,6 +20,7 @@ from typing import List
 from genome_tools import GenomicInterval
 import os
 from tqdm import tqdm
+import multiprocessing
 
 
 class FDRCorrection(WithLogger):
@@ -215,7 +216,10 @@ class MultiSampleFDRCorrection(FDRCorrection):
         all_args = [list(x) for x in zip(*all_args)]
 
         if self.config.cpus > 1:
-            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
+            with ProcessPoolExecutor(
+                max_workers=self.config.cpus,
+                mp_context=multiprocessing.get_context("spawn")
+            ) as executor:
                 try:
                     results_list = {}
                     futures = {
