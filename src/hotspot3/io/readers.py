@@ -139,7 +139,12 @@ class GenomeReader(WithLogger):
         )[column]
 
     def read_pval_from_parquet(self, pvals_path, **kwargs):
-        return dd.read_parquet(pvals_path, engine='pyarrow', columns=['log10_pval'], **kwargs)['log10_pval'].compute()
+        return dd.read_parquet(
+            pvals_path,
+            engine='pyarrow',
+            columns=['log10_pval'],
+            dtype_backend='pyarrow',
+            **kwargs)['log10_pval'].compute()
     
     def read_chrom_pos_mapping(
         self,
