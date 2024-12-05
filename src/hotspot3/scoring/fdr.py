@@ -219,6 +219,7 @@ class MultiSampleFDRCorrection(FDRCorrection):
                     x: y for x, y in zip(paths.keys(), executor.map(self.process_sample, *all_args))
                 }
         else:
+            print(all_args)
             results_list = {
                 args[0]: self.process_sample(*args) 
                 for args in zip(all_args)
