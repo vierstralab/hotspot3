@@ -15,7 +15,7 @@ import pandas as pd
 import shutil
 from logging import Logger
 import gc
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List
 from genome_tools import GenomicInterval
 import os
@@ -217,13 +217,21 @@ class MultiSampleFDRCorrection(FDRCorrection):
             with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
                 try:
                     results_list = {}
-                    for sample_id, result in zip(
-                        self.name,
-                        executor.map(self.process_sample, *all_args)
-                    ):
-                        if result is not None:
-                            self.logger.debug(f"Data extracted for {sample_id}")
-                            results_list[sample_id] = result
+                    futures = {
+                        executor.submit(self.process_sample, *args): sample_id
+                        for sample_id, args in zip(self.name, zip(*all_args))
+                    }
+        
+                    for future in as_completed(futures):
+                        sample_id = futures[future]
+                        try:
+                            result = future.result()
+                            if result is not None:
+                                self.logger.debug(f"Data extracted for {sample_id}")
+                                results_list[sample_id] = result
+                        except Exception as e:
+                            self.logger.error(f"Error processing {sample_id}: {e}")
+                            raise e  
                 except Exception as e:
                     self.logger.critical(f"Exception occured, gracefully shutting down executor...")
                     self.logger.critical(e)
