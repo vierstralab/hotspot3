@@ -79,17 +79,6 @@ class GenomeProcessor(WithLogger):
             reverse=True
         )
         self.writer = self.copy_with_params(GenomeWriter)
-
-    
-    def __getstate__(self):
-        state = self.__dict__
-        if 'logger' in state:
-            del state['logger']
-        return state
-
-    def __setstate__(self, state: dict):
-        for name, value in state.items():
-            setattr(self, name, value)
     
     ## Parallel processing functions
 

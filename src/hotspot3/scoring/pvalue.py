@@ -3,7 +3,7 @@ import itertools
 
 from hotspot3.io.logging import WithLogger
 from hotspot3.helpers.models import WindowedFitResults
-from hotspot3.scoring import logpval_for_dtype, fast_logfdr_below_threshold, fix_inf_pvals
+from hotspot3.scoring import logpval_for_dtype, fix_inf_pvals
 
 
 class PvalueEstimator(WithLogger):

@@ -30,6 +30,17 @@ class WithLogger:
         # Setter allows updating the logger
         self._logger = logger
     
+    def __getstate__(self):
+        state = self.__dict__
+        if 'logger' in state:
+            del state['logger']
+        return state
+
+    def __setstate__(self, state: dict):
+        for name, value in state.items():
+            setattr(self, name, value)
+
+
     def copy_with_params(self, cls: Type[T], **kwargs) -> T:
         """
         Creates a new instance of the specified class `cls` with the same initialization parameters.
