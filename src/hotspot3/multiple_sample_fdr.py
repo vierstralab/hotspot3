@@ -19,8 +19,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    config = ProcessorConfig(cpus=args.cpus)
-    logger = setup_logger(level=logging.DEBUG)
+    config = ProcessorConfig(cpus=args.cpus, logger_level=logging.DEBUG)
+    logger = setup_logger(level=config.logger_level)
     reader = GenomeReader(config=config, logger=logger)
     chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
     mapping_df = pd.read_table(args.mapping_df).set_index('id')['pvals_parquet']
