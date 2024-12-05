@@ -15,7 +15,7 @@ import pandas as pd
 import shutil
 from logging import Logger
 import gc
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import List
 from genome_tools import GenomicInterval
 import os
@@ -214,12 +214,11 @@ class MultiSampleFDRCorrection(FDRCorrection):
         all_args = [list(x) for x in zip(*all_args)]
 
         if self.config.cpus > 1:
-            with ProcessPoolExecutor(max_workers=self.config.cpus) as executor:
+            with ThreadPoolExecutor(max_workers=self.config.cpus) as executor:
                 results_list = {
                     x: y for x, y in zip(paths.keys(), executor.map(self.process_sample, *all_args))
                 }
         else:
-            print([x for x in zip(*all_args)])
             results_list = {
                 args[0]: self.process_sample(*args) 
                 for args in zip(*all_args)
