@@ -5,7 +5,6 @@ from hotspot3.io.readers import GenomeReader
 import pandas as pd
 import logging
 import argparse
-import os
 
 
 def parse_args():
