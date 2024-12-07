@@ -6,11 +6,12 @@ import pandas as pd
 import logging
 import argparse
 
-
+# TODO: Finish implementing this function
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('mapping_df', type=str)
     parser.add_argument('save_path', type=str)
+    parser.add_argument('--mapping_df', type=str, default=None)
+
     parser.add_argument('--fdr_cutoff', type=float, default=0.05)
     parser.add_argument('--chrom_sizes', type=str, default=None)
     parser.add_argument('--cpus', type=int, default=10)
