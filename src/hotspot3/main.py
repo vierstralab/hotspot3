@@ -25,7 +25,7 @@ def main() -> None:
         chrom_sizes_file=args.chrom_sizes,
         mappable_bases_file=args.mappable_bases,
         chromosomes=args.chromosomes,
-        reference_fasta=args.fasta,
+        reference_fasta=args.reference,
         config=config,
     )
     precomp_pvals = args.pvals_parquet
