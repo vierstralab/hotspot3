@@ -25,6 +25,7 @@ def main() -> None:
         chrom_sizes_file=args.chrom_sizes,
         mappable_bases_file=args.mappable_bases,
         chromosomes=args.chromosomes,
+        reference_fasta=args.fasta,
         config=config,
     )
     precomp_pvals = args.pvals_parquet
@@ -184,6 +185,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
         "--fdrs", help="List of FDR thresholds, space separated", type=float, 
         nargs='+', default=[0.05]
     )
+    parser.add_argument("--reference", help="Path to reference fasta file. Required to work with cram files with missing fasta", default=None)
     parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
     parser.add_argument("--outdir", help="Path to output directory", default=".")
     parser.add_argument("--debug", help="Run in debug mode. Adds additional prints and saves background window fit params", action='store_true', default=False)

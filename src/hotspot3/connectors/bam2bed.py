@@ -9,7 +9,7 @@ from hotspot3.io.logging import WithLogger
 from hotspot3.helpers.models import NotEnoughDataForContig
 
 
-def run_bam2bed(*args):
+def run_bam2bed(*args, reference_fasta=None):
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
         result = subprocess.run(
             f'bash {script} {" ".join(args)}',
@@ -22,23 +22,30 @@ def run_bam2bed(*args):
 
 
 class BamFileCutsExtractor(WithLogger):
-    def extract_all_chroms(self, bam_path, tabix_bed_path, chromosomes):
+    def extract_all_chroms(self, bam_path, tabix_bed_path, chromosomes, reference_fasta=None):
         """
         Run bam2bed conversion script.
         Very fast but can't be parallelized.
         """
-        run_bam2bed(bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path)
+        reference_fasta_args = self.fasta_as_arg(reference_fasta)
+        run_bam2bed(*reference_fasta_args, bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path)
         pysam.tabix_index(tabix_bed_path, preset='bed', force=True)
 
 
-    def extract_chromosome_to_df(self, bam_path, chromosome: str) -> pd.DataFrame:
+    def extract_chromosome_to_df(self, bam_path, chromosome: str, reference_fasta=None) -> pd.DataFrame:
         """
         Run bam2bed for a single chromosome. Returns a pandas DataFrame.
         """
-        result = run_bam2bed(bam_path, chromosome)
+        reference_fasta_args = self.fasta_as_arg(reference_fasta)
+        result = run_bam2bed(*reference_fasta_args, bam_path, chromosome)
         df = pd.read_table(StringIO(result.stdout))
         return df.drop(columns=['#chr'])
 
+    def fasta_as_arg(self, reference_fasta):
+        reference_fasta_args = ()
+        if reference_fasta is not None:
+            reference_fasta_args = ('-T', reference_fasta)
+        return reference_fasta_args
 
     def extract_reads_pysam(self, bam_path, chromosome) -> pd.DataFrame:
         """

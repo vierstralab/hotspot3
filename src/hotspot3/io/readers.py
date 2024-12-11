@@ -68,8 +68,8 @@ class ChromReader(WithLoggerAndInterval):
         return agg_cutcounts
 
 
-    def extract_cutcounts_for_chrom(self, bam_path):
-        return self.read_extractor.extract_chromosome_to_df(bam_path, self.chrom_name)
+    def extract_cutcounts_for_chrom(self, bam_path, reference_fasta=None):
+        return self.read_extractor.extract_chromosome_to_df(bam_path, self.chrom_name, reference_fasta)
     
 
     def extract_mappable_agg_cutcounts(self, cutcounts_file, mappable_file) -> ma.MaskedArray:
@@ -177,9 +177,9 @@ class GenomeReader(WithLogger):
             names=['chrom', 'size']
         ).set_index('chrom')['size'].to_dict()
 
-    def extract_cutcounts_all_chroms(self, bam_path, tabix_path, chromosomes):
+    def extract_cutcounts_all_chroms(self, bam_path, tabix_path, chromosomes, reference_fasta=None):
         read_extractor = self.copy_with_params(BamFileCutsExtractor)
-        return read_extractor.extract_all_chroms(bam_path, tabix_path, chromosomes)
+        return read_extractor.extract_all_chroms(bam_path, tabix_path, chromosomes, reference_fasta)
     
     def read_total_cutcounts(self, total_cutcounts_path):
         return np.loadtxt(total_cutcounts_path, dtype=int)

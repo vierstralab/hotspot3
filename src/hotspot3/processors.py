@@ -49,12 +49,21 @@ class GenomeProcessor(WithLogger):
 
         - config: ProcessorConfig object containing parameters.
     """
-    def __init__(self, sample_id, chrom_sizes_file=None, config=None, mappable_bases_file=None, chromosomes=None):
+    def __init__(
+        self,
+        sample_id,
+        chrom_sizes_file=None,
+        config=None,
+        mappable_bases_file=None, 
+        reference_fasta=None,
+        chromosomes=None
+    ):
         super().__init__(config=config)
         self.sample_id = sample_id
         self.mappable_bases_file = mappable_bases_file
         self.chrom_sizes_file = chrom_sizes_file
         self.reader = self.copy_with_params(GenomeReader)
+        self.reference_fasta = reference_fasta
 
         self.cpus = min(self.config.cpus, max(1, mp.cpu_count()))
 
@@ -164,7 +173,7 @@ class GenomeProcessor(WithLogger):
             - outpath: Path to save the cutcounts to.
         """
         self.logger.info('Extracting cutcounts from bam file')
-        if self.cpus >= 3:
+        if self.cpus >= 10:
             data = self.parallel_by_chromosome(
                 ChromosomeProcessor.extract_cutcounts_for_chromosome,
                 bam_path,
@@ -172,11 +181,12 @@ class GenomeProcessor(WithLogger):
             data = self.merge_and_add_chromosome(data).data_df
             self.writer.df_to_tabix(data, outpath)
         else:
-            # BAM2BED is faster in ~almost~ single-threaded mode
+            # BAM2BED writes to file faster
             self.reader.extract_cutcounts_all_chroms(
                 bam_path,
                 outpath,
-                self.chrom_sizes.keys()
+                self.chrom_sizes.keys(),
+                reference_fasta=self.reference_fasta
             )
 
 
@@ -488,7 +498,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @parallel_func_error_handler
     @ensure_contig_exists
     def extract_cutcounts_for_chromosome(self, bam_path) -> ProcessorOutputData:
-        data = self.reader.extract_cutcounts_for_chrom(bam_path)
+        data = self.reader.extract_cutcounts_for_chrom(bam_path, self.gp.reference_fasta)
         return ProcessorOutputData(self.chrom_name, data)
 
 

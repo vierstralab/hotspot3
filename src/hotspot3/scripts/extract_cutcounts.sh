@@ -2,17 +2,42 @@
 set -e -o pipefail
 
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-  echo "Usage: $0 <input.bam> <chromosome(s)>"
+  echo "Usage: $0 [-T reference.fasta] <input.bam> <chromosome(s)>"
   exit 1
 fi
 
 AWK_EXE=$(which mawk 2>/dev/null || which awk)
-BAM_FILE=$1
-# Can accept any number of chromosomes
-CHROMS="${@:2}"
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -T)
+      REFERENCE_FASTA="$2"
+      shift 2
+      ;;
+    *.bam|*.cram)
+      BAM_FILE="$1"
+      shift
+      ;;
+    *)
+      CHROMS+=("$1")
+      shift
+      ;;
+  esac
+done
 
-samtools view -b $BAM_FILE $CHROMS \
+if [[ -z "$BAM_FILE" || ${#CHROMS[@]} -eq 0 ]]; then
+  echo "Error: Missing BAM/CRAM file or chromosomes."
+  echo "Usage: $0 [-T reference.fasta] <input.bam|input.cram> <chromosome(s)...>"
+  exit 1
+fi
+
+SAMTOOLS_CMD="samtools view -b"
+if [[ -n "$REFERENCE_FASTA" ]]; then
+  SAMTOOLS_CMD+=" -T $REFERENCE_FASTA"
+fi
+SAMTOOLS_CMD+=" $BAM_FILE ${CHROMS[*]}"
+
+eval "$SAMTOOLS_CMD" \
   | bam2bed --do-not-sort \
   | "$AWK_EXE" -v FS="\t" -v OFS="\t" '
     {
