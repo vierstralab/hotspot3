@@ -19,7 +19,8 @@ def run_bam2bed(*args, reference_fasta=None):
             capture_output=True,
             shell=True,
         )
-        print(result)
+        if result.returncode != 0:
+            raise ValueError(f"extract_cutcounts.sh failed: {result.stderr}")
     return result
 
 def fasta_as_arg(reference_fasta):
