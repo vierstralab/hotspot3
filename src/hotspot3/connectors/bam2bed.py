@@ -10,9 +10,10 @@ from hotspot3.helpers.models import NotEnoughDataForContig
 
 
 def run_bam2bed(*args, reference_fasta=None):
+    fasta_args = fasta_as_arg(reference_fasta)
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
         result = subprocess.run(
-            f'bash {script} {" ".join(args)}',
+            f'bash {script} {" ".join(fasta_args)} {" ".join(args)}',
             check=True,
             text=True,
             capture_output=True,
@@ -20,6 +21,11 @@ def run_bam2bed(*args, reference_fasta=None):
         )
     return result
 
+def fasta_as_arg(reference_fasta):
+    if reference_fasta is not None:
+        return ('-T', reference_fasta)
+    else:
+        return ()
 
 class BamFileCutsExtractor(WithLogger):
     def extract_all_chroms(self, bam_path, tabix_bed_path, chromosomes, reference_fasta=None):
@@ -27,9 +33,7 @@ class BamFileCutsExtractor(WithLogger):
         Run bam2bed conversion script.
         Very fast but can't be parallelized.
         """
-        reference_fasta_args = self.fasta_as_arg(reference_fasta)
-        print(*reference_fasta_args, bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path, sep='|')
-        run_bam2bed(*reference_fasta_args, bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path)
+        run_bam2bed(bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path, reference_fasta=reference_fasta)
         pysam.tabix_index(tabix_bed_path, preset='bed', force=True)
 
 
@@ -37,16 +41,9 @@ class BamFileCutsExtractor(WithLogger):
         """
         Run bam2bed for a single chromosome. Returns a pandas DataFrame.
         """
-        reference_fasta_args = self.fasta_as_arg(reference_fasta)
-        result = run_bam2bed(*reference_fasta_args, bam_path, chromosome)
+        result = run_bam2bed(bam_path, chromosome, reference_fasta=reference_fasta)
         df = pd.read_table(StringIO(result.stdout))
         return df.drop(columns=['#chr'])
-
-    def fasta_as_arg(self, reference_fasta):
-        if reference_fasta is not None:
-            return ('-T', reference_fasta)
-        else:
-            return ()
 
     def extract_reads_pysam(self, bam_path, chromosome) -> pd.DataFrame:
         """
