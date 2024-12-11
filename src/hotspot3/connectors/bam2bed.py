@@ -28,6 +28,7 @@ class BamFileCutsExtractor(WithLogger):
         Very fast but can't be parallelized.
         """
         reference_fasta_args = self.fasta_as_arg(reference_fasta)
+        print(*reference_fasta_args, bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path, sep='|')
         run_bam2bed(*reference_fasta_args, bam_path, *chromosomes, '|', 'bgzip', '>', tabix_bed_path)
         pysam.tabix_index(tabix_bed_path, preset='bed', force=True)
 
@@ -42,10 +43,10 @@ class BamFileCutsExtractor(WithLogger):
         return df.drop(columns=['#chr'])
 
     def fasta_as_arg(self, reference_fasta):
-        reference_fasta_args = ()
         if reference_fasta is not None:
-            reference_fasta_args = ('-T', reference_fasta)
-        return reference_fasta_args
+            return ('-T', reference_fasta)
+        else:
+            return ()
 
     def extract_reads_pysam(self, bam_path, chromosome) -> pd.DataFrame:
         """
