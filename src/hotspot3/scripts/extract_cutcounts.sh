@@ -37,6 +37,7 @@ if [[ -n "$REFERENCE_FASTA" ]]; then
 fi
 SAMTOOLS_CMD+=" $BAM_FILE ${CHROMS[*]}"
 
+echo "$SAMTOOLS_CMD"
 eval "$SAMTOOLS_CMD" \
   | bam2bed --do-not-sort \
   | "$AWK_EXE" -v FS="\t" -v OFS="\t" '
