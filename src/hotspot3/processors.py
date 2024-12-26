@@ -260,7 +260,24 @@ class GenomeProcessor(WithLogger):
             total_cutcounts,
             chrom_sizes=self.chrom_sizes
         )
-    
+
+    def refit_outlier_segments(self, cutcounts_file, params_df: pd.DataFrame):
+        outlier_params = params_df.query('refit_with_constraint | fit_type == "global"')
+
+        bad_segments = [
+            ProcessorOutputData(x[0], x[1]) 
+            for x in outlier_params.groupby('chrom', observed=True)
+        ]
+
+        refit_params = self.parallel_by_chromosome(
+            ChromosomeProcessor.refit_outlier_segments,
+            cutcounts_file,
+            bad_segments
+        )
+        refit_params = self.merge_and_add_chromosome(refit_params).data_df
+        return refit_params
+
+
     def fit_background_model(
             self,
             cutcounts_file,
@@ -281,37 +298,27 @@ class GenomeProcessor(WithLogger):
         per_region_params = self.merge_and_add_chromosome(per_region_params).data_df
 
         sn_fit = self.copy_with_params(SignalToNoiseFit)
-        iteration = 1
         per_region_params, spot_results = sn_fit.fit(per_region_params)
         per_region_params['refit_with_constraint'] = sn_fit.find_outliers(per_region_params)
 
         # keep track of all segments that have been refitted through the iterations
         refit_with_constraint = per_region_params['refit_with_constraint'].values
-        has_outlier_segments = per_region_params['refit_with_constraint'].sum() > 0
 
         for iteration in range(1, self.config.max_outlier_iterations + 1):
-            if not has_outlier_segments:
-                break
             is_outlier_segment = per_region_params['refit_with_constraint']
+            if is_outlier_segment.sum() == 0:
+                break
+
 
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
 
             if self.config.save_debug:
                 self.writer.df_to_tabix(per_region_params, per_region_stats_path + f'.iter{iteration}')
 
-            outlier_params = per_region_params.query('refit_with_constraint | fit_type == "global"')
-
-            bad_segments = [
-                ProcessorOutputData(x[0], x[1]) 
-                for x in outlier_params.groupby('chrom', observed=True)
-            ]
-
-            refit_params = self.parallel_by_chromosome(
-                ChromosomeProcessor.refit_outlier_segments,
-                cutcounts_file,
-                bad_segments
+            refit_params = self.refit_outlier_segments(
+                cutcounts_file=cutcounts_file,
+                params_df=per_region_params
             )
-            refit_params = self.merge_and_add_chromosome(refit_params).data_df
             per_region_params.loc[is_outlier_segment, refit_params.columns] = refit_params.values
 
             # Refit the model and check for outliers
@@ -319,9 +326,6 @@ class GenomeProcessor(WithLogger):
             per_region_params['refit_with_constraint'] = sn_fit.find_outliers(per_region_params)
 
             refit_with_constraint |= per_region_params['refit_with_constraint']
-            has_outlier_segments = per_region_params['refit_with_constraint'].sum() > 0
-            
-            iteration += 1
         else:
             self.logger.info(f'No outlier segments found at iteration {iteration}.')
 

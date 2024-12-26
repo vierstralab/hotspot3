@@ -156,6 +156,6 @@ def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion: fl
     total = uq * cts
     cdf = np.cumsum(total) / np.sum(total)
     valid_cts = uq[cdf >= min_bg_tag_proportion]
-    if valid_cts.size == 0:
+    if valid_cts.size < 2:
         raise ValueError(f"Not enough background data")
-    return valid_cts[0]
+    return valid_cts[1]
