@@ -79,17 +79,18 @@ class SegmentalFit(WithLoggerAndInterval):
                         signal_with_step,
                         min_bg_tag_proportion[i],
                     )
-                    g_fit.config.min_background_prop = min(
-                        g_fit.get_bg_quantile_from_tr(
-                            signal_with_step,
-                            valid_count
-                        ), 
-                        g_fit.config.max_background_prop
-                    )
+                    min_bg_quantile = g_fit.get_bg_quantile_from_tr(signal_with_step, valid_count)
+                    if min_bg_quantile < g_fit.config.max_background_prop:
+                        g_fit.config.min_background_prop = min_bg_quantile
+                    else:
+                        bg_tr = np.quantile(signal_with_step, g_fit.config.max_background_prop)
+                        if bg_tr <= 1:
+                            raise NotEnoughDataForContig
+                        g_fit.config.min_background_prop = g_fit.config.max_background_prop
 
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
-                    step,
+                    step=step,
                     fallback_fit_results=fallback_fit_results
                 )
                 success_fit = True
