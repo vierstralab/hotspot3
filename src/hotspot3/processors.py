@@ -560,6 +560,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             global_fit_params
         )
         if len(bad_segments) == 0:
+            print('No segments')
             raise NotEnoughDataForContig
         segments_fit = self.copy_with_params(SegmentalFit)
         per_interval_params = segments_fit.fit_per_segment_bg_model(
