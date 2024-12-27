@@ -559,7 +559,8 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             per_window_trs_global,
             global_fit_params
         )
-        print(len(bad_segments))
+        if len(bad_segments) == 0:
+            raise NotEnoughDataForContig
         segments_fit = self.copy_with_params(SegmentalFit)
         per_interval_params = segments_fit.fit_per_segment_bg_model(
             agg_cutcounts=agg_cutcounts,
