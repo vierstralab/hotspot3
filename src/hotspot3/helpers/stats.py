@@ -3,9 +3,8 @@ import scipy.stats as st
 import gc
 from scipy.special import logsumexp, betainc, hyp2f1, betaln
 from typing import Union
-import pandas as pd
 
-from hotspot3.helpers.models import WindowedFitResults, FitResults
+from hotspot3.helpers.models import WindowedFitResults, FitResults, NotEnoughDataForContig
 
 
 # Calculate p-values and FDR
@@ -157,5 +156,5 @@ def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion: fl
     cdf = np.cumsum(total) / np.sum(total)
     valid_cts = uq[cdf >= min_bg_tag_proportion]
     if valid_cts.size < 2:
-        raise ValueError(f"Not enough background data")
+        raise NotEnoughDataForContig
     return valid_cts[1]
