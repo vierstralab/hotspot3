@@ -83,11 +83,10 @@ class SegmentalFit(WithLoggerAndInterval):
                     if min_bg_quantile < g_fit.config.max_background_prop:
                         g_fit.config.min_background_prop = min_bg_quantile
                     else:
-                        bg_tr = np.quantile(signal_with_step, g_fit.config.max_background_prop)
-                        print(segment_interval.to_ucsc(), bg_tr)
-                        if bg_tr <= 1:
-                            raise NotEnoughDataForContig
-                        g_fit.config.min_background_prop = g_fit.config.max_background_prop
+                        g_fit.config.min_background_prop = min(
+                            g_fit.config.max_background_prop,
+                            min_bg_quantile
+                        )
 
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
