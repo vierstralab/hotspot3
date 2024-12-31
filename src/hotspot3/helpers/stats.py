@@ -4,7 +4,7 @@ import gc
 from scipy.special import logsumexp, betainc, hyp2f1, betaln
 from typing import Union
 
-from hotspot3.helpers.models import WindowedFitResults, FitResults, NotEnoughDataForContig
+from hotspot3.helpers.models import WindowedFitResults, FitResults
 
 
 # Calculate p-values and FDR
@@ -150,3 +150,6 @@ def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion: fl
         # Since background is defined as less (not leq) => tr - use inf
         return np.inf
     return valid_cts[1]
+
+def roundup_float(number, decimals):
+    return np.ceil(number * 10 ** decimals) / 10 ** decimals

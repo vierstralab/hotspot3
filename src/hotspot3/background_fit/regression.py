@@ -7,6 +7,7 @@ from hotspot3.io.logging import WithLogger
 from hotspot3.helpers.models import SPOTEstimationResults, SPOTEstimationData
 from hotspot3.helpers.stats import upper_bg_quantile, weighted_median, weighted_std
 from hotspot3.helpers.format_converters import get_spot_score_fit_data
+from hotspot3.helpers.stats import roundup_float
 
 
 class SignalToNoiseFit(WithLogger):
@@ -64,7 +65,13 @@ class SignalToNoiseFit(WithLogger):
         
         y_pred = model.predict(X)
         resid = y - y_pred
-        min_bg_tags_fraction = np.ceil(expit(-y_pred - np.log(self.config.outlier_segment_threshold)) * 100) / 100 # Avoid precision issues
+        min_bg_tags_fraction = roundup_float(
+            expit(
+                -y_pred
+                - np.log(self.config.outlier_segment_threshold)
+            ), 
+            4
+        ) # Ceil to 4th decimal place to avoid precision issues
         outlier_dist = np.exp(resid)
 
         spot_score_std = self.calc_spot_score_error(resid, spot_score, spot_data.total_bases)
