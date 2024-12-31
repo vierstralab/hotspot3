@@ -69,7 +69,7 @@ class SignalToNoiseFit(WithLogger):
             expit(
                 -y_pred - np.log(self.config.outlier_segment_threshold)
             ), 
-            5
+            3
         ) # Ceil to 5th decimal place to avoid precision issues
         outlier_dist = np.exp(resid)
 
