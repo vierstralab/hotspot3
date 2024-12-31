@@ -64,7 +64,7 @@ class SignalToNoiseFit(WithLogger):
         
         y_pred = model.predict(X)
         resid = y - y_pred
-        min_bg_tags_fraction = expit(-y_pred - np.log(self.config.outlier_segment_threshold))
+        min_bg_tags_fraction = np.ceil(expit(-y_pred - np.log(self.config.outlier_segment_threshold)) * 100) / 100 # Avoid precision issues
         outlier_dist = np.exp(resid)
 
         spot_score_std = self.calc_spot_score_error(resid, spot_score, spot_data.total_bases)
