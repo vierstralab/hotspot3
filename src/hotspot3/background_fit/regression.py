@@ -69,8 +69,8 @@ class SignalToNoiseFit(WithLogger):
             expit(
                 -y_pred - np.log(self.config.outlier_segment_threshold)
             ), 
-            3
-        ) # Ceil to 3th decimal place to avoid precision issues
+            5
+        ) # Ceil to 5th decimal place to avoid precision issues
         outlier_dist = np.exp(resid)
 
         spot_score_std = self.calc_spot_score_error(resid, spot_score, spot_data.total_bases)
