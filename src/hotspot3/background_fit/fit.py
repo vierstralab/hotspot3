@@ -216,8 +216,8 @@ class GlobalBackgroundFit(BackgroundFit):
         )
         best_fit_result.n_signal = signal_mask.sum()
 
-        best_fit_result.signal_tags = agg_cutcounts[signal_mask].sum()
-        best_fit_result.total_tags = agg_cutcounts.sum()
+        best_fit_result.signal_tags = agg_cutcounts[signal_mask].compressed().sum()
+        best_fit_result.total_tags = agg_cutcounts.compressed().sum()
 
         return best_fit_result
     
