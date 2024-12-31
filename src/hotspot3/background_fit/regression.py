@@ -67,10 +67,9 @@ class SignalToNoiseFit(WithLogger):
         resid = y - y_pred
         min_bg_tags_fraction = roundup_float(
             expit(
-                -y_pred
-                - np.log(self.config.outlier_segment_threshold)
+                -y_pred - np.log(self.config.outlier_segment_threshold)
             ), 
-            3
+            2
         ) # Ceil to 3th decimal place to avoid precision issues
         outlier_dist = np.exp(resid)
 
