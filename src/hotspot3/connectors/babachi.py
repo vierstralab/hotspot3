@@ -2,9 +2,9 @@ import numpy as np
 import numpy.ma as ma
 from typing import List
 
-from genome_tools.genomic_interval import GenomicInterval
+from genome_tools import GenomicInterval
 
-from hotspot3.helpers.models import FitResults
+from hotspot3.helpers.models import FitResults, NotEnoughDataForContig
 from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.connectors.bottleneck import BottleneckWrapper
 
@@ -55,6 +55,8 @@ class BabachiWrapper(WithLoggerAndInterval):
         )
         chrom_sizes = {self.genomic_interval.chrom: len(self.genomic_interval)}
         bad_segments = self.run_babachi(snps_collection, chrom_sizes, bads)
+        if len(bad_segments) == 0:
+            raise NotEnoughDataForContig
         return [
             GenomicInterval(x.chr, x.start, x.end, BAD=x.BAD / chrom_bad) for x in bad_segments
         ]

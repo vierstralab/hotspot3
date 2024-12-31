@@ -83,15 +83,6 @@ def logfdr_from_logpvals(log_pvals, *, method='bh', dtype=np.float32, m=None):
     return np.clip(log_pvals, a_min=None, a_max=0)
 
 
-def fix_inf_pvals(neglog_pvals, fname): # TODO move somewhere else
-    infs = np.isinf(neglog_pvals)
-    n_infs = np.sum(infs) 
-    if n_infs > 0:
-        np.savetxt(fname, np.where(infs)[0], fmt='%d')
-        neglog_pvals[infs] = 300
-    return neglog_pvals
-
-
 def calc_g_sq(obs, exp):
     valid = (exp != 0) & (obs != 0)
     with np.errstate(over='ignore'):
@@ -155,7 +146,7 @@ def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion: fl
     total = uq * cts
     cdf = np.cumsum(total) / np.sum(total)
     valid_cts = uq[cdf >= min_bg_tag_proportion]
-    if valid_cts.size < 2: # Only with largest count min_bg_tag_proportion < cdf (cdf = 1)
-        # Since background is defined as less (not leq) than tr - use inf
+    if valid_cts.size < 2: # Only at largest count min_bg_tag_proportion < cdf (cdf = 1)
+        # Since background is defined as less (not leq) => tr - use inf
         return np.inf
     return valid_cts[1]

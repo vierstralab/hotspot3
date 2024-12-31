@@ -323,7 +323,8 @@ class GlobalBackgroundFit(BackgroundFit):
             bin_edges,
             where=~assumed_signal_mask[:, None]
         )
-        if calc_rmsea:
+        if calc_rmsea: # Used to bypass RMSEA calculation
+            # in the code used when np.inf passed 
             rmsea = self.calc_rmsea_all_windows(
                 p,
                 r,

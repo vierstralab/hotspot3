@@ -103,4 +103,4 @@ def interpolate_nan(array):
             right=None,
         )
     except ValueError:
-        return np.full(array.shape, np.nan)
+        return np.full(array.shape, np.nan, dtype=np.float32)

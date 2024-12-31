@@ -536,7 +536,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @ensure_contig_exists
     def fit_background_model(self, cutcounts_file) -> ProcessorOutputData:
         """
-        Fit background model to cutcounts and save fit parameters to parquet file.
+        Fit background model to cutcounts and save fit parameters to a bed file.
         """
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
             cutcounts_file,
@@ -559,8 +559,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             per_window_trs_global,
             global_fit_params
         )
-        if len(bad_segments) == 0:
-            raise NotEnoughDataForContig
         segments_fit = self.copy_with_params(SegmentalFit)
         per_interval_params = segments_fit.fit_per_segment_bg_model(
             agg_cutcounts=agg_cutcounts,
