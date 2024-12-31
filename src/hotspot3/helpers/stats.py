@@ -152,4 +152,4 @@ def threhold_from_bg_tag_proportion(signal_at_segment, min_bg_tag_proportion: fl
     return valid_cts[1]
 
 def roundup_float(number, decimals):
-    return np.ceil(number * 10 ** decimals) / 10 ** decimals
+    return np.ceil(number * (10 ** decimals)) / (10 ** decimals)
