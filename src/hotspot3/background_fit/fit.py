@@ -210,10 +210,14 @@ class GlobalBackgroundFit(BackgroundFit):
                 raise NotEnoughDataForContig
 
         best_fit_result.n_total = agg_cutcounts.count()
-        best_fit_result.n_signal = self.get_signal_mask_for_tr(
+        signal_mask = self.get_signal_mask_for_tr(
             agg_cutcounts,
             best_fit_result.fit_threshold
-        ).sum()
+        )
+        best_fit_result.n_signal = signal_mask.sum()
+
+        best_fit_result.signal_tags = agg_cutcounts[signal_mask].sum()
+        best_fit_result.total_tags = agg_cutcounts.sum()
 
         return best_fit_result
     

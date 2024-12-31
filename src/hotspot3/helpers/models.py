@@ -12,8 +12,10 @@ class FitResults:
     rmsea: np.ndarray = np.nan
     fit_quantile: np.ndarray = np.nan
     fit_threshold: np.ndarray = np.nan
-    n_signal: int = np.nan
-    n_total: int = np.nan
+    n_signal: int = np.nan # Number of signal bases
+    n_total: int = np.nan # Total number of mappable bases
+    signal_tags: int = np.nan # Number of tags at signal bases
+    total_tags: int = np.nan # Number of tags total
 
 
 @dataclasses.dataclass

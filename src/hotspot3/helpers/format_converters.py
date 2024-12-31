@@ -26,10 +26,8 @@ def fit_stats_df_to_fallback_fit_results(fit_result_df: pd.DataFrame):
 
 
 def get_spot_score_fit_data(fit_data: pd.DataFrame):
-    total_tags_background = fit_data.eval(
-        'bg_tags_mean * bg_bases'
-    ).values
-    total_tags = fit_data.eval('mappable_tags_mean * mappable_bases').values
+    total_tags_background = fit_data['bg_tags'].values
+    total_tags = fit_data['mappable_tags'].values
     total_bases = fit_data['mappable_bases'].values
 
     spot_scores = np.clip(1 - total_tags_background / total_tags, 0, 1)
@@ -45,7 +43,6 @@ def get_spot_score_fit_data(fit_data: pd.DataFrame):
 
 def convert_fit_results_to_series(
         fit_results: FitResults,
-        mean: float,
         fit_type: str,
         success_fit: bool
     ) -> pd.Series:
@@ -57,8 +54,8 @@ def convert_fit_results_to_series(
         'mappable_bases': fit_results.n_total,
         'bg_bases': fit_results.n_total - fit_results.n_signal,
         'bg_bases_prop': fit_results.fit_quantile,
-        'mappable_tags_mean': mean,
-        'bg_tags_mean': mean_from_r_p(fit_results.r, fit_results.p),
+        'mappable_tags': fit_results.total_tags,
+        'bg_tags': fit_results.total_tags - fit_results.signal_tags,
         'fit_type': fit_type,
         'success_fit': success_fit
     })
