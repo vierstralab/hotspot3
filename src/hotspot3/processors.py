@@ -566,7 +566,6 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             fallback_fit_results=global_fit_params
         )
         per_interval_params = segments_fit.add_fallback_fit_stats(
-            agg_cutcounts,
             global_fit_params,
             per_interval_params,
         )

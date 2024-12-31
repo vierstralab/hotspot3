@@ -98,7 +98,6 @@ class SegmentalFit(WithLoggerAndInterval):
             
             fit_series = convert_fit_results_to_series(
                 segment_fit_results,
-                segment_mean_signal,
                 fit_type='segment',
                 success_fit=success_fit
             )
@@ -108,7 +107,6 @@ class SegmentalFit(WithLoggerAndInterval):
 
     def add_fallback_fit_stats(
             self,
-            agg_cutcounts: ma.MaskedArray,
             fallback_fit_results: FitResults,
             segment_stats: pd.DataFrame
         ):
@@ -118,7 +116,6 @@ class SegmentalFit(WithLoggerAndInterval):
         intervals_stats['BAD'] = 0
         fit_series = convert_fit_results_to_series(
             fallback_fit_results,
-            np.mean(agg_cutcounts.compressed()),
             fit_type='global',
             success_fit=True,
         )
