@@ -66,7 +66,7 @@ class SegmentalFit(WithLoggerAndInterval):
         self.logger.debug(f"{self.genomic_interval.chrom}: Fitting background model for {len(bad_segments)} segments")
         for i, segment_interval in enumerate(bad_segments):
             signal_at_segment = self.filter_signal_to_segment(agg_cutcounts, segment_interval)
-            segment_mean_signal = np.mean(signal_at_segment.compressed())
+
             g_fit = self.copy_with_params(
                 GlobalBackgroundFit,
                 name=segment_interval.to_ucsc()
@@ -74,12 +74,15 @@ class SegmentalFit(WithLoggerAndInterval):
             try:
                 step = self.get_optimal_segment_step(total_len, len(segment_interval))
                 if min_bg_tag_proportion is not None:
-                    signal_with_step = signal_at_segment[::step].compressed()
+                    compressed_signal = signal_at_segment.compressed()
                     valid_count = threhold_from_bg_tag_proportion(
-                        signal_with_step,
+                        compressed_signal,
                         min_bg_tag_proportion[i],
                     )
-                    min_bg_quantile = g_fit.get_bg_quantile_from_tr(signal_with_step, valid_count)
+                    min_bg_quantile = g_fit.get_bg_quantile_from_tr(
+                        compressed_signal,
+                        valid_count
+                    )
                     g_fit.config.min_background_prop = min(
                         g_fit.config.max_background_prop,
                         min_bg_quantile
