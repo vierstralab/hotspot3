@@ -71,6 +71,7 @@ class SegmentalFit(WithLoggerAndInterval):
                 GlobalBackgroundFit,
                 name=segment_interval.to_ucsc()
             )
+            reached_max_q = False
             try:
                 step = self.get_optimal_segment_step(total_len, len(segment_interval))
                 if min_bg_tag_proportion is not None:
@@ -83,6 +84,8 @@ class SegmentalFit(WithLoggerAndInterval):
                         compressed_signal,
                         valid_count
                     )
+                    if min_bg_quantile > g_fit.config.max_background_prop:
+                        reached_max_q = True
                     g_fit.config.min_background_prop = min(
                         g_fit.config.max_background_prop,
                         min_bg_quantile
@@ -102,7 +105,8 @@ class SegmentalFit(WithLoggerAndInterval):
             fit_series = convert_fit_results_to_series(
                 segment_fit_results,
                 fit_type='segment',
-                success_fit=success_fit
+                success_fit=success_fit,
+                reached_max_q=reached_max_q
             )
             set_series_row_to_df(intervals_stats, fit_series, i)
         return intervals_stats

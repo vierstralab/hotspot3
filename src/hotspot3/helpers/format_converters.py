@@ -44,7 +44,8 @@ def get_spot_score_fit_data(fit_data: pd.DataFrame):
 def convert_fit_results_to_series(
         fit_results: FitResults,
         fit_type: str,
-        success_fit: bool
+        success_fit: bool,
+        reached_max_q: bool=False
     ) -> pd.Series:
     return pd.Series({
         'bg_r': fit_results.r,
@@ -57,7 +58,8 @@ def convert_fit_results_to_series(
         'mappable_tags': fit_results.total_tags,
         'bg_tags': fit_results.total_tags - fit_results.signal_tags,
         'fit_type': fit_type,
-        'success_fit': success_fit
+        'success_fit': success_fit,
+        'max_bg_reached': reached_max_q
     })
 
 def set_dtype(intervals_stats: pd.DataFrame, fit_series: pd.Series):
