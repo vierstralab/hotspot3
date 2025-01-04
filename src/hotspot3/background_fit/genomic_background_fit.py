@@ -10,7 +10,7 @@ from hotspot3.io.logging import WithLoggerAndInterval
 from hotspot3.background_fit.fit import GlobalBackgroundFit, StridedBackgroundFit, WindowBackgroundFit
 from hotspot3.helpers.models import FitResults, WindowedFitResults, NotEnoughDataForContig
 from hotspot3.helpers.format_converters import set_series_row_to_df, convert_fit_results_to_series, fit_stats_df_to_fallback_fit_results
-from hotspot3.helpers.stats import check_valid_nb_params, threhold_from_bg_tag_proportion
+from hotspot3.helpers.stats import check_valid_nb_params, threhold_from_bg_tag_proportion, roundup_float
 from hotspot3.helpers.utils import interpolate_nan
 
 
@@ -80,9 +80,12 @@ class SegmentalFit(WithLoggerAndInterval):
                         compressed_signal,
                         min_bg_tag_proportion[i],
                     )
-                    min_bg_quantile = g_fit.get_bg_quantile_from_tr(
-                        compressed_signal[::step], # calc quantile on the same data that goes in g_fit
-                        valid_count
+                    min_bg_quantile = roundup_float(
+                        g_fit.get_bg_quantile_from_tr(
+                            compressed_signal[::step], # calc quantile on the same data that goes in g_fit
+                            valid_count
+                        ),
+                        3
                     )
                     if min_bg_quantile > g_fit.config.max_background_prop:
                         reached_max_q = True
