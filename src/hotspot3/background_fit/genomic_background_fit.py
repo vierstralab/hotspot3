@@ -75,13 +75,12 @@ class SegmentalFit(WithLoggerAndInterval):
             try:
                 step = self.get_optimal_segment_step(total_len, len(segment_interval))
                 if min_bg_tag_proportion is not None:
-                    compressed_signal = signal_at_segment.compressed()
                     valid_count = threhold_from_bg_tag_proportion(
-                        compressed_signal,
+                        signal_at_segment.compressed(),
                         min_bg_tag_proportion[i],
                     )
                     min_bg_quantile = g_fit.get_bg_quantile_from_tr(
-                        compressed_signal[::step], # calc quantile on the same data that goes in g_fit
+                        signal_at_segment[::step].compressed(), # calc quantile on the same data that goes in g_fit
                         valid_count
                     )
                     if min_bg_quantile > g_fit.config.max_background_prop:
