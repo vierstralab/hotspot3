@@ -66,6 +66,7 @@ class BackgroundFit(BottleneckWrapper):
     
     def get_all_bins(self, array: np.ndarray, fallback_fit_results: FitResults=None):
         min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
+        min_bg_tr = np.ceil(min_bg_tr)
         signal_bins, n_signal_bins = self.get_signal_bins(
             array,
             min_bg_tr=min_bg_tr,

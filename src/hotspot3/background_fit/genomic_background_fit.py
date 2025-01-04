@@ -80,12 +80,9 @@ class SegmentalFit(WithLoggerAndInterval):
                         compressed_signal,
                         min_bg_tag_proportion[i],
                     )
-                    min_bg_quantile = roundup_float(
-                        g_fit.get_bg_quantile_from_tr(
-                            compressed_signal[::step], # calc quantile on the same data that goes in g_fit
-                            valid_count
-                        ),
-                        3
+                    min_bg_quantile = g_fit.get_bg_quantile_from_tr(
+                        compressed_signal[::step], # calc quantile on the same data that goes in g_fit
+                        valid_count
                     )
                     if min_bg_quantile > g_fit.config.max_background_prop:
                         reached_max_q = True
