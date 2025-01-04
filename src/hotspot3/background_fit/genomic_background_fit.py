@@ -80,7 +80,7 @@ class SegmentalFit(WithLoggerAndInterval):
                         min_bg_tag_proportion[i],
                     )
                     min_bg_quantile = g_fit.get_bg_quantile_from_tr(
-                        signal_at_segment.filled(np.nan)[::step], # calc quantile on the same data that goes in g_fit
+                        signal_at_segment[::step].filled(np.nan), # calc quantile on the same data that goes in g_fit
                         valid_count
                     )
                     if min_bg_quantile > g_fit.config.max_background_prop:
