@@ -66,7 +66,6 @@ class BackgroundFit(BottleneckWrapper):
     
     def get_all_bins(self, array: np.ndarray, fallback_fit_results: FitResults=None):
         min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
-        min_bg_tr = np.ceil(min_bg_tr)
         signal_bins, n_signal_bins = self.get_signal_bins(
             array,
             min_bg_tr=min_bg_tr,
@@ -142,7 +141,7 @@ class BackgroundFit(BottleneckWrapper):
         if array.ndim == 1:
             return np.nan if all_nan else np.nanquantile(array, quantile)
         result = np.full(array.shape[1], np.nan, dtype=np.float32)
-        result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0)
+        result[~all_nan] = np.nanquantile(array[:, ~all_nan], quantile, axis=0, method='higher')
         return result
     
     @wrap_masked
