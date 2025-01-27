@@ -322,13 +322,14 @@ class GlobalBackgroundFit(BackgroundFit):
         if not check_valid_nb_params(FitResults(p, r)):
             raise NotEnoughDataForContig
         
-        value_counts = self.value_counts_per_bin(
-            agg_cutcounts[:, None],
-            bin_edges,
-            where=~assumed_signal_mask[:, None]
-        )
         if calc_rmsea: # Used to bypass RMSEA calculation
             # in the code used when np.inf passed 
+
+            value_counts = self.value_counts_per_bin(
+                agg_cutcounts[:, None],
+                bin_edges,
+                where=~assumed_signal_mask[:, None]
+            )
             rmsea = self.calc_rmsea_all_windows(
                 p,
                 r,

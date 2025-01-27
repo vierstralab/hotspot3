@@ -15,8 +15,6 @@ from hotspot3.connectors.bam2bed import BamFileCutsExtractor
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger
 from hotspot3.io import check_partition_exists
 
-import pyarrow.parquet as pq
-
 
 class ChromReader(WithLoggerAndInterval):
     def __init__(self, genomic_interval: GenomicInterval, config: ProcessorConfig=None, logger=None):
