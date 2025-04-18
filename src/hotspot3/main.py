@@ -142,7 +142,7 @@ def main() -> None:
 
 
 def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
-    name = "Run hotspot2 peak calling" + extra_desc
+    name = "Run hotspot3 peak calling" + extra_desc
     # TODO: Change description to reflect the new functionality
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,

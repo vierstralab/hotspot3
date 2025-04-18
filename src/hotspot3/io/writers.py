@@ -7,8 +7,7 @@ import numpy as np
 import subprocess
 
 from genome_tools.helpers import df_to_tabix
-
-from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig, WindowedFitResults
+from hotspot3.helpers.models import ProcessorOutputData, NotEnoughDataForContig
 
 from hotspot3.io import parallel_write_partitioned_parquet
 from hotspot3.io.logging import WithLoggerAndInterval, WithLogger

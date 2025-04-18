@@ -723,6 +723,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
             SampleFDRCorrection,
             name=self.gp.sample_id
         ).read_fdrs_for_chrom(fdr_path, self.chrom_name)
+
         self.logger.debug(f"{self.chrom_name}: Calling peaks at FDR={fdr_threshold}")
         
         # TODO: move logic to a peak calling class

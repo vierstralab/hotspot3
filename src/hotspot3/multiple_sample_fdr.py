@@ -24,7 +24,7 @@ def main():
     reader = GenomeReader(config=config)
     chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
     mapping_df = pd.read_table(args.mapping_df).set_index('id')['pvals_parquet']
-    ms_fdr = reader.copy_with_params(
+    reader.copy_with_params(
         MultiSampleFDRCorrection,
         name=mapping_df.index.tolist(),
         chrom_sizes=chrom_sizes
