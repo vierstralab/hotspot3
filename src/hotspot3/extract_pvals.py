@@ -29,6 +29,7 @@ def main():
     else:
         input_bed = args.bed
     bed_df = pd.read_table(input_bed, header=None, names=['chrom', 'start', 'end'], comment='#', usecols=[0, 1, 2])
+    print(len(bed_df))
     groups = bed_df.groupby('chrom')
     data = []
     for chrom, group in groups:
