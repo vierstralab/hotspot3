@@ -29,12 +29,10 @@ def main():
     else:
         input_bed = args.bed
     bed_df = pd.read_table(input_bed, header=None, names=['chrom', 'start', 'end'], comment='#', usecols=[0, 1, 2])
-    print(len(bed_df))
     groups = bed_df.groupby('chrom')
     data = []
     for chrom, group in groups:
         if chrom not in chrom_sizes:
-            print("Ignoring chromosome", chrom, "not in chrom_sizes")
             continue
         chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
         chrom_reader = ChromReader(genomic_interval=chrom_interval)
