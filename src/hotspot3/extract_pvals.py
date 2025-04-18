@@ -23,7 +23,7 @@ def extract_max_pval(row, chrom_pvals):
 def main():
     args = parse_args()
     reader = GenomeReader()
-    chrom_sizes = reader.get_chrom_sizes_file(args.chrom_sizes)
+    chrom_sizes = reader.read_chrom_sizes(args.chrom_sizes)
     if args.bed == '-':
         input_bed = sys.stdin
     else:
