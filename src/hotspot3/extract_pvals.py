@@ -46,19 +46,20 @@ def main():
     data = []
     for chrom, group in tqdm(groups, total=len(groups)):
         if chrom not in chrom_sizes:
-            continue
-        chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
-
-        chrom_reader = ChromReader(genomic_interval=chrom_interval)
-        try:
-            chrom_pvals = chrom_reader.extract_from_parquet(
-                args.pvals_parquet,
-                columns=['log10_pval']
-            )['log10_pval'].values
-            max_pvals = group.apply(extract_max_pval, chrom_pvals=chrom_pvals, axis=1)
-        except NotEnoughDataForContig:
             max_pvals = np.zeros(len(group), dtype=np.float32)
-        
+        else:
+            chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
+
+            chrom_reader = ChromReader(genomic_interval=chrom_interval)
+            try:
+                chrom_pvals = chrom_reader.extract_from_parquet(
+                    args.pvals_parquet,
+                    columns=['log10_pval']
+                )['log10_pval'].values
+                max_pvals = group.apply(extract_max_pval, chrom_pvals=chrom_pvals, axis=1)
+            except NotEnoughDataForContig:
+                max_pvals = np.zeros(len(group), dtype=np.float32)
+            
         group['max_neglog_p'] = max_pvals
         data.append(group)
 
