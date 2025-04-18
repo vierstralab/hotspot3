@@ -2,6 +2,7 @@ import pandas as pd
 import argparse
 import numpy as np
 import sys
+from tqdm import tqdm
 
 from hotspot3.io.readers import GenomeReader, ChromReader
 from genome_tools import GenomicInterval
@@ -31,7 +32,7 @@ def main():
     bed_df = pd.read_table(input_bed, header=None, names=['chrom', 'start', 'end'], comment='#', usecols=[0, 1, 2])
     groups = bed_df.groupby('chrom')
     data = []
-    for chrom, group in groups:
+    for chrom, group in tqdm(groups, total=len(groups)):
         if chrom not in chrom_sizes:
             continue
         chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
