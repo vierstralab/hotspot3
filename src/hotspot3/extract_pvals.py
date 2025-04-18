@@ -11,6 +11,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('pvals_parquet', type=str)
     parser.add_argument('bed', type=str)
+    parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
+
     parser.add_argument('save_path', type=str)
 
     return parser.parse_args()
