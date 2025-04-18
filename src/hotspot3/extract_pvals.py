@@ -45,7 +45,7 @@ def main():
         if chrom not in chrom_sizes:
             continue
         chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
-        max_neglog_p = np.zeros(len(chrom_interval), dtype=np.float32)
+        max_neglog_p = np.zeros(len(group), dtype=np.float32)
 
         chrom_reader = ChromReader(genomic_interval=chrom_interval)
         chrom_pvals = chrom_reader.extract_from_parquet(
