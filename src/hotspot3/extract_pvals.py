@@ -22,11 +22,12 @@ def segment_max(vec, starts, ends, out):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('pvals_parquet', type=str)
-    parser.add_argument('bed', type=str)
+    parser.add_argument('pvals_parquet', type=str, help='Path to parquet file with pvals')
+    parser.add_argument('bed', type=str, help='Path to bed file with regions to extract pvals from. Use "-" for stdin')
+    parser.add_argument('--format', choices=['bed', 'npy'], default='bed', help='Output format')
     parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
 
-    parser.add_argument('save_path', type=str)
+    parser.add_argument('save_path', type=str, help='Path to save results')
 
     return parser.parse_args()
 
@@ -64,12 +65,15 @@ def main():
         data.append(group)
 
     data = pd.concat(data, ignore_index=True)
-    data.sort_values(['chrom', 'start']).to_csv(
-        args.save_path,
-        sep='\t',
-        index=False,
-        header=None
-    )
+    if args.format == 'npy':
+        np.save(args.save_path, data['max_neglog_p'].astype(np.float32).values)
+    else:
+        data.sort_values(['chrom', 'start']).to_csv(
+            args.save_path,
+            sep='\t',
+            index=False,
+            header=None
+        )
 
 if __name__ == '__main__':
     main()
