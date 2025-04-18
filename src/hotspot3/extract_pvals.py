@@ -30,6 +30,7 @@ def main():
         input_bed = args.bed
     bed_df = pd.read_table(input_bed, header=None, names=['chrom', 'start', 'end'], comment='#', usecols=[0, 1, 2])
     groups = bed_df.groupby('chrom')
+    data = []
     for chrom, group in groups:
         if chrom not in chrom_sizes:
             continue
@@ -40,8 +41,10 @@ def main():
             columns=['log10_pval']
         )['log10_pval'].values
         group['max_neglog_p'] = group.apply(extract_max_pval, chrom_pvals=chrom_pvals, axis=1)
+        data.append(group)
 
-    groups.sort_values(['chrom', 'start']).to_csv(
+    data = pd.concat(data, ignore_index=True)
+    data.sort_values(['chrom', 'start']).to_csv(
         args.save_path,
         sep='\t',
         index=False,
