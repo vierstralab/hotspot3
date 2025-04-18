@@ -34,6 +34,7 @@ def main():
     data = []
     for chrom, group in groups:
         if chrom not in chrom_sizes:
+            print("Ignoring chromosome", chrom, "not in chrom_sizes")
             continue
         chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
         chrom_reader = ChromReader(genomic_interval=chrom_interval)
