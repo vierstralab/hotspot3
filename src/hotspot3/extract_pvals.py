@@ -5,6 +5,7 @@ import sys
 from tqdm import tqdm
 
 from hotspot3.io.readers import GenomeReader, ChromReader
+from hotspot3.helpers.models import NotEnoughDataForContig
 from genome_tools import GenomicInterval
 import numba
 
@@ -49,12 +50,16 @@ def main():
         chrom_interval = GenomicInterval(chrom, 0, chrom_sizes[chrom])
 
         chrom_reader = ChromReader(genomic_interval=chrom_interval)
-        chrom_pvals = chrom_reader.extract_from_parquet(
-            args.pvals_parquet,
-            columns=['log10_pval']
-        )['log10_pval'].values
+        try:
+            chrom_pvals = chrom_reader.extract_from_parquet(
+                args.pvals_parquet,
+                columns=['log10_pval']
+            )['log10_pval'].values
+            max_pvals = group.apply(extract_max_pval, chrom_pvals=chrom_pvals, axis=1)
+        except NotEnoughDataForContig:
+            max_pvals = np.zeros(len(group), dtype=np.float32)
         
-        group['max_neglog_p'] = group.apply(extract_max_pval, chrom_pvals=chrom_pvals, axis=1)
+        group['max_neglog_p'] = max_pvals
         data.append(group)
 
     data = pd.concat(data, ignore_index=True)
