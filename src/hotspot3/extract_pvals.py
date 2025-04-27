@@ -64,11 +64,11 @@ def main():
         group['max_neglog_p'] = max_pvals
         data.append(group)
 
-    data = pd.concat(data, ignore_index=True)
+    data = pd.concat(data, ignore_index=True).sort_values(['chrom', 'start'])
     if args.format == 'npy':
         np.save(args.save_path, data['max_neglog_p'].astype(np.float32).values)
     else:
-        data.sort_values(['chrom', 'start']).to_csv(
+        data.to_csv(
             args.save_path,
             sep='\t',
             index=False,
