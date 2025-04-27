@@ -8,7 +8,7 @@ dependencies:
   - pandas
   - scipy
   - pip
-  - numpy==2.0.2
+  - numpy
   - h5py
   - statsmodels
   - samtools=1.15.1
