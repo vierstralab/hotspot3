@@ -7,7 +7,13 @@ from tqdm import tqdm
 from hotspot3.io.readers import GenomeReader, ChromReader
 from hotspot3.helpers.models import NotEnoughDataForContig
 from genome_tools import GenomicInterval
-import numba
+
+try:
+    import numba
+
+except ImportError:
+    print("Numba is not installed. Please install it to use this script.")
+    sys.exit(1)
 
 
 @numba.njit
