@@ -64,7 +64,7 @@ def main():
         group['max_neglog_p'] = max_pvals
         data.append(group)
 
-    data = pd.concat(data, ignore_index=True).sort_values(['chrom', 'start'])
+    data = pd.concat(data).sort_index()
     if args.format == 'npy':
         np.save(args.save_path, data['max_neglog_p'].astype(np.float32).values)
     else:
