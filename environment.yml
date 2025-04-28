@@ -24,7 +24,9 @@ dependencies:
   - bioconda::mawk
   - bottleneck
   - pywavelets
+  - sklearn
   - pip:
     - git+https://github.com/vierstralab/genome-tools.git@plotting
     - git+https://github.com/autosome-ru/BABACHI.git@3.0dev
+    - 
 
