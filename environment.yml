@@ -9,7 +9,6 @@ dependencies:
   - scipy
   - pip
   - numpy
-  - h5py
   - statsmodels
   - samtools=1.15.1
   - pybigwig
@@ -25,6 +24,7 @@ dependencies:
   - bottleneck
   - pywavelets
   - scikit-learn
+  - pyarrow
   - pip:
     - git+https://github.com/vierstralab/genome-tools.git@plotting
     - git+https://github.com/autosome-ru/BABACHI.git@3.0dev
