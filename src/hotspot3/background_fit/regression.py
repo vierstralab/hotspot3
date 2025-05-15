@@ -57,12 +57,26 @@ class SignalToNoiseFit(WithLogger):
         model = RANSACRegressor(random_state=42, min_samples=0.2)
         spot_score = self.calc_dataset_spot_score(spot_data)
 
+        where = spot_data.valid_scores
+        inliers = np.zeros_like(where, dtype=bool)
+
+        if np.isnan(spot_score):
+            return SPOTEstimationResults(
+                spot_score=np.nan,
+                spot_score_std=np.nan,
+                inliers_mask=inliers,
+                slope=np.nan,
+                intercept=np.nan,
+                outlier_distance=np.nan,
+                min_bg_tags_fraction=1
+            )
+
         X = np.log(spot_data.total_bases)[:, None]
         y = logit(spot_data.segment_spot_scores)
 
-        where = spot_data.valid_scores
+
         model.fit(X[where], y[where])
-        inliers = np.zeros_like(where, dtype=bool)
+    
         inliers[where] = model.inlier_mask_
         slope, intercept = model.estimator_.coef_[0], model.estimator_.intercept_
         
