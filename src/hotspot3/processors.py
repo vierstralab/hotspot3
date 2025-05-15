@@ -157,7 +157,9 @@ class GenomeProcessor(WithLogger):
                 categories=categories,
             )
             data.append(df)
-            
+        
+        if len(data) == 0:
+            return ProcessorOutputData('all', pd.DataFrame(columns=['chrom']))
         data = pd.concat(data, ignore_index=True)
         data = data[['chrom'] + [col for col in data.columns if col != 'chrom']]
         return ProcessorOutputData('all', data)
