@@ -43,6 +43,9 @@ class SignalToNoiseFit(WithLogger):
     def calc_dataset_spot_score(self, spot_data: SPOTEstimationData):
         spot_scores = spot_data.segment_spot_scores[spot_data.valid_scores]
         total_bases = spot_data.total_bases[spot_data.valid_scores]
+        if len(spot_scores) == 0:
+            self.logger.warning("No segments with valid SPOT score found for the dataset.")
+            return np.nan
         spot_score = weighted_median(spot_scores, total_bases)
         return spot_score
     
