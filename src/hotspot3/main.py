@@ -1,11 +1,155 @@
 import logging
 import argparse
 import os
+import sys
 import shutil
 
 from hotspot3.processors import GenomeProcessor
 from hotspot3.io.logging import setup_logger
 from hotspot3.config import ProcessorConfig
+from hotspot3.io.paths import Hotspot3Paths
+import networkx as nx
+
+
+def resolve_required_steps(outputs, available, graph):
+    """
+    Given a set of desired outputs and already available nodes,
+    return the minimal set of required nodes (topologically sorted).
+    """
+    required = set()
+    visited = set()
+
+    def visit(node):
+        if node in visited or node in available:
+            return
+        visited.add(node)
+        for dep in graph.predecessors(node):
+            visit(dep)
+        required.add(node)
+
+    for out in outputs:
+        visit(out)
+
+    return list(nx.topological_sort(graph.subgraph(required)))
+
+
+def find_missing_steps(paths: Hotspot3Paths, save_density):
+    step_graph = nx.DiGraph()
+    step_graph.add_edges_from([
+        ("bam", "cutcounts"),
+        ("cutcounts", "total_cutcounts"),
+        ("cutcounts", "smoothed_signal"),
+        ("total_cutcounts", "smoothed_signal"),
+        ("cutcounts", "fit_params"),
+        ("total_cutcounts", "fit_params"),
+        ("fit_params", "pvals"),
+        ("cutcounts", "pvals"),
+        ("pvals", "fdrs"),
+        ("smoothed_signal", "normalized_density"),
+        ("fdrs", "peak_calling"),
+        ("smoothed_signal", "peak_calling")
+    ])
+    inputs = [
+        paths.was_set(x) for x in step_graph.nodes
+    ]
+    outputs = {'peak_calling',}
+    if save_density:
+        outputs.add('normalized_density')
+    result = resolve_required_steps(inputs, outputs, step_graph)
+    if 'bam' in result:
+        raise ValueError("Provide a bam file or cutcounts")
+    return result
+
+
+def run_from_configs(
+        genome_processor: GenomeProcessor, 
+        paths: Hotspot3Paths, 
+        fdrs, 
+        save_density,
+    ):
+    step_names = find_missing_steps(paths, save_density)
+    genome_processor.logger.info(f"Running: {', '.join(step_names)}")
+    if 'cutcounts' in step_names:
+        genome_processor.extract_cutcounts_from_bam(paths.bam, paths.cutcounts)
+    
+    if 'total_cutcounts' in step_names:
+        genome_processor.get_total_cutcounts(paths.cutcounts, paths.total_cutcounts)
+    
+    if 'smoothed_signal' in step_names:
+        genome_processor.smooth_signal_modwt(
+            paths.cutcounts,
+            save_path=paths.smoothed_signal,
+            total_cutcounts_path=paths.total_cutcounts
+        )
+    if 'fit_params' in step_names:
+        genome_processor.fit_background_model(
+            paths.cutcounts,
+            total_cutcounts_path=paths.total_cutcounts,
+            save_path=paths.fit_params,
+            per_region_stats_path=paths.per_region_stats,
+            per_region_stats_path_bw=paths.per_region_background,
+        )
+
+        genome_processor.extract_fit_thresholds_to_bw(
+            paths.fit_params,
+            paths.total_cutcounts,
+            paths.thresholds,
+        )
+
+        genome_processor.extract_bg_quantile_to_bw(
+            paths.fit_params,
+            paths.total_cutcounts,
+            paths.background
+        )
+    
+    if 'pvals' in step_names:
+        genome_processor.calc_pvals(
+            paths.cutcounts,
+            paths.fit_params,
+            paths.pvals
+        )
+    
+    if 'fdrs' in step_names:
+        genome_processor.calc_fdr(
+            paths.pvals,
+            paths.fdrs,
+            max(fdrs)
+        )
+    
+    if 'normalized_density' in step_names:
+        genome_processor.extract_normalized_density(
+            paths.smoothed_signal,
+            paths.normalized_density
+        )
+    
+    if 'peak_calling' in step_names:
+        genome_processor.logger.info(f'Calling peaks and hotspots at FDRs: {fdrs}') 
+        for fdr in fdrs:
+            fdr_dir = paths.fdrs_dir(fdr)
+            if os.path.exists(fdr_dir):
+                shutil.rmtree(fdr_dir)
+            os.makedirs(fdr_dir, exist_ok=True)
+
+            genome_processor.logger.debug(f'Calling hotspots at FDR={fdr}')
+            genome_processor.call_hotspots(
+                paths.fdrs,
+                sample_id=genome_processor.sample_id,
+                save_path=paths.hotspots(fdr),
+                save_path_bb=paths.hotspots_bb(fdr),
+                fdr_tr=fdr
+            )
+
+            genome_processor.logger.debug(f'Calling variable width peaks at FDR={fdr}')
+            genome_processor.call_variable_width_peaks(
+                paths.smoothed_signal,
+                paths.fdrs,
+                paths.total_cutcounts,
+                sample_id=genome_processor.sample_id,
+                save_path=paths.peaks(fdr),
+                save_path_bb=paths.peaks_bb(fdr),
+                fdr_tr=fdr
+            )
+
 
 
 def main() -> None:
@@ -28,116 +172,20 @@ def main() -> None:
         reference_fasta=args.reference,
         config=config,
     )
-    precomp_pvals = args.pvals_parquet
-    cutcounts_path = args.cutcounts
-    smoothed_signal_path = args.signal_parquet
-    precomp_fdrs = args.fdrs_parquet
-    sample_id = args.id
 
-    debug_dir = f"{args.outdir}/debug/"
-    os.makedirs(debug_dir, exist_ok=True)
-
-    main_dir_prefix = f"{args.outdir}/{sample_id}"
-    debug_dir_prefix = f"{args.outdir}/debug/{sample_id}"
-    
-    if cutcounts_path is None:
-        total_cutcounts_path = None
-    else:
-        total_cutcounts_path = cutcounts_path.replace('.cutcounts.bed.gz', '.total_cutcounts')
-
-    if smoothed_signal_path is None or precomp_pvals is None:
-        if cutcounts_path is None:
-            cutcounts_path = f"{main_dir_prefix}.cutcounts.bed.gz"
-            total_cutcounts_path = f"{main_dir_prefix}.total_cutcounts"
-            genome_processor.extract_cutcounts_from_bam(args.bam, cutcounts_path)
-
-            genome_processor.get_total_cutcounts(cutcounts_path, total_cutcounts_path)
-            
+    paths = Hotspot3Paths(
+        outdir=args.outdir,
+        sample_id=args.id,
+        cutcounts=args.cutcounts,
+        total_cutcounts=args.total_cutcounts,
+        smoothed_signal=args.signal_parquet,
+        pvals=args.pvals_parquet,
+        fdrs=args.fdrs_parquet,
         
-        if smoothed_signal_path is None:
-            smoothed_signal_path = f"{debug_dir_prefix}.smoothed_signal.parquet"
-            
-            genome_processor.smooth_signal_modwt(
-                cutcounts_path,
-                save_path=smoothed_signal_path,
-                total_cutcounts_path=total_cutcounts_path
-            )
-
-        if precomp_pvals is None and precomp_fdrs is None:
-            fit_params_path = f"{debug_dir_prefix}.fit_params.parquet"
-
-            per_region_stats_path = f"{main_dir_prefix}.fit_stats.tsv.gz"
-            per_region_stats_path_bw = f"{main_dir_prefix}.per_segment.background.bw"
-            
-            threholds_bw_path = f"{main_dir_prefix}.threholds.bw"
-            background_bw_path = f"{main_dir_prefix}.background.bw"
-            genome_processor.fit_background_model(
-                cutcounts_path,
-                total_cutcounts_path=total_cutcounts_path,
-                save_path=fit_params_path,
-                per_region_stats_path=per_region_stats_path,
-                per_region_stats_path_bw=per_region_stats_path_bw,
-            )
-
-            precomp_pvals = f"{main_dir_prefix}.pvals.parquet"
-            genome_processor.calc_pvals(
-                cutcounts_path,
-                fit_params_path,
-                precomp_pvals,
-            )
-
-            genome_processor.extract_thresholds_to_bw(
-                fit_params_path,
-                total_cutcounts_path,
-                threholds_bw_path,
-            )
-
-            genome_processor.extract_bg_quantile_to_bw(
-                fit_params_path,
-                total_cutcounts_path,
-                background_bw_path
-            )
+    )
+    root_logger.info(f"Executing command: {' '.join(sys.argv)}")
+    run_from_configs(genome_processor, paths, args.fdrs, args.save_density)
     
-    if precomp_fdrs is None:
-        precomp_fdrs = f"{debug_dir_prefix}.fdrs.parquet"
-        genome_processor.calc_fdr(precomp_pvals, precomp_fdrs, max(args.fdrs))
-
-    root_logger.info(f'Calling peaks and hotspots at FDRs: {args.fdrs}') 
-    for fdr in args.fdrs:
-        fdr_dir = f"{args.outdir}/fdr{fdr}"
-        if os.path.exists(fdr_dir):
-            shutil.rmtree(fdr_dir)
-        os.makedirs(fdr_dir, exist_ok=True)
-        fdr_pref = f"{fdr_dir}/{sample_id}"
-        
-        hotspots_path = f"{fdr_pref}.hotspots.fdr{fdr}.bed.gz"
-        hotspots_path_bb = f"{fdr_pref}.hotspots.fdr{fdr}.bb"
-        root_logger.debug(f'Calling hotspots at FDR={fdr}')
-        genome_processor.call_hotspots(
-            precomp_fdrs,
-            sample_id=sample_id,
-            save_path=hotspots_path,
-            save_path_bb=hotspots_path_bb,
-            fdr_tr=fdr
-        )
-
-        root_logger.debug(f'Calling variable width peaks at FDR={fdr}')
-        peaks_path = f"{fdr_pref}.peaks.fdr{fdr}.bed.gz"
-        peaks_path_bb = f"{fdr_pref}.peaks.fdr{fdr}.bb"
-        genome_processor.call_variable_width_peaks(
-            smoothed_signal_path,
-            precomp_fdrs,
-            total_cutcounts_path,
-            sample_id=sample_id,
-            save_path=peaks_path,
-            save_path_bb=peaks_path_bb,
-            fdr_tr=fdr
-        )
-
-    if args.save_density:
-        root_logger.info('Saving density')
-        denisty_path = f"{main_dir_prefix}.normalized_density.bw"
-        genome_processor.extract_normalized_density(smoothed_signal_path, denisty_path)
     root_logger.info('Program finished')
 
 
@@ -148,32 +196,47 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
         formatter_class=argparse.RawTextHelpFormatter,
         description=name + """
     
-    Saves the following temporary files in the output directory:
-        - tabix indexed cutcounts: {sample_id}.cutcounts.bed.gz (~200MB)
+    Saves the following files in the output directory:
+        - tabix indexed cutcounts: {sample_id}.cutcounts.bed.gz (~200 MB)
+        - file with total # of cutcounts: {sample_id}.total_cutcounts (~1 kb)
+        - per-bp 0.995 percentile of 'background': {sample_id}.background.bw (~10 MB)
+        - per-bp raw p-values: {sample_id}.pvals.parquet (large, ~800 MB)
+        Optional if --save_density is provided:
+            - normalized density of cutcounts in bigwig format: {sample_id}.normalized_density.bw
+    
+    Additionally, in debug folder saves:
         - per-bp smoothed signal: {sample_id}.smoothed_signal.parquet (large, ~10GB)
-        - per-bp raw p-values: {sample_id}.pvals.parquet (large, ~1.5GB)
-        - parameters used for background per-chromosome fits: {sample_id}.pvals.params.parquet (~1.5MB)
-        - per-bp FDR estimates: {sample_id}.fdrs.parquet (~600MB)
+        - parameters used for background per-chromosome fits: {sample_id}.fit_params.parquet (large, ~10GB)
+        - per-bp threshold for background fit: {sample_id}.thresholds.bw (~10 MB)
+        - per-bp 0.995 background estimated for each segment: {sample_id}.per_segment.background.bw (~10 MB)
+        - per-bp FDR estimates: {sample_id}.fdrs.parquet (~200 MB)
     
     Note:
         Multiple FDR thresholds can be provided as a space-separated list.
 
     For each FDR threshold:
         - tabix indexed hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bed.gz
-        - tabix indexed peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
-    
-    To quickly find hotspots and peaks at other FDRs than initially provided, specify 
-    --fdrs_parquet {sample_id}.fdrs.parquet 
-    and 
-    --signal_parquet {sample_id}.smoothed_signal.parquet.
+        - bb hotspots at FDR: {sample_id}.hotspots.fdr{fdr}.bb
 
-    Or --fdrs_parquet {sample_id}.fdrs.parquet 
-    and
-    --cutcounts {sample_id}.cutcounts.bed.gz or --bam input.bam
-    if signal_parquet was deleted (will take more time smoothing the signal).
+        - tabix indexed peaks at FDR: {sample_id}.peaks.fdr{fdr}.bed.gz
+        - bb peaks at FDR: {sample_id}.peaks.fdr{fdr}.bb
     
-    Optional if --save_density is provided:
-        - normalized density of cutcounts in bigwig format: {sample_id}.normalized_density.bw
+    To quickly re-run hotspot and peak calling at other FDRs without recomputing everything:
+    Fastest option (everything precomputed):
+    Provide both
+        --fdrs_parquet {sample_id}.fdrs.parquet
+        and
+        --signal_parquet {sample_id}.smoothed_signal.parquet
+    if you still have the smoothed signal. 
+
+    Slower fallback (signal needs recomputing):
+    If signal_parquet is missing, you can still provide
+        --fdrs_parquet {sample_id}.fdrs.parquet
+        and either
+        --cutcounts {sample_id}.cutcounts.bed.gz
+        or
+        --bam input.bam
+    to regenerate the smoothed signal before peak calling.
     """
     )
     
@@ -186,18 +249,18 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
         nargs='+', default=[0.05]
     )
     parser.add_argument("--reference", help="Path to reference fasta file. Required to work with cram files with missing fasta", default=None)
-    parser.add_argument("--cpus", type=int, help="Number of CPUs to use", default=1)
+    parser.add_argument("--cpus", type=int, help="Number of CPUs to use. Doesn't use more than # of chromosomes.", default=1)
     parser.add_argument("--outdir", help="Path to output directory", default=".")
-    parser.add_argument("--debug", help="Run in debug mode. Adds additional prints and saves background window fit params", action='store_true', default=False)
+    parser.add_argument("--debug", help="Adds additional prints", action='store_true', default=False)
     parser.add_argument("--tempdir", help="Path to temporary directory. Defaults to system temp directory", default=None)
 
     # Arguments for calculating p-values
-    parser.add_argument("--mappable_bases", help="Path to mappable bases file (if needed). Used in fit of background model", default=None)
+    parser.add_argument("--mappable_bases", help=" (Optional) Path to tabix indexed mappable bases file. Ignore unmappable bases for statistical model.", default=None)
     parser.add_argument("--window", help="Window size for smoothing cutcounts", type=int, default=151)
     parser.add_argument("--background_window", help="Background window size", type=int, default=50001)
     parser.add_argument(
         "--signal_quantile",
-        help="Chromosome signal quantile. Positions with signal above the threshold considered to be 'potential peaks' and are not used to fit a background model",
+        help="Max proportion of background expected in the data. Change if you know what you are doing.",
         type=float,
         default=0.995
     )
@@ -207,12 +270,12 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
     parser.add_argument("--cutcounts", help="Path to pre-calculated cutcounts tabix file. Skip extracting cutcounts from bam file", default=None)
     parser.add_argument("--signal_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips modwt signal smoothing", default=None)
     parser.add_argument("--pvals_parquet", help="Path to pre-calculated partitioned parquet file(s) with per-bp p-values. Skips p-value calculation", default=None)
-    parser.add_argument("--fdrs_parquet", help="Path to pre-calculated fdrs. Can correct for several sampels using multiple_samples_fdr.py", default=None)
+    parser.add_argument("--fdrs_parquet", help="Path to pre-calculated fdrs. Can correct for several samples using multiple_samples_fdr.py", default=None)
 
-    parser.add_argument("--chromosomes", help="List of chromosomes to process. Used for debug", nargs='+', default=None)
+    parser.add_argument("--chromosomes", help="List of chromosomes to process. Useful for debug", nargs='+', default=None)
 
     # Optional - save density
-    parser.add_argument("--save_density", action='store_true', help="Save density of cutcounts", default=False)
+    parser.add_argument("--save_density", action='store_true', help="Save normalized density of cutcounts", default=False)
 
     args = parser.parse_args()
     logger_level = logging.DEBUG if args.debug else logging.INFO

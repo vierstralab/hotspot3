@@ -5,11 +5,20 @@
 
 ## Command line interface
 - hotspot3 - call peaks
-- hotspot3-pvals - extract pvals using reference bed file
+- hotspot3-pvals - (extra) extract pvals using reference bed file
 
 ## Input parameters
 - sample_id - unique identifier of the sample
+- chrom_sizes - two column tsv file (chrom size). Can provide url.
+- reference - path to fasta file (for cram files with path to fasta missing)
+- mappable_bases - tabix indexed bed file listing mappable bases
 
+- cpus - # of cpus to use. Uses a lot of memory for large # of cpus. Doesn't utlize more than number of chromosomes
+- debug - add additional prints
+- outdir - path to output directory
+- --tempdir - path to temporary directory. Defaults to system temp directory
+
+- fdrs - comma separated list of FDRs at which to call peaks
 
 ## Output files
 - tabix indexed cutcounts: {sample_id}.cutcounts.bed.gz (~200MB)
