@@ -30,7 +30,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('pvals_parquet', type=str, help='Path to parquet file with pvals')
     parser.add_argument('bed', type=str, help='Path to bed file with regions to extract pvals from. Use "-" for stdin')
-    parser.add_argument('--format', choices=['bed', 'npy'], default='bed', help='Output format')
+    parser.add_argument('--format', choices=['bed', 'txt', 'npy'], default='bed', help='Output format')
     parser.add_argument("--chrom_sizes", help="Path to chromosome sizes file. If none assumed to be hg38 sizes", default=None)
 
     parser.add_argument('save_path', type=str, help='Path to save results')
@@ -73,6 +73,11 @@ def main():
     data = pd.concat(data).sort_index()
     if args.format == 'npy':
         np.save(args.save_path, data['max_neglog_p'].astype(np.float32).values)
+    elif args.format == "txt":
+        np.savetxt(
+            args.save_path,
+            data['max_neglog_p'].astype(np.float32).values,
+        )
     else:
         data.to_csv(
             args.save_path,
