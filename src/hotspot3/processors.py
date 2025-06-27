@@ -225,7 +225,7 @@ class GenomeProcessor(WithLogger):
             save_path
         )
 
-    def extract_thresholds_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
+    def extract_fit_thresholds_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
         """
         Convert threshold values to bigwig file.
         """
@@ -332,6 +332,7 @@ class GenomeProcessor(WithLogger):
             self.logger.info(f'No outlier segments found at iteration {iteration}.')
 
         per_region_params['refit_with_constraint'] = refit_with_constraint
+        per_region_params['valid_segment'] = per_region_params.eval('success_fit & ~max_bg_reached & fit_type == "segment"')
         self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}. Refitted {refit_with_constraint.sum()} segments.")
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
         self.writer.fit_stats_to_bw(

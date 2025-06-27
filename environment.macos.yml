@@ -10,17 +10,15 @@ dependencies:
   - pip
   - numpy
   - statsmodels
-  - samtools=1.15.1
+  - samtools
   - pybigwig
   - pysam
   - tqdm
   - ca-certificates
   - openssl
   - libflint
-  - bedops
   - ucsc-bedgraphtobigwig
   - bioconda::ucsc-bedtobigbed
-  - bioconda::mawk
   - bottleneck
   - pywavelets
   - scikit-learn
