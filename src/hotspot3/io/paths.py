@@ -52,7 +52,7 @@ class Hotspot3Paths:
     def was_set(self, prop):
         return getattr(self, f"_{prop}", None) is not None
 
-    @fallback_path()
+    @property
     def debug_dir(self):
         path = self.outdir / "debug"
         path.mkdir(parents=True, exist_ok=True)
