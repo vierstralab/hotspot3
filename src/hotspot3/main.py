@@ -177,7 +177,6 @@ def main() -> None:
         outdir=args.outdir,
         sample_id=args.id,
         cutcounts=args.cutcounts,
-        total_cutcounts=args.total_cutcounts,
         smoothed_signal=args.signal_parquet,
         pvals=args.pvals_parquet,
         fdrs=args.fdrs_parquet,
