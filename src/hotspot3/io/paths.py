@@ -49,7 +49,7 @@ class Hotspot3Paths:
         for key, value in kwargs.items():
             self.__setattr__(f"_{key}", value)
             if key == "cutcounts":
-                self._total_cutcounts = self.total_cutcounts(value)
+                self._total_cutcounts = self.total_cutcounts(value) is None
     
     def was_set(self, prop):
         return getattr(self, f"_{prop}", None) is not None
