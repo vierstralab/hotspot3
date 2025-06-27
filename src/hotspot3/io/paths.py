@@ -49,7 +49,7 @@ class Hotspot3Paths:
         for key, value in kwargs.items():
             self.__setattr__(f"_{key}", value)
             if key == "cutcounts":
-                self._total_cutcounts = self.total_cutcounts(value) is None
+                self._total_cutcounts = self.total_cutcounts
     
     def was_set(self, prop):
         return getattr(self, f"_{prop}", None) is not None
@@ -68,12 +68,11 @@ class Hotspot3Paths:
     def cutcounts(self):
         return self.outdir / f"{self.sample_id}.cutcounts.bed.gz"
 
-    def total_cutcounts(self, cutcounts=None):
-        if cutcounts is None:
-            cutcounts = self.cutcounts
-        if cutcounts is None:
+    @property
+    def total_cutcounts(self):
+        if self.cutcounts is None:
             return None
-        return cutcounts.replace('.cutcounts.bed.gz', '.total_cutcounts')
+        return self.cutcounts.replace('.cutcounts.bed.gz', '.total_cutcounts')
 
     @fallback_path()
     def smoothed_signal(self):
