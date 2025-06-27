@@ -18,6 +18,7 @@ def resolve_required_steps(outputs, available, graph):
     """
     required = set()
     visited = set()
+    print(available)
 
     def visit(node):
         if node in visited or node in available:
