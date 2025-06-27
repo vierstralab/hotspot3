@@ -9,7 +9,7 @@ setup(
     author="Serj Abramov & Alexandr Boytsov",
     author_email="sabramov@altius.org",
     url="https://github.com/vierstralab/hotspot3",
-    packages=find_packages(),
+    packages=find_packages(where='src'),
     include_package_data=True,
     package_dir={'': 'src'},
     package_data={
