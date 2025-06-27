@@ -11,6 +11,18 @@ from hotspot3.io.paths import Hotspot3Paths
 import networkx as nx
 
 
+display_names ={
+    'cutcounts': 'Extract cutcounts from BAM',
+    'total_cutcounts': 'Calculate total cutcounts',
+    'smoothed_signal': 'Smooth cutcounts',
+    'fit_params': 'Fit background model',
+    'pvals': 'Calculate p-values',
+    'fdrs': 'Calculate FDRs',
+    'normalized_density': 'Extract normalized density',
+    'peak_calling': 'Call hotspots and peaks',
+}
+
+
 def resolve_required_steps(outputs, available, graph):
     """
     Given a set of desired outputs and already available nodes,
@@ -18,7 +30,6 @@ def resolve_required_steps(outputs, available, graph):
     """
     required = set()
     visited = set()
-    print(available)
 
     def visit(node):
         if node in visited or node in available:
@@ -67,7 +78,7 @@ def run_from_configs(
         save_density,
     ):
     step_names = find_missing_steps(paths, save_density)
-    genome_processor.logger.info(f"Running: {', '.join(step_names)}")
+    genome_processor.logger.info(f"Running: {', '.join([display_names.get(x) for x in step_names])}")
     if 'cutcounts' in step_names:
         genome_processor.extract_cutcounts_from_bam(paths.bam, paths.cutcounts)
     
