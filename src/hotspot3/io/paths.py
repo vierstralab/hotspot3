@@ -54,7 +54,9 @@ class Hotspot3Paths:
 
     @fallback_path()
     def debug_dir(self):
-        return (self.outdir / "debug").mkdir(parents=True, exist_ok=True)
+        path = self.outdir / "debug"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     @fallback_path()
     def bam(self):
