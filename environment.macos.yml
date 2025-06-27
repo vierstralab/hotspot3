@@ -1,0 +1,31 @@
+name: hotspot3
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.9
+  - pandas
+  - scipy
+  - pip
+  - numpy
+  - statsmodels
+  - samtools
+  - pybigwig
+  - pysam
+  - tqdm
+  - ca-certificates
+  - openssl
+  - libflint
+  - ucsc-bedgraphtobigwig
+  - bioconda::ucsc-bedtobigbed
+  - bottleneck
+  - pywavelets
+  - scikit-learn
+  - pyarrow
+  - networkx
+  - pip:
+    - babachi
+    - git+https://github.com/vierstralab/genome-tools.git@plotting
+
+
