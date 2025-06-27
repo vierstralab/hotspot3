@@ -18,7 +18,6 @@ def resolve_required_steps(outputs, available, graph):
     """
     required = set()
     visited = set()
-    print(available)
 
     def visit(node):
         if node in visited or node in available:
@@ -50,13 +49,11 @@ def find_missing_steps(paths: Hotspot3Paths, save_density):
         ("fdrs", "peak_calling"),
         ("smoothed_signal", "peak_calling")
     ])
-    inputs = [
-        paths.was_set(x) for x in step_graph.nodes
-    ]
+    available = {x for x in step_graph.nodes if paths.was_set(x)}
     outputs = {'peak_calling',}
     if save_density:
         outputs.add('normalized_density')
-    result = resolve_required_steps(outputs, inputs, step_graph)
+    result = resolve_required_steps(outputs, available, step_graph)
     if 'bam' in result:
         raise ValueError("Provide a bam file or cutcounts")
     return result
