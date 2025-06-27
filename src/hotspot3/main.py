@@ -175,6 +175,7 @@ def main() -> None:
     paths = Hotspot3Paths(
         outdir=args.outdir,
         sample_id=args.id,
+        bam=args.bam,
         cutcounts=args.cutcounts,
         smoothed_signal=args.signal_parquet,
         pvals=args.pvals_parquet,
