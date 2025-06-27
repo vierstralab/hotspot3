@@ -56,6 +56,7 @@ def find_missing_steps(paths: Hotspot3Paths, save_density):
     if save_density:
         outputs.add('normalized_density')
     result = resolve_required_steps(outputs, inputs, step_graph)
+    print(result)
     if 'bam' in result:
         raise ValueError("Provide a bam file or cutcounts")
     return result
