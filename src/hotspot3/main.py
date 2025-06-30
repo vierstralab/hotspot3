@@ -8,20 +8,15 @@ from hotspot3.processors import GenomeProcessor
 from hotspot3.io.logging import setup_logger
 from hotspot3.config import ProcessorConfig
 from hotspot3.io.paths import Hotspot3Paths
-from hotspot3.helpers.steps_solver import StepsSolver
-
-
 
 
 def run_from_configs(
         genome_processor: GenomeProcessor, 
         paths: Hotspot3Paths, 
-        fdrs, 
-        save_density,
+        fdrs,
     ):
-    solver = StepsSolver(paths, save_density)
-    step_names = solver.find_missing_steps(paths, save_density)
-    genome_processor.logger.info(f"Running: {', '.join(solver.get_step_display_names(step_names))}")
+    step_names = paths.find_missing_steps()
+    genome_processor.logger.info(f"Running: {', '.join(paths.get_display_names(step_names))}")
     if 'cutcounts' in step_names:
         genome_processor.extract_cutcounts_from_bam(paths.bam, paths.cutcounts)
     
@@ -129,15 +124,15 @@ def main() -> None:
     paths = Hotspot3Paths(
         outdir=args.outdir,
         sample_id=args.id,
+        save_density=args.save_density,
         bam=args.bam,
         cutcounts=args.cutcounts,
         smoothed_signal=args.signal_parquet,
         pvals=args.pvals_parquet,
         fdrs=args.fdrs_parquet,
-        
     )
     root_logger.info(f"Executing command: {' '.join(sys.argv)}")
-    run_from_configs(genome_processor, paths, args.fdrs, args.save_density)
+    run_from_configs(genome_processor, paths, args.fdrs)
     
     root_logger.info('Program finished')
 

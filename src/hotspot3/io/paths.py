@@ -1,4 +1,5 @@
 from pathlib import Path
+from hotspot3.helpers.steps_solver import StepsSolver
 
 
 def fallback_path():
@@ -34,6 +35,7 @@ class Hotspot3Paths:
             self,
             outdir,
             sample_id,
+            save_density=False,
             **kwargs
         ):
         self.outdir = outdir
@@ -50,6 +52,8 @@ class Hotspot3Paths:
             self.__setattr__(f"_{key}", value)
             if key == "cutcounts":
                 self._total_cutcounts = self.total_cutcounts
+        
+        self.solver = StepsSolver(self, save_density)
     
     def was_set(self, prop):
         return getattr(self, f"_{prop}", None) is not None
@@ -124,3 +128,9 @@ class Hotspot3Paths:
     
     def peaks_bb(self, fdr):
         return str(self.fdrs_dir(fdr) / f"{self.sample_id}.peaks.fdr{fdr}.bb")
+    
+    def find_missing_steps(self):
+        return self.solver.find_missing_steps()
+    
+    def get_display_names(self, steps):
+        return self.solver.get_step_display_names(steps)
