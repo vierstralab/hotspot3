@@ -8,67 +8,9 @@ from hotspot3.processors import GenomeProcessor
 from hotspot3.io.logging import setup_logger
 from hotspot3.config import ProcessorConfig
 from hotspot3.io.paths import Hotspot3Paths
-import networkx as nx
+from hotspot3.helpers.steps_solver import StepsSolver
 
 
-display_names ={
-    'cutcounts': 'Extract cutcounts from BAM',
-    'total_cutcounts': 'Calculate total cutcounts',
-    'smoothed_signal': 'Smooth cutcounts',
-    'fit_params': 'Fit background model',
-    'pvals': 'Calculate p-values',
-    'fdrs': 'Calculate FDRs',
-    'normalized_density': 'Extract normalized density',
-    'peak_calling': 'Call hotspots and peaks',
-}
-
-
-def resolve_required_steps(outputs, available, graph):
-    """
-    Given a set of desired outputs and already available nodes,
-    return the minimal set of required nodes (topologically sorted).
-    """
-    required = set()
-    visited = set()
-
-    def visit(node):
-        if node in visited or node in available:
-            return
-        visited.add(node)
-        for dep in graph.predecessors(node):
-            visit(dep)
-        required.add(node)
-
-    for out in outputs:
-        visit(out)
-
-    return list(nx.topological_sort(graph.subgraph(required)))
-
-
-def find_missing_steps(paths: Hotspot3Paths, save_density):
-    step_graph = nx.DiGraph()
-    step_graph.add_edges_from([
-        ("bam", "cutcounts"),
-        ("cutcounts", "total_cutcounts"),
-        ("cutcounts", "smoothed_signal"),
-        ("total_cutcounts", "smoothed_signal"),
-        ("cutcounts", "fit_params"),
-        ("total_cutcounts", "fit_params"),
-        ("fit_params", "pvals"),
-        ("cutcounts", "pvals"),
-        ("pvals", "fdrs"),
-        ("smoothed_signal", "normalized_density"),
-        ("fdrs", "peak_calling"),
-        ("smoothed_signal", "peak_calling")
-    ])
-    available = {x for x in step_graph.nodes if paths.was_set(x)}
-    outputs = {'peak_calling',}
-    if save_density:
-        outputs.add('normalized_density')
-    result = resolve_required_steps(outputs, available, step_graph)
-    if 'bam' in result:
-        raise ValueError("Provide a bam file or cutcounts")
-    return result
 
 
 def run_from_configs(
@@ -77,8 +19,9 @@ def run_from_configs(
         fdrs, 
         save_density,
     ):
-    step_names = find_missing_steps(paths, save_density)
-    genome_processor.logger.info(f"Running: {', '.join([display_names.get(x) for x in step_names])}")
+    solver = StepsSolver(paths, save_density)
+    step_names = solver.find_missing_steps(paths, save_density)
+    genome_processor.logger.info(f"Running: {', '.join(solver.get_step_display_names(step_names))}")
     if 'cutcounts' in step_names:
         genome_processor.extract_cutcounts_from_bam(paths.bam, paths.cutcounts)
     
