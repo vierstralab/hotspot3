@@ -114,13 +114,13 @@ class Hotspot3Paths:
         return self.outdir / f"{fdr}"
 
     def hotspots(self, fdr):
-        return self.fdrs_dir(fdr) / f"{self.sample_id}.hotspots.fdr{fdr}.bed.gz"
+        return str(self.fdrs_dir(fdr) / f"{self.sample_id}.hotspots.fdr{fdr}.bed.gz")
     
     def peaks(self, fdr):
-        return self.fdrs_dir(fdr) / f"{self.sample_id}.peaks.fdr{fdr}.bed.gz"
+        return str(self.fdrs_dir(fdr) / f"{self.sample_id}.peaks.fdr{fdr}.bed.gz")
     
     def hotspots_bb(self, fdr):
-        return self.fdrs_dir(fdr) / f"{self.sample_id}.hotspots.fdr{fdr}.bb"
+        return str(self.fdrs_dir(fdr) / f"{self.sample_id}.hotspots.fdr{fdr}.bb")
     
     def peaks_bb(self, fdr):
-        return self.fdrs_dir(fdr) / f"{self.sample_id}.peaks.fdr{fdr}.bb"
+        return str(self.fdrs_dir(fdr) / f"{self.sample_id}.peaks.fdr{fdr}.bb")
