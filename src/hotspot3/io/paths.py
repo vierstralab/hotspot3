@@ -114,7 +114,7 @@ class Hotspot3Paths:
         return self.outdir / f"{self.sample_id}.background.bw"
 
     def fdrs_dir(self, fdr):
-        return self.outdir / f"{fdr}"
+        return self.outdir / f"fdr{fdr}"
 
     def hotspots(self, fdr):
         return str(self.fdrs_dir(fdr) / f"{self.sample_id}.hotspots.fdr{fdr}.bed.gz")
