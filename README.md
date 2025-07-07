@@ -36,7 +36,8 @@ hotspot3 --help
 ```
 # Example Usage
 ## Basic peak calling from BAM/CRAM
-```hotspot3 AG10883 \
+```
+hotspot3 AG10883 \
   --chrom_sizes /net/seq/data2/projects/sabramov/hotspot3/GRCh38_no_alts.nuclear.chrom_sizes \
   --bam AG10883.filtered.cram \
   --fdrs 0.01 0.05 0.1 \
@@ -47,7 +48,8 @@ hotspot3 --help
 This performs processing from CRAM, calls peaks at 1%, 5%, and 10% FDR, and saves cutcount density. Uses 6 threads for parallel processing.
 
 ## Additional FDR threshold (fast reuse of precomputed data)
-```hotspot3 AG10883 \
+```
+hotspot3 AG10883 \
   --chrom_sizes /net/seq/data2/projects/sabramov/hotspot3/GRCh38_no_alts.nuclear.chrom_sizes \
   --cutcounts ./AG10883/AG10883.cutcounts.bed.gz \
   --signal_parquet ./AG10883/debug/AG10883.smoothed_signal.parquet \
@@ -89,11 +91,11 @@ This reuses previously computed intermediate files to quickly generate peaks at 
 ## Change if you know what you are doing
 - `--window WINDOW` - Smoothing window size for cut counts.
 - `--background_window BACKGROUND_WINDOW` - Background window size
-- `--signal_quantile SIGNAL_QUANTILE` - Fraction of genomic positions to model as a background (default: 0.995). Used to exclude extreme outliers (e.g., regions with unusually high coverage) when fitting the background model. This reduces computational burden by limiting the background estimation to the lower portion of the signal distribution (e.g., the lowest 99.5% of sites if --signal_quantile 0.995).
+- `--signal_quantile SIGNAL_QUANTILE` - Fraction of genomic positions to model as a background (default: 0.995). Used to exclude extreme outliers (e.g., regions with unusually high coverage) when fitting the background model. This reduces computational burden by limiting the background estimation to the lower portion of the signal distribution (e.g., the lowest 99.5% of sites if `--signal_quantile 0.995`).
 
 
 # Output files
-Currently, Hotspot3 doesn't delete files in the debug folder upon completion. You can manually delete them to save disk space.
+Currently, Hotspot3 doesn't delete files in the debug folder upon completion. You can manually delete the created `debug` folder to save disk space.
 
 - tabix indexed cutcounts: `{sample_id}.cutcounts.bed.gz` (~200MB)
 - File with total # of cutcounts: `{sample_id}.total_cutcounts` (~10kb)
