@@ -45,7 +45,7 @@ class ProcessorConfig:
     # not used by default
     exclude_peak_flank_fit: int = 0
 
-    # Remove peak flanks to reduce effect of peaks on scoring params from local window
+    # Remove peak flanks to reduce overfit to peak flanks when using local window
     exclude_peak_flank_scoring: int = 500
 
     # Remove obvious signal before segmentation
@@ -57,13 +57,14 @@ class ProcessorConfig:
     num_background_bins: int = 20
     num_signal_bins: int = 100
     min_obs_rmsea: int = 5 # Merge signal bins with less than this number of observations
-    rmsea_tr: float = 0.05 # Threhold for good fit, currently used only for reporting 'bad' rmsea
+    rmsea_tr: float = 0.05 # Threhold for good fit, used only to report 'bad' rmsea
 
     # Segmentation
     babachi_min_segment_size: int = 50001 # same as bg_window, can be changed
     babachi_segmentation_step: int = 500
     babachi_boundary_penalty: int = 20
 
+    # Refit segments with signal/noise > outlier_segment_threshold * median(signal/noise)
     outlier_segment_threshold: float = 5
     max_outlier_iterations: int = 5
 
