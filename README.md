@@ -1,9 +1,26 @@
-# Calling peaks with hotspot3
+# Calling Peaks with hotspot3
+hotspot3 identifies regulatory regions with elevated chromatin accessibility or sequencing signal by modeling the background distribution of cut counts.
 
-- Peak calling assumes a negative binomial distribution for background cut counts.
-- A segmentation-based approach (see [BABACHI](https://github.com/autosome-ru/BABACHI)) is used to identify regions with approximately uniform background signal. Within each segment, background parameters are estimated using the negative binomial model.
+The method combines:
+- **Background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments.  
+- **Bayesian segmentation** (via [BABACHI](https://github.com/autosome-ru/BABACHI)) to partition the genome into regions with a homogeneous background (a common overdispersion parameter in the background model).
+- **Per-base statistical testing** to assign p-values and estimate FDR for enrichment at each position.  
+- **Signal smoothing** using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints), enabling more robust peak detection.   
+- **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
+- **Peak calling**, which detects local maxima in the smoothed signal and reports those that overlap significant bases.
 
+hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
 
+## Table of Contents
+
+- [Command line interface](#command-line-interface)
+- [Installation](#installation)
+- [Usage example](#usage-example)
+- [Input parameters](#input-parameters)
+- [Output files](#output-files)
+- [Performance and resource requirements](#performance-and-resource-requirements)
+- [Authors](#authors)
+  
 # Command line interface
 - `hotspot3` - Call peaks from input data using MODWT-smoothed signal and local background estimation.
 - `hotspot3-pvals` - (Experimental) Extract raw p-values for regions defined in a reference BED file. This is useful when comparing or aggregating signal across multiple samples at predefined loci (e.g., shared peak positions), enabling downstream consensus ("core") peak calling.
@@ -34,7 +51,7 @@ You can check that the CLI is working with:
 ```
 hotspot3 --help
 ```
-# Example Usage
+# Usage example 
 ## Basic peak calling from BAM/CRAM
 ```
 hotspot3 AG10883 \
@@ -95,7 +112,7 @@ This reuses previously computed intermediate files to quickly generate peaks at 
 
 
 # Output files
-Currently, Hotspot3 doesn't delete files in the debug folder upon completion. You can manually delete the created `debug` folder to save disk space.
+Currently, hotspot3 doesn't delete files in the debug folder upon completion. You can manually delete the created `debug` folder to save disk space.
 
 - tabix indexed cutcounts: `{sample_id}.cutcounts.bed.gz` (~200MB)
 - File with total # of cutcounts: `{sample_id}.total_cutcounts` (~10kb)
@@ -117,14 +134,18 @@ The following files are saved to the debug folder:
     - estimated parameters background fits: `{sample_id}.fit_params.parquet` (large, ~2GB)
     - per-bp FDR estimates: `{sample_id}.fdrs.parquet` (~600MB)
 
-# Performance and Resource Requirements
-- Typical runtime: ~1 hour for a 100 million read CRAM file.
+# Performance and resource requirements
+- **Typical runtime**: ~1 hour for a 100 million read CRAM file.
+  
+- **Runtime is largely independent of dataset coverage**, since most computations are per-base rather than per-read.
+  
+- **Recommended input coverage**: At least 10 million mapped reads for a somewhat reliable background fit.
+  
+- **CPU usage**: Parallelized by chromosome. Using more CPUs (e.g., 22 for all chromosomes) can reduce wall-clock time but significantly increases memory usage.
 
-- CPU usage: Parallelized by chromosome. Using more CPUs (e.g., 22 for all chromosomes) can reduce wall-clock time but significantly increases memory usage.
+- **Memory usage**: ~80 GB RAM with 6 CPUs. Can exceed 150 GB when using 22 threads (e.g., one per chromosome).
 
-- Memory usage: ~80 GB RAM with 6 CPUs. Can exceed 150 GB when using 22 threads (e.g., one per chromosome).
-
-- Recommendation: Use a machine with 100–200 GB RAM for high-threaded runs (significantly improves time). Reduce thread count to lower memory use.
+- **Recommendation**: Use a machine with 100–200 GB RAM for high-threaded runs (significantly improves time). Reduce thread count to lower memory use.
 
 # Authors
 
