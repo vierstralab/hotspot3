@@ -7,7 +7,7 @@ The main algorithm steps are:
 - **Per-base statistical testing** to assign p-values and estimate FDR for enrichment at each position.  
 - **Signal smoothing** using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints)
 - **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
-- **Peak calling**, which detects peaks using the smoothed signal and reports those that overlap with significant bases.
+- **Peak calling**, which detects peaks from the smoothed signal and reports those that overlap with significant bases.
 
 hotspot3 is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
 
