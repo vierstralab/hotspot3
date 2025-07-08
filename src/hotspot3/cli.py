@@ -6,7 +6,7 @@ import sys
 epilog = """
 Examples:
 hotspot3 sample123 --bam sample123.bam --chrom_sizes hg38.chrom.sizes --fdrs 0.01 0.05
-hotspot3 sample123 --cutcounts sample123.cutcounts.bed.gz --signal_parquet sample123.signal.parquet --fdrs_parquet sample123.fdrs.parquet --fdrs 0.001
+hotspot3 sample123 --chrom_sizes hg38.chrom.sizes --cutcounts sample123.cutcounts.bed.gz --signal_parquet sample123.signal.parquet --fdrs_parquet sample123.fdrs.parquet --fdrs 0.001
 
 See full documentation at: https://github.com/vierstralab/hotspot3
 """
