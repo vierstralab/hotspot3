@@ -208,7 +208,7 @@ Each row includes:
 
 - **Coordinates**: `#chr`, `start`, `end`
 - **Negative binomial parameters**: `r`, `p`
-- **Background and total cut counts**: Total number of tags in the region and how many are assigned to be the background
+- **Background and total cut counts**: Total number of tags in the region and how many are used to produce the best background fit
 - **Segment SPOT score**: Signal Proportion Of Tags. Proportion of tags that were not used to fit the background model (i.e., signal tags)
 - **Overall SPOT score**: Weighted median of segment SPOT scores — a dataset-level quality metric
 - **Status flags**: `refit_with_constraint`, `success_fit`, `max_bg_reached`
