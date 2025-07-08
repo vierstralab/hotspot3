@@ -1,9 +1,9 @@
-# Calling Peaks with hotspot3
+# Calling peaks with hotspot3
 hotspot3 identifies regulatory regions with elevated chromatin accessibility or sequencing signal by modeling the background distribution of cut counts.
 
 The method combines:
 - **Background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments.  
-- **Bayesian segmentation** (via [BABACHI](https://github.com/autosome-ru/BABACHI)) to partition the genome into regions with a homogeneous background (a common overdispersion parameter in the background model).
+- **Bayesian segmentation** (via [BABACHI](https://github.com/autosome-ru/BABACHI)) to partition the genome into regions with a homogeneous background (i.e., similar signal-to-noise ratio, modeled using a common overdispersion parameter in the background model).
 - **Per-base statistical testing** to assign p-values and estimate FDR for enrichment at each position.  
 - **Signal smoothing** using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints), enabling more robust peak detection.   
 - **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
@@ -11,13 +11,14 @@ The method combines:
 
 hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
 
-## Table of Contents
+## Table of contents
 
 - [Command line interface](#command-line-interface)
 - [Installation](#installation)
 - [Usage example](#usage-example)
 - [Input parameters](#input-parameters)
 - [Output files](#output-files)
+- [Interpreting output](#interpreting-output)
 - [Performance and resource requirements](#performance-and-resource-requirements)
 - [Authors](#authors)
   
@@ -114,12 +115,14 @@ This reuses previously computed intermediate files to quickly generate peaks at 
 # Output files
 Currently, hotspot3 doesn't delete files in the debug folder upon completion. You can manually delete the created `debug` folder to save disk space.
 
-- tabix indexed cutcounts: `{sample_id}.cutcounts.bed.gz` (~200MB)
+- Tabix indexed cutcounts: `{sample_id}.cutcounts.bed.gz` (~200MB)
 - File with total # of cutcounts: `{sample_id}.total_cutcounts` (~10kb)
 
-- tabix indexed per-segment fit stats: `{sample_id}.fit_stats.tsv.gz` (~20MB)
+- Tabix-indexed BED file summarizing per-segment background model parameters: `{sample_id}.fit_stats.bed.gz` (~20MB)
 
-- per-bp raw p-values: `{sample_id}.pvals.parquet` (large, ~1.5GB)
+- Per-bp raw p-values: `{sample_id}.pvals.parquet` (large, ~1.5GB)
+- - Normalized cut count density (**cuts per million**) (generated if `--save_density` is specified): `{sample_id}.normalized_density.bw` (~200MB)
+
 
 For each FDR threshold:
   - tabix indexed hotspots at FDR: `{sample_id}.hotspots.fdr{fdr}.bed.gz`
@@ -127,12 +130,79 @@ For each FDR threshold:
   - tabix indexed peaks at FDR: `{sample_id}.peaks.fdr{fdr}.bed.gz`
   - peaks at FDR in bb (BED12) format
 
-
 The following files are saved to the debug folder:
-
     - per-bp smoothed signal: `{sample_id}.smoothed_signal.parquet` (large, ~2GB)
     - estimated parameters background fits: `{sample_id}.fit_params.parquet` (large, ~2GB)
     - per-bp FDR estimates: `{sample_id}.fdrs.parquet` (~600MB)
+
+# Interpreting output
+Once hotspot3 has finished running, the most effective way to understand and validate the results is by visualizing key tracks and inspecting background fits.
+
+## Visualizing results in genome browser
+You can load the following files in IGV or the UCSC Genome Browser for interactive inspection:
+![UCSC visualization](docs/HOTSPOT3.png)
+
+- `{sample_id}.normalized_density.bw` — **(black track)** BigWig file with normalized cut count density (in cuts per million).  
+- `{sample_id}.background.bw` — **(orange track)** BigWig file representing the estimated background signal level at each position (defined by raw p-value > 0.005).  
+  Overlay with the normalized density to visualize how much observed signal exceeds the modeled background.
+
+- `{sample_id}.hotspots.fdr{fdr}.bb` - called hotspots at each FDR threshold
+- `{sample_id}.peaks.fdr{fdr}.bb` - **(green track)** Called peaks at each FDR threshold.
+
+
+## Flagging problematic segments
+
+The file `{sample_id}.fit_stats.bed.gz` contains background model parameters for each genomic segment identified by `hotspot3`. This file is useful for diagnosing modeling issues that may affect the peak calling.
+
+Each row includes:
+
+- **Coordinates**: `#chr`, `start`, `end`
+- **Negative binomial parameters**: `r`, `p`
+- **Background and total cut counts**: Total number of tags in the region and how many are assigned to be the background
+- **Segment SPOT score**: Signal Proportion Of Tags. Fraction of tags not assigned to background (i.e., signal tags)
+- **Overall SPOT score**: Weighted median of segment SPOT scores — a dataset-level quality metric
+- **Status flags**: `refit_with_constraint`, `success_fit`, `max_bg_reached`
+
+---
+
+### ⚠️ What to look for
+
+#### `refit_with_constraint = True`
+- The segment was initially assigned too much signal (i.e., too high SPOT score).
+- It was re-fit using a **minimum background proportion constraint** to prevent overcalling peaks.
+- This commonly occurs in regions where the signal distribution deviates from the negative binomial assumption — such as **telomeres**, **centromeres**, or domains with broad accessibility.
+- **This is not a failure**, but a safeguard to ensure model robustness.
+
+In these cases, `hotspot3` applies a conservative re-fit to enforce a **maximum signal-to-noise ratio** — by default, **no more than 5×** the global weighted median.  
+Outlier segments are identified using a robust linear fit (`RANSACRegressor`) between total signal and estimated background, and re-fit to avoid inflating background estimates.
+
+
+#### `success_fit = False`
+- The model failed to fit a negative binomial distribution for this segment (even when using all the data).
+- This happens in regions with very low signal.
+- ❗**Peaks will not be called** in these segments.
+
+
+#### `max_bg_reached = True`
+- Even after assigning **99.5% of positions** as background, the remaining 0.5% still contained more signal than allowed.
+- This means the segment exceeded the [maximum signal-to-noise ratio threshold](#refit_with_constraint--true) and could not be re-fit under constraints.
+
+This usually indicates:
+
+- ⚠️ **Mapping artifacts** (e.g., multimappers, misalignments)
+- ⚠️ **Collapsed repeats or copy number variants**
+- ⚠️ **Biological outliers** (e.g., viral integrations)
+
+Segments with this flag **may still produce peaks**, but the background is likely overestimated, which can reduce sensitivity.  
+This flag is rare, typically occurring in a small number of samples (e.g., ~100 out of 16,000 analyzed datasets).
+
+---
+
+**Tip:** If many segments are flagged with `max_bg_reached = True`, consider:
+- inspecting affected regions visually,
+- excluding problematic chromosomes or regions from analysis.
+- increasing `--signal_quantile` (e.g., from 0.995 to 0.998)
+
 
 # Performance and resource requirements
 - **Typical runtime**: ~1 hour for a 100 million read CRAM file.
@@ -141,7 +211,7 @@ The following files are saved to the debug folder:
   
 - **Recommended input coverage**: At least 10 million mapped reads for a somewhat reliable background fit.
   
-- **CPU usage**: Parallelized by chromosome. Using more CPUs (e.g., 22 for all chromosomes) can reduce wall-clock time but significantly increases memory usage.
+- **CPU usage**: Parallelized by chromosome. Using more CPUs (e.g., 22 for all chromosomes) reduces wall-clock time but significantly increases memory usage.
 
 - **Memory usage**: ~80 GB RAM with 6 CPUs. Can exceed 150 GB when using 22 threads (e.g., one per chromosome).
 
