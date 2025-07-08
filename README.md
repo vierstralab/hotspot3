@@ -79,7 +79,7 @@ hotspot3 AG10883 \
   --save_density \
   --cpus 6
 ```
-This performs processing from CRAM, calls peaks at 1%, 5%, and 10% FDR, and saves cutcount density. Uses 6 threads for parallel processing.
+This command uses a CRAM file to call peaks at 1%, 5%, and 10% FDR, and save cutcount density. It uses 6 threads for parallel processing.
 
 ## Additional FDR threshold (fast reuse of precomputed data)
 ```
@@ -100,7 +100,11 @@ This reuses previously computed intermediate files to quickly generate peaks at 
 - `--chrom_sizes CHROM_SIZES` - Two-column TSV file with chromosome names and sizes (no header). Local path or URL.
 - `--bam BAM` - Path to the input BAM or CRAM file.
 
-- `--fdrs FDRS [FDRS ...]` - Space separated list of FDR thresholds to generate peak calls at. A Parquet track of per-base FDR values is generated only for the largest FDR threshold among provided.
+- `--fdrs FDRS [FDRS ...]` - Space separated list of FDR thresholds to generate peak calls and hotspots at.
+
+⚠️ **Note**: The resulting per-base FDR file will only include values **up to the highest FDR** you specify.  
+All higher FDR values will be `NaN`, so you won’t be able to call peaks at higher thresholds later  
+without re-running the FDR step (e.g., starting from raw p-values).
 
 ## Arguments to skip steps using pre-calculated data
 
@@ -110,7 +114,7 @@ This reuses previously computed intermediate files to quickly generate peaks at 
 - `--fdrs_parquet FDRS_PARQUET` - Path to pre-calculated fdrs. (Experimental) Can be used with multiple_samples_fdr.py to correct across samples.
 
 ## Optional arguments
-- `--cpus CPUS` - Number of CPUs to use. High thread count increases memory usage. No benefit from using more threads than chromosomes.
+- `--cpus CPUS` - Number of CPUs to use. A high thread count increases memory usage — no benefit from using more CPUs than the number of chromosomes.
   
 - `--reference REFERENCE` - Path to reference FASTA (required for CRAMs missing sequence dictionary).
 - `--mappable_bases MAPPABLE_BASES` - Tabix-indexed BED file listing mappable positions.
@@ -142,9 +146,9 @@ Currently, hotspot3 doesn't delete files in the debug folder upon completion. Yo
 
 For each FDR threshold:
   - tabix indexed hotspots at FDR: `{sample_id}.hotspots.fdr{fdr}.bed.gz`
-  - hotspots at FDR in bb (BED12) format
+  - hotspots at FDR in Bigbed (BED12) format
   - tabix indexed peaks at FDR: `{sample_id}.peaks.fdr{fdr}.bed.gz`
-  - peaks at FDR in bb (BED12) format
+  - peaks at FDR in Bigbed (BED12) format
 
 The following files are saved to the debug folder:
     - per-bp smoothed signal: `{sample_id}.smoothed_signal.parquet` (large, ~2GB)
@@ -168,14 +172,14 @@ You can load the following files in IGV or the UCSC Genome Browser for interacti
 
 ## Flagging problematic segments
 
-The file `{sample_id}.fit_stats.bed.gz` contains background model parameters for each genomic segment identified by `hotspot3`. This file is useful for diagnosing modeling issues that may affect the peak calling.
+The file `{sample_id}.fit_stats.bed.gz` contains background model parameters for each genomic segment identified by `hotspot3`. This file helps diagnose modeling issues that may affect the peak calling.
 
 Each row includes:
 
 - **Coordinates**: `#chr`, `start`, `end`
 - **Negative binomial parameters**: `r`, `p`
 - **Background and total cut counts**: Total number of tags in the region and how many are assigned to be the background
-- **Segment SPOT score**: Signal Proportion Of Tags. Fraction of tags not assigned to background (i.e., signal tags)
+- **Segment SPOT score**: Signal Proportion Of Tags. Proportion of tags that were not used to fit the background model (i.e., signal tags)
 - **Overall SPOT score**: Weighted median of segment SPOT scores — a dataset-level quality metric
 - **Status flags**: `refit_with_constraint`, `success_fit`, `max_bg_reached`
 
@@ -186,7 +190,7 @@ Each row includes:
 #### `refit_with_constraint = True`
 - The segment was initially assigned too much signal (i.e., too high SPOT score).
 - It was re-fit using a **minimum background proportion constraint** to prevent overcalling peaks.
-- This commonly occurs in regions where the signal distribution deviates from the negative binomial assumption — such as **telomeres** or **centromeres**.
+- This commonly occurs in regions where the signal distribution deviates from the negative binomial assumption, such as **telomeres** or **centromeres**.
 - **This is not a failure**, but a safeguard to ensure model robustness.
 
 In these cases, `hotspot3` applies a conservative re-fit to enforce a **maximum signal-to-noise ratio** — by default, no more than 5x the global weighted median.  
