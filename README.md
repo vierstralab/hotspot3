@@ -62,7 +62,7 @@ conda activate hotspot3
 ## 2. Install hotspot3
 Once the environment is activated:
 ```
-git clone https://github.com/autosome-ru/hotspot3.git
+git clone https://github.com/vierstralab/hotspot3.git
 cd hotspot3
 pip install -e .
 ```
