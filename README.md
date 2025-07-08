@@ -1,5 +1,5 @@
 # hotspot3
-hotspot3 is a peak caller for chromatin accessibility data. It is tailored to work on the datasets without a control experiment (ATAC-seq and DNase-seq) using adaptive estimation of the background (nonspecific cleavages) with a negative binomial distribution. hotspot3 accounts for variation in both total signal level and signal-to-background ratio along the genome.
+hotspot3 is a peak caller for chromatin accessibility data. It is tailored to work on  datasets without a control experiment (ATAC-seq and DNase-seq) using adaptive estimation of the background (nonspecific cleavages) with a negative binomial distribution. hotspot3 accounts for variation in both total signal level and signal-to-background ratio along the genome.
 
 The main algorithm steps are: 
 - **Adaptive background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments. 
@@ -118,7 +118,7 @@ without re-running the FDR step (e.g., starting from raw p-values).
 - `--cutcounts CUTCOUNTS` - Tabix-indexed file with per-base cut counts. Skips extracting cut counts from BAM/CRAM.
 - `--signal_parquet SIGNAL_PARQUET` - Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips MODWT signal smoothing
 - `--pvals_parquet PVALS_PARQUET` - Path to pre-calculated partitioned parquet file(s) with per-bp p-values. Skips p-value calculation
-- `--fdrs_parquet FDRS_PARQUET` - Path to pre-calculated partinioned parquet file(s) with per-bp FDRs. (Experimental) Can be used with multiple_samples_fdr.py to correct across samples.
+- `--fdrs_parquet FDRS_PARQUET` - Path to pre-calculated partinioned parquet file(s) with per-bp FDRs. (Experimental) Can be used with multiple_samples_fdr.py to FDR correct across samples.
 
 ## Optional arguments
 - `--cpus CPUS` - Number of CPUs to use. A high thread count increases memory usage — no benefit from using more CPUs than the number of chromosomes.
@@ -265,9 +265,9 @@ This flag is rare, typically occurring in a small number of samples (e.g., ~100 
   
 - **Recommended input coverage**: At least 10 million mapped reads for a somewhat reliable background fit.
   
-- **CPU usage**: Parallelized by chromosome. Using more CPUs (e.g., 22 for all chromosomes) reduces wall-clock time but significantly increases memory usage.
+- **CPU usage**: Parallelized by chromosome. Using more CPUs (e.g., 24 for all chromosomes) reduces wall-clock time but significantly increases memory usage.
 
-- **Memory usage**: ~80 GB RAM with 6 CPUs. Can exceed 150 GB when using 22 threads (e.g., one per chromosome).
+- **Memory usage**: ~80 GB RAM with 6 CPUs. Can exceed 150 GB when using 24 threads (e.g., one per chromosome).
 
 - **Recommendation**: Use a machine with 100–200 GB RAM for high-threaded runs (significantly improves time). Reduce thread count to lower memory use.
 
