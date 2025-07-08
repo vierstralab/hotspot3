@@ -1,5 +1,5 @@
 # Calling peaks with hotspot3
-hotspot3 identifies regulatory regions with elevated chromatin accessibility or sequencing signal by modeling the background distribution of cut counts.
+hotspot3 identifies regions with elevated chromatin accessibility or sequencing signal by modeling the background distribution of cut counts.
 
 The method combines:
 - **Background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments.  
@@ -9,16 +9,30 @@ The method combines:
 - **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
 - **Peak calling**, which detects local maxima in the smoothed signal and reports those that overlap significant bases.
 
-hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
+hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. It requires at least ≥ 10 M reads for meaningful modeling.
 
 ## Table of contents
 
 - [Command line interface](#command-line-interface)
 - [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [1. Create conda environment](#1-create-conda-environment-from-environmentyml)
+  - [2. Install hotspot3](#2-install-hotspot3)
+  - [3. Test installation](#3-test-installation)
 - [Usage example](#usage-example)
+  - [Basic peak calling from BAM/CRAM](#basic-peak-calling-from-bamcram)
+  - [Additional FDR threshold (reuse intermediate files)](#additional-fdr-threshold-fast-reuse-of-precomputed-data)
 - [Input parameters](#input-parameters)
+  - [Required arguments](#required-arguments)
+  - [Arguments to skip steps using pre-calculated data](#arguments-to-skip-steps-using-pre-calculated-data)
+  - [Optional arguments](#optional-arguments)
 - [Output files](#output-files)
 - [Interpreting output](#interpreting-output)
+  - [Visualizing results in a genome browser](#visualizing-results-in-a-genome-browser)
+  - [Flagging problematic segments](#flagging-problematic-segments)
+    - [refit_with_constraint = True](#refit_with_constraint--true)
+    - [success_fit = False](#success_fit--false)
+    - [max_bg_reached = True](#max_bg_reached--true)
 - [Performance and resource requirements](#performance-and-resource-requirements)
 - [Authors](#authors)
   
