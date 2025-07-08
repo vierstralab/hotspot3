@@ -9,7 +9,7 @@ The method combines:
 - **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
 - **Peak calling**, which detects local maxima in the smoothed signal and reports those that overlap significant bases.
 
-hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. It requires at least ≥ 10 M reads for meaningful modeling.
+hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. It requires at least ≥ 10 million tags for meaningful modeling.
 
 ## Table of contents
 
