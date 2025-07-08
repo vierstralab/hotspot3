@@ -2,12 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name="hotspot3",
-    version="0.1.0",
-    description="Peak calling in DNase-seq data",
+    version="0.1.1",
+    description="Chromatin accessibility peak caller with an adaptive background model",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    author="Serj Abramov & Alexandr Boytsov",
-    author_email="sabramov@altius.org",
+    author="Sergey Abramov, Alexandr Boytsov and Jeff Vierstra",
     url="https://github.com/vierstralab/hotspot3",
     packages=find_packages(where='src'),
     include_package_data=True,
