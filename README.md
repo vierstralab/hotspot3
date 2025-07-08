@@ -1,15 +1,15 @@
-# Calling peaks with hotspot3
-hotspot3 identifies regions with elevated chromatin accessibility or sequencing signal by modeling the background distribution of cut counts.
+# hotspot3
+hotspot3 is a peak caller for chromatin accessibility data. It is tailored to work on the datasets without a control experiment (ATAC-seq and DNase-seq) using adaptive estimation of background (nonspecific cleavages) and accounts for variation in both total signal level and signal-to-background ratio along the genome.
 
-The method combines:
-- **Background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments.  
+The main algorithm steps are: 
+- **Adaptive background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments. 
 - **Bayesian segmentation** (via [BABACHI](https://github.com/autosome-ru/BABACHI)) to partition the genome into regions with a homogeneous background (i.e., similar signal-to-noise ratio, modeled using a common overdispersion parameter in the background model).
 - **Per-base statistical testing** to assign p-values and estimate FDR for enrichment at each position.  
 - **Signal smoothing** using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints), enabling more robust peak detection.   
 - **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
 - **Peak calling**, which detects local maxima in the smoothed signal and reports those that overlap significant bases.
 
-hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq) and is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
+hotspot3 is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
 
 ⚠️ hotspot3 has been primarily tested on datasets with 10 million or more tags. Lower coverage may work, but the results could be less stable.
 
@@ -195,7 +195,7 @@ You can load the following files in IGV or the UCSC Genome Browser for interacti
 ![UCSC visualization](docs/HOTSPOT3.png)
 
 - `{sample_id}.normalized_density.bw` — **(black track)** BigWig file with normalized cut count density (in cuts per million).  
-- `{sample_id}.background.bw` — **(orange track)** BigWig file representing the estimated background signal level at each position (defined by raw p-value > 0.005).  
+- `{sample_id}.background.bw` — **(orange track)** BigWig file representing the estimated background level at each position (defined by raw p-value > 0.005).  
   Overlay with the normalized density to visualize how much observed signal exceeds the modeled background.
 
 - `{sample_id}.hotspots.fdr{fdr}.bb` - called hotspots at each FDR threshold
