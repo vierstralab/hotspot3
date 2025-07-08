@@ -29,6 +29,9 @@ hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq)
   - [Arguments to skip steps using pre-calculated data](#arguments-to-skip-steps-using-pre-calculated-data)
   - [Optional arguments](#optional-arguments)
 - [Output files](#output-files)
+  - [Main outputs](#main-outputs)
+  - [Peak and hotspot calls (for each FDR threshold)](#peak-and-hotspot-calls-for-each-fdr-threshold)
+  - [Debug folder](#debug-folder)
 - [Interpreting output](#interpreting-output)
   - [Visualizing results in a genome browser](#visualizing-results-in-a-genome-browser)
   - [Flagging problematic segments](#flagging-problematic-segments)
@@ -135,27 +138,52 @@ without re-running the FDR step (e.g., starting from raw p-values).
 
 
 # Output files
-Currently, hotspot3 doesn't delete files in the `debug` folder upon completion. You can manually delete the created `debug` folder to save disk space.
 
-- Tabix indexed cutcounts: `{sample_id}.cutcounts.bed.gz` (~200MB)
-- File with total # of cutcounts: `{sample_id}.total_cutcounts` (~10kb)
+hotspot3 produces several output files, including signal tracks, peak calls, and internal model diagnostics. Most files are saved in the output directory, while large intermediate files are placed in the `debug/` folder for optional inspection or reuse.
 
-- Tabix-indexed BED file summarizing per-segment background model parameters: `{sample_id}.fit_stats.bed.gz` (~20MB)
+---
 
-- Per-bp raw p-values: `{sample_id}.pvals.parquet` (large, ~1.5GB)
-- - Normalized cut count density (**cuts per million**) (generated if `--save_density` is specified): `{sample_id}.normalized_density.bw` (~200MB)
+## Main outputs
 
+- `{sample_id}.cutcounts.bed.gz` — Tabix-indexed file with per-base cut counts (~200MB)
+- `{sample_id}.total_cutcounts` — Total number of cut counts observed in the sample (~10KB)
 
-For each FDR threshold:
-  - tabix indexed hotspots at FDR: `{sample_id}.hotspots.fdr{fdr}.bed.gz`
-  - hotspots at FDR in Bigbed (BED12) format
-  - tabix indexed peaks at FDR: `{sample_id}.peaks.fdr{fdr}.bed.gz`
-  - peaks at FDR in Bigbed (BED12) format
+- `{sample_id}.fit_stats.bed.gz` — Tabix-indexed BED file with background model fit statistics for each segment (~20MB)
 
-The following files are saved to the debug folder:
-    - per-bp smoothed signal: `{sample_id}.smoothed_signal.parquet` (large, ~2GB)
-    - estimated parameters background fits: `{sample_id}.fit_params.parquet` (large, ~2GB)
-    - per-bp FDR estimates: `{sample_id}.fdrs.parquet` (~600MB)
+- `{sample_id}.pvals.parquet` — Per-base raw p-values (~1.5GB). Can be used later to aggregate p-values across datasets.
+
+- `{sample_id}.normalized_density.bw` — Normalized raw signal (**cuts per million**), generated if `--save_density` is specified (~200MB). Useful for visualization.
+
+- `{sample_id}.background.bw` — Final estimated background level at each position, based on the local negative binomial model (corresponding to the `p = 0.005` cutoff). Useful for visualization and model inspection.
+
+- `{sample_id}.thresholds.bw` — Per-base signal threshold used to select background bases during model fitting. Useful for debugging background model behavior.
+
+- `{sample_id}.segment_background.bw` — Segment-level background estimate, defined as the signal threshold corresponding to the `p = 0.005` cutoff under the fitted negative binomial model. Useful for interpreting background segmentation.
+  
+---
+
+## Peak and hotspot calls (for each FDR threshold)
+
+- `{fdr}/{sample_id}.hotspots.fdr{fdr}.bed.gz` — Tabix-indexed file with called hotspots
+- `{fdr}/{sample_id}.hotspots.fdr{fdr}.bb` — Hotspots in BigBed (BED12) format
+
+- `{fdr}/{sample_id}.peaks.fdr{fdr}.bed.gz` — Tabix-indexed file with called peaks
+- `{fdr}/{sample_id}.peaks.fdr{fdr}.bb` — Peaks in BigBed (BED12) format
+
+---
+
+## Debug folder
+
+The following large intermediate files are always saved to the `debug/` subdirectory of the output path. These can be reused for re-calling peaks at additional FDR thresholds or inspected to understand model behavior.
+
+- `{sample_id}.smoothed_signal.parquet` — Per-base MODWT-smoothed signal (~2GB)
+- `{sample_id}.fdrs.parquet` — Per-base FDR values (only for the highest FDR used in the run) (~600MB)
+- `{sample_id}.fit_params.parquet` — Per-base final model parameters (~2GB)
+
+---
+
+ `hotspot3` does **not** automatically delete the `debug/` folder upon completion. You can safely remove it to free up disk space if it is no longer needed.
+
 
 # Interpreting output
 Once hotspot3 has finished running, the most effective way to understand and validate the results is by visualizing key tracks and inspecting background fits.
