@@ -6,7 +6,7 @@ import os
 import threading
 import logging
 
-from hotspot3.main import parse_arguments
+from hotspot3.cli import parse_arguments
 from hotspot3.io.logging import setup_logger
 
 """

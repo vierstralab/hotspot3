@@ -1,4 +1,4 @@
-from hotspot3.main import main as start_main
+from hotspot3.cli import main as start_main
 
 if __name__ == '__main__':
     start_main()
