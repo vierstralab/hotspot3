@@ -5,9 +5,9 @@ The main algorithm steps are:
 - **Adaptive background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments. 
 - **Bayesian segmentation** (via [BABACHI](https://github.com/autosome-ru/BABACHI)) to partition the genome into regions with a homogeneous background (i.e., similar signal-to-noise ratio, modeled using a common overdispersion parameter in the background model).
 - **Per-base statistical testing** to assign p-values and estimate FDR for enrichment at each position.  
-- **Signal smoothing** using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints), enabling more robust peak detection.   
+- **Signal smoothing** using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints)
 - **Hotspot calling**, which identifies contiguous regions of signal enrichment at a specified FDR threshold.  
-- **Peak calling**, which detects local maxima in the smoothed signal and reports those that overlap significant bases.
+- **Peak calling**, which detects peaks using the smoothed signal and reports those that overlap with significant bases.
 
 hotspot3 is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
 
