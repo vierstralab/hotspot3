@@ -45,11 +45,13 @@ hotspot3 is designed for high-resolution signal data (e.g., DNase-seq, ATAC-seq)
 `python ≥ 3.8`
 ## 1. Create conda environment from environment.yml
 ### For linux:
-```mamba env create -n hotspot3 -f environment.yml
+```
+mamba env create -n hotspot3 -f environment.yml
 conda activate hotspot3
 ```
 ### For macOS:
-```mamba env create -n hotspot3 -f environment.macos.yml
+```
+mamba env create -n hotspot3 -f environment.macos.yml
 conda activate hotspot3
 ```
 ## 2. Install hotspot3
