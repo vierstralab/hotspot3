@@ -77,7 +77,7 @@ hotspot3 --help
 ## Basic peak calling from BAM/CRAM
 ```
 hotspot3 AG10883 \
-  --chrom_sizes /net/seq/data2/projects/sabramov/hotspot3/SuperIndex/GRCh38_no_alts.nuclear.chrom_sizes \
+  --chrom_sizes /net/seq/data2/projects/sabramov/SuperIndex/hotspot3/GRCh38_no_alts.nuclear.chrom_sizes \
   --mappable_bases /net/seq/data2/projects/sabramov/SuperIndex/GRCh38_no_alts.K36.n150.center_sites_and_extended_blacklist.bed.gz \
   --bam AG10883.filtered.cram \
   --fdrs 0.01 0.05 0.1 \
@@ -90,7 +90,7 @@ This command uses a CRAM file to call peaks at 1%, 5%, and 10% FDR, and save cut
 ## Additional FDR threshold (fast reuse of precomputed data)
 ```
 hotspot3 AG10883 \
-  --chrom_sizes /net/seq/data2/projects/sabramov/hotspot3/SuperIndex/GRCh38_no_alts.nuclear.chrom_sizes \
+  --chrom_sizes /net/seq/data2/projects/sabramov/SuperIndex/hotspot3/GRCh38_no_alts.nuclear.chrom_sizes \
   --mappable_bases /net/seq/data2/projects/sabramov/SuperIndex/GRCh38_no_alts.K36.n150.center_sites_and_extended_blacklist.bed.gz \
   --cutcounts ./AG10883/AG10883.cutcounts.bed.gz \
   --signal_parquet ./AG10883/debug/AG10883.smoothed_signal.parquet \
