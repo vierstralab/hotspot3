@@ -131,14 +131,17 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
 
 def main() -> None:
     args = parse_arguments()
-    logger_level = logging.DEBUG if args.debug else logging.INFO
 
+    # Imports here to make it faster
     from hotspot3.io.logging import setup_logger
+    logger_level = logging.DEBUG if args.debug else logging.INFO
+    root_logger = setup_logger(level=logger_level)
+    root_logger.info(f"Executing command: {' '.join(sys.argv)}")
+
+
     from hotspot3.config import ProcessorConfig
     from hotspot3.from_configs import GenomeProcessor, run_from_configs
     from hotspot3.io.paths import Hotspot3Paths
-
-    root_logger = setup_logger(level=logger_level)
 
     config = ProcessorConfig(
         window=args.window,
@@ -168,7 +171,6 @@ def main() -> None:
         pvals=args.pvals_parquet,
         fdrs=args.fdrs_parquet,
     )
-    root_logger.info(f"Executing command: {' '.join(sys.argv)}")
     run_from_configs(genome_processor, paths, args.fdrs)
     
     root_logger.info('Program finished')
