@@ -113,7 +113,7 @@ without re-running the FDR step (e.g., starting from raw p-values).
 - `--cutcounts CUTCOUNTS` - Tabix-indexed file with per-base cut counts. Skips extracting cut counts from BAM/CRAM.
 - `--signal_parquet SIGNAL_PARQUET` - Path to pre-calculated partitioned parquet file(s) with per-bp smoothed signal. Skips MODWT signal smoothing
 - `--pvals_parquet PVALS_PARQUET` - Path to pre-calculated partitioned parquet file(s) with per-bp p-values. Skips p-value calculation
-- `--fdrs_parquet FDRS_PARQUET` - Path to pre-calculated fdrs. (Experimental) Can be used with multiple_samples_fdr.py to correct across samples.
+- `--fdrs_parquet FDRS_PARQUET` - Path to pre-calculated partinioned parquet file(s) with per-bp FDRs. (Experimental) Can be used with multiple_samples_fdr.py to correct across samples.
 
 ## Optional arguments
 - `--cpus CPUS` - Number of CPUs to use. A high thread count increases memory usage — no benefit from using more CPUs than the number of chromosomes.
@@ -135,7 +135,7 @@ without re-running the FDR step (e.g., starting from raw p-values).
 
 
 # Output files
-Currently, hotspot3 doesn't delete files in the debug folder upon completion. You can manually delete the created `debug` folder to save disk space.
+Currently, hotspot3 doesn't delete files in the `debug` folder upon completion. You can manually delete the created `debug` folder to save disk space.
 
 - Tabix indexed cutcounts: `{sample_id}.cutcounts.bed.gz` (~200MB)
 - File with total # of cutcounts: `{sample_id}.total_cutcounts` (~10kb)
