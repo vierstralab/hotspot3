@@ -187,14 +187,16 @@ Each row includes:
 - This commonly occurs in regions where the signal distribution deviates from the negative binomial assumption — such as **telomeres** or **centromeres**.
 - **This is not a failure**, but a safeguard to ensure model robustness.
 
-In these cases, `hotspot3` applies a conservative re-fit to enforce a **maximum signal-to-noise ratio** — by default, **no more than 5×** the global weighted median.  
-Outlier segments are identified using a robust linear fit (`RANSACRegressor`) between total signal and estimated background, and re-fit to avoid inflating background estimates.
+In these cases, `hotspot3` applies a conservative re-fit to enforce a **maximum signal-to-noise ratio** — by default, no more than 5x the global weighted median.  
+Outlier segments are identified using a robust linear fit (`RANSACRegressor`) signal-to-noise ratio vs segment length, and then re-fit to avoid inflating background estimates.
 
 
 #### `success_fit = False`
 - The model failed to fit a negative binomial distribution for this segment (even when using all the data).
 - This happens in regions with very low signal.
 - ❗**Peaks will not be called** in these segments.
+
+If many segments are flagged this way, it may indicate insufficient coverage for reliable modeling — consider increasing sequencing depth or focusing on higher-quality regions.
 
 
 #### `max_bg_reached = True`
