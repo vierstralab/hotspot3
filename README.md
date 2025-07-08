@@ -138,7 +138,7 @@ The following files are saved to the debug folder:
 # Interpreting output
 Once hotspot3 has finished running, the most effective way to understand and validate the results is by visualizing key tracks and inspecting background fits.
 
-## Visualizing results in genome browser
+## Visualizing results in a genome browser
 You can load the following files in IGV or the UCSC Genome Browser for interactive inspection:
 ![UCSC visualization](docs/HOTSPOT3.png)
 
@@ -170,7 +170,7 @@ Each row includes:
 #### `refit_with_constraint = True`
 - The segment was initially assigned too much signal (i.e., too high SPOT score).
 - It was re-fit using a **minimum background proportion constraint** to prevent overcalling peaks.
-- This commonly occurs in regions where the signal distribution deviates from the negative binomial assumption — such as **telomeres**, **centromeres**, or domains with broad accessibility.
+- This commonly occurs in regions where the signal distribution deviates from the negative binomial assumption — such as **telomeres** or **centromeres**.
 - **This is not a failure**, but a safeguard to ensure model robustness.
 
 In these cases, `hotspot3` applies a conservative re-fit to enforce a **maximum signal-to-noise ratio** — by default, **no more than 5×** the global weighted median.  
