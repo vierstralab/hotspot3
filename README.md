@@ -11,7 +11,7 @@ The main algorithm steps are:
 
 hotspot3 is optimized for scalability on large datasets with chromosome-level parallelism and optional reuse of intermediate results. 
 
-⚠️ hotspot3 has been primarily tested on datasets with 10 million or more tags. Lower coverage may work, but the results could be less stable.
+⚠️ hotspot3 has been primarily tested on the datasets with 10 million or more tags. Lower coverage may work, but the results could be less stable.
 
 ## Table of contents
 
