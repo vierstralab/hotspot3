@@ -1,5 +1,5 @@
 # hotspot3
-hotspot3 is a peak caller for chromatin accessibility data. It is tailored to work on the datasets without a control experiment (ATAC-seq and DNase-seq) using adaptive estimation of background (nonspecific cleavages) and accounts for variation in both total signal level and signal-to-background ratio along the genome.
+hotspot3 is a peak caller for chromatin accessibility data. It is tailored to work on the datasets without a control experiment (ATAC-seq and DNase-seq) using adaptive estimation of background (nonspecific cleavages) with a negative binomial distribution. hotspot3 accounts for variation in both total signal level and signal-to-background ratio along the genome.
 
 The main algorithm steps are: 
 - **Adaptive background modeling** using a negative binomial distribution, fitted within locally uniform genomic segments. 
