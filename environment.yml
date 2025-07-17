@@ -29,5 +29,6 @@ dependencies:
   - pip:
     - babachi
     - git+https://github.com/vierstralab/genome-tools.git@plotting
+    - git+https://github.com/vierstralab/hotspot3
 
 
