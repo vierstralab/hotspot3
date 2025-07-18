@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hotspot3"
+version = "0.1.1"
+description = "Chromatin accessibility peak caller with an adaptive background model"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Sergey Abramov" },
+  { name = "Alexandr Boytsov" },
+  { name = "Jeff Vierstra" }
+]
+urls = { 
+  Homepage = "https://github.com/vierstralab/hotspot3"
+}
+requires-python = ">=3.7"
+dependencies = [
+  "numpy ==1.26.0",
+  "scipy",
+  "pandas"
+
+]
+
+[project.scripts]
+hotspot3 = "hotspot3.cli:main"
+hotspot3-track-mem = "hotspot3.track_memory:main"
+hotspot3-fdr = "hotspot3.multiple_sample_fdr:main"
+hotspot3-pvals = "hotspot3.extract_pvals:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hotspot3 = ["scripts/extract_cutcounts.sh"]
+
+[tool.bumpversion]
+current_version = "1.0.0"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"

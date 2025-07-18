@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="hotspot3",
-    version="0.1.1",
+    version="1.0.0",
     description="Chromatin accessibility peak caller with an adaptive background model",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
