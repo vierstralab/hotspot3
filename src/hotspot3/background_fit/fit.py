@@ -200,7 +200,7 @@ class GlobalBackgroundFit(BackgroundFit):
             agg_cutcounts (np.ndarray): Array of aggregated cutcounts.
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
             fallback_fit_results (FitResults): Fallback fit results to use if the fit has failed.
-        """     
+        """
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
         best_fit_result = self.fit_and_choose_best(data_for_fit)
         if not check_valid_nb_params(best_fit_result):
@@ -217,16 +217,8 @@ class GlobalBackgroundFit(BackgroundFit):
         best_fit_result.n_signal = signal_mask.sum()
 
         best_fit_result.signal_tags = agg_cutcounts[signal_mask].compressed().astype(np.int64).sum()
-        data = agg_cutcounts.compressed()
-        nonfinite_mask = ~np.isfinite(data)
-
-        if np.any(nonfinite_mask):
-            indices = np.where(nonfinite_mask)[0]
-            print("Non-finite values found:")
-            for i in indices:
-                print(f"Index: {i}, Value: {data[i]}")
-
-        best_fit_result.total_tags = agg_cutcounts.compressed().astype(np.int64).sum()
+       
+        best_fit_result.total_tags = np.nansum(agg_cutcounts[ma.isfinite(agg_cutcounts)].compressed().astype(np.int64))
 
         return best_fit_result
     

@@ -63,6 +63,7 @@ class ChromReader(WithLoggerAndInterval):
         window = self.config.window
         
         agg_cutcounts = self.bn_wrapper.centered_running_nansum(cutcounts, window)
+        assert not np.any(np.isinf(agg_cutcounts)), "Aggregated cutcounts contain infinite values (in float32)!"
         return agg_cutcounts
 
 
