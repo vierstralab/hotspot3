@@ -207,6 +207,9 @@ class GenomeProcessor(WithLogger):
             )
         )
         self.logger.info('Total cutcounts = %d', total_cutcounts)
+        if total_cutcounts == 0:
+            self.logger.critical('Total # of cuts (ends of reads) is 0. Most likely the input is malformed or empty. Exiting.')
+            raise ValueError('Total # of cuts (ends of reads) is 0. Most likely the input is malformed or empty. Exiting.')
         self.writer.save_cutcounts(total_cutcounts, total_cutcounts_path)
 
 
