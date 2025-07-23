@@ -218,7 +218,7 @@ class GlobalBackgroundFit(BackgroundFit):
 
         best_fit_result.signal_tags = agg_cutcounts[signal_mask].compressed().astype(np.int64).sum()
        
-        best_fit_result.total_tags = np.nansum(agg_cutcounts[ma.isfinite(agg_cutcounts)].compressed().astype(np.int64))
+        best_fit_result.total_tags = np.nansum(agg_cutcounts[np.isfinite(agg_cutcounts)].compressed().astype(np.int64))
 
         return best_fit_result
     
