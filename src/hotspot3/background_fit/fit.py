@@ -217,6 +217,15 @@ class GlobalBackgroundFit(BackgroundFit):
         best_fit_result.n_signal = signal_mask.sum()
 
         best_fit_result.signal_tags = agg_cutcounts[signal_mask].compressed().astype(np.int64).sum()
+        data = agg_cutcounts.compressed()
+        nonfinite_mask = ~np.isfinite(data)
+
+        if np.any(nonfinite_mask):
+            indices = np.where(nonfinite_mask)[0]
+            print("Non-finite values found:")
+            for i in indices:
+                print(f"Index: {i}, Value: {data[i]}")
+
         best_fit_result.total_tags = agg_cutcounts.compressed().astype(np.int64).sum()
 
         return best_fit_result
