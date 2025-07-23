@@ -18,10 +18,20 @@ urls = {
 }
 requires-python = ">=3.7"
 dependencies = [
-  "numpy ==1.26.0",
+  "numpy==1.26.0",
+  "pandas",
   "scipy",
-  "pandas"
-
+  "statsmodels",
+  "pybigwig",
+  "pysam",
+  "tqdm",
+  "bottleneck",
+  "pywavelets",
+  "scikit-learn",
+  "pyarrow",
+  "networkx",
+  "babachi==3.0.0",
+  "genome-tools==2.0.0",
 ]
 
 [project.scripts]
