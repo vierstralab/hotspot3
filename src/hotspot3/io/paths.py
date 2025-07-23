@@ -49,7 +49,7 @@ class Hotspot3Paths:
             raise ValueError(f"Unknown keys provided: {unknown_keys}")
         for key, value in kwargs.items():
             self.__setattr__(f"_{key}", value)
-            if key == "cutcounts":
+            if key == "cutcounts" and value is not None:
                 self._total_cutcounts = self.total_cutcounts
         
         self.solver = StepsSolver(self, save_density)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hotspot3"
-version = "0.1.1"
+version = "1.0.0"
 description = "Chromatin accessibility peak caller with an adaptive background model"
 readme = "README.md"
 license = { file = "LICENSE" }
