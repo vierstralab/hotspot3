@@ -14,7 +14,7 @@ authors = [
   { name = "Jeff Vierstra" }
 ]
 urls = { 
-  Homepage = "https://github.com/vierstralab/hotspot3"
+  "Homepage" = "https://github.com/vierstralab/hotspot3"
 }
 requires-python = ">=3.7"
 dependencies = [
