@@ -148,7 +148,10 @@ class GenomeProcessor(WithLogger):
     
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
-        results = sorted(results, key=lambda x: x.id)
+        results = {r.id: r for r in results}
+        results: List[ProcessorOutputData] = [
+            results[chrom] for chrom in self.chrom_sizes if chrom in results
+        ]
         categories = [x.id for x in results]
         for res in results:
             df = res.data_df
@@ -314,7 +317,6 @@ class GenomeProcessor(WithLogger):
             if is_outlier_segment.sum() == 0:
                 break
 
-
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
 
             if self.config.save_debug:
@@ -336,6 +338,7 @@ class GenomeProcessor(WithLogger):
 
         per_region_params['refit_with_constraint'] = refit_with_constraint
         per_region_params['valid_segment'] = per_region_params.eval('success_fit & ~max_bg_reached & fit_type == "segment"')
+
         self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}. Refitted {refit_with_constraint.sum()} segments.")
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
         self.writer.fit_stats_to_bw(

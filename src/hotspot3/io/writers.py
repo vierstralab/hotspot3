@@ -41,7 +41,8 @@ class ChromWriter(WithLoggerAndInterval):
 
 class GenomeWriter(WithLogger):
 
-    def df_to_bigwig(self, df: pd.DataFrame, outpath: str, chrom_sizes: dict, col='value'):
+    @staticmethod
+    def write_bigwig(df: pd.DataFrame, col: str, outpath, chrom_sizes: dict):
         with pyBigWig.open(outpath, 'w') as bw:
             bw.addHeader(list(chrom_sizes.items()))
             chroms = df['chrom'].to_list()
@@ -49,7 +50,37 @@ class GenomeWriter(WithLogger):
             ends = df['end'].to_list()
             values = df[col].to_list()
             bw.addEntries(chroms, starts, ends=ends, values=values)
-    
+
+    def df_to_bigwig(self, df: pd.DataFrame, outpath: str, chrom_sizes: dict, col='value'):
+        try:
+            self.write_bigwig(df, col, outpath, chrom_sizes)
+        except RuntimeError as e:
+            self.logger.warning(
+                "pyBigWig.addEntries failed: Entries are out of order.\n"
+                "Ensure that:\n"
+                "  1. Chromosomes in chrom_sizes file follow UCSC order (chr1, chr2, ..., chrX, chrY, chrM).\n"
+                "  2. Non-standard contigs (e.g., chrUn_*, GL*, KI*) are filtered or placed at the end.\n"
+                f"Attempting to filter non-standard contigs and retrying.\n"
+            )
+            non_standard_chroms = [chrom for chrom in chrom_sizes if '_' in chrom]
+            if non_standard_chroms:
+                self.logger.info(
+                    f"Filtering out non-standard chromosomes: {', '.join(non_standard_chroms)}"
+                )
+                df = df[~df['chrom'].isin(non_standard_chroms)]
+                try:
+                    self.write_bigwig(df, col, outpath, chrom_sizes)
+                except RuntimeError as e:
+                    self.logger.error(f"Retrying failed: {e}")
+                    raise RuntimeError(
+                        "pyBigWig.addEntries failed: Entries are still out of order.\n"
+                        "Ensure that:\n"
+                        "  1. Chromosomes in chrom_sizes file follow UCSC order (chr1, chr2, ..., chrX, chrY, chrM).\n"
+                        "  2. Non-standard contigs (e.g., chrUn_*, GL*, KI*) are filtered or placed at the end.\n"
+                        f"Original error: {e}"
+                    )
+
+
     def sanitize_path(self, path):
         """
         Call to properly clean up the path to replace parquets
