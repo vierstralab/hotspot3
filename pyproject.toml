@@ -13,9 +13,7 @@ authors = [
   { name = "Alexandr Boytsov" },
   { name = "Jeff Vierstra" }
 ]
-urls = { 
-  "Homepage" = "https://github.com/vierstralab/hotspot3"
-}
+
 requires-python = ">=3.7"
 dependencies = [
   "numpy==1.26.0",
@@ -33,6 +31,8 @@ dependencies = [
   "babachi==3.0.0",
   "genome-tools==2.0.0",
 ]
+[project.urls]
+Homepage = "https://github.com/vierstralab/hotspot3"
 
 [project.scripts]
 hotspot3 = "hotspot3.cli:main"
