@@ -22,12 +22,11 @@ def run_bam2bed(*args, reference_fasta=None):
                 shell=True,
             )
         except subprocess.CalledProcessError as e:
-            if result.returncode != 0:
-                raise RuntimeError(
-                    f"extract_cutcounts.sh failed with exit code {e.returncode}.\n"
-                    f"Command: {cmd}\n"
-                    f"stderr:\n{e.stderr}"
-            ) from e
+            raise RuntimeError(
+                f"extract_cutcounts.sh failed with exit code {e.returncode}.\n"
+                f"Command: {cmd}\n"
+                f"stderr:\n{e.stderr}"
+            )
     return result
 
 def fasta_as_arg(reference_fasta):
