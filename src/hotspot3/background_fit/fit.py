@@ -10,6 +10,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy.special import betainc
 from typing import List
+import warnings
 
 from hotspot3.helpers.models import NotEnoughDataForContig, FitResults, WindowedFitResults, DataForFit
 from hotspot3.config import ProcessorConfig
@@ -34,8 +35,11 @@ class BackgroundFit(BottleneckWrapper):
     
     @wrap_masked
     def get_mean_and_var(self, array: np.ndarray, **kwargs):
-        mean = np.nanmean(array, axis=0, dtype=np.float32, **kwargs)
-        var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, **kwargs)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            mean = np.nanmean(array, axis=0, dtype=np.float32, **kwargs)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, **kwargs)
         return mean, var
 
     @wrap_masked
@@ -66,6 +70,7 @@ class BackgroundFit(BottleneckWrapper):
     
     def get_all_bins(self, array: np.ndarray, fallback_fit_results: FitResults=None):
         min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
+
         signal_bins, n_signal_bins = self.get_signal_bins(
             array,
             min_bg_tr=min_bg_tr,
@@ -82,6 +87,7 @@ class BackgroundFit(BottleneckWrapper):
                 n_bg_bins + 1,
             )
         )
+
         
         return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
@@ -104,9 +110,11 @@ class BackgroundFit(BottleneckWrapper):
         
         bin_edges = np.full((n_signal_bins + 1, *min_bg_tr.shape), np.nan, dtype=np.float32)
         nan_tr = np.isnan(min_bg_tr) | np.isnan(max_bg_tr)
-        bin_edges[:, ~nan_tr] = np.round(
-            np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
-        )
+        with np.errstate(invalid='ignore'):
+            bin_edges[:, ~nan_tr] = np.round(
+                np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
+            )
+            bin_edges[0, ~nan_tr] = min_bg_tr[~nan_tr]
 
         return bin_edges, n_signal_bins
     
@@ -161,21 +169,24 @@ class BackgroundFit(BottleneckWrapper):
 
         sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
+       
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
         expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
-        df = np.sum(
-            np.diff(bin_edges, axis=0) != 0,
-            axis=0,
-            where=valid_bins
-        ) - n_params - 1
-        return calc_rmsea(
+        with np.errstate(invalid='ignore'):
+            df = np.sum(
+                np.diff(bin_edges, axis=0) != 0,
+                axis=0,
+                where=valid_bins
+            ) - n_params - 1
+        rmsea = calc_rmsea(
             value_counts_per_bin,
             expected_counts,
             bg_sum_mappable,
             df,
             where=valid_bins
         )
+        return rmsea
 
     def get_bg_quantile_from_tr(self, agg_cutcounts: np.ndarray, tr: float):
         with np.errstate(invalid='ignore'):
@@ -200,7 +211,8 @@ class GlobalBackgroundFit(BackgroundFit):
             agg_cutcounts (np.ndarray): Array of aggregated cutcounts.
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
             fallback_fit_results (FitResults): Fallback fit results to use if the fit has failed.
-        """     
+        """
+
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
         best_fit_result = self.fit_and_choose_best(data_for_fit)
         if not check_valid_nb_params(best_fit_result):
@@ -208,7 +220,6 @@ class GlobalBackgroundFit(BackgroundFit):
                 best_fit_result = self.fit_and_choose_best(data_for_fit, fallback_fit_results)
             else:
                 raise NotEnoughDataForContig
-
         best_fit_result.n_total = agg_cutcounts.count()
         signal_mask = self.get_signal_mask_for_tr(
             agg_cutcounts,
@@ -217,7 +228,8 @@ class GlobalBackgroundFit(BackgroundFit):
         best_fit_result.n_signal = signal_mask.sum()
 
         best_fit_result.signal_tags = agg_cutcounts[signal_mask].compressed().astype(np.int64).sum()
-        best_fit_result.total_tags = agg_cutcounts.compressed().astype(np.int64).sum()
+       
+        best_fit_result.total_tags = np.nansum(agg_cutcounts[np.isfinite(agg_cutcounts)].compressed().astype(np.int64))
 
         return best_fit_result
     
@@ -324,7 +336,6 @@ class GlobalBackgroundFit(BackgroundFit):
         
         if calc_rmsea: # Used to bypass RMSEA calculation
             # in the code used when np.inf passed 
-
             value_counts = self.value_counts_per_bin(
                 agg_cutcounts[:, None],
                 bin_edges,
@@ -337,7 +348,6 @@ class GlobalBackgroundFit(BackgroundFit):
                 bin_edges,
                 value_counts,
             )[0]
-            
             if not np.isfinite(rmsea):
                 raise NotEnoughDataForContig
         else:
@@ -386,7 +396,8 @@ class StridedBackgroundFit(BackgroundFit):
     
     def upcast(self, original_shape, subsampled_indices: np.ndarray, values: np.ndarray):
         upcasted = np.full(original_shape, np.nan, dtype=np.float16)
-        upcasted[subsampled_indices] = np.asarray(values, dtype=np.float16)
+        with np.errstate(over='ignore'):
+            upcasted[subsampled_indices] = np.asarray(values, dtype=np.float16)
         upcasted[~np.isfinite(upcasted)] = np.nan
         return upcasted
 

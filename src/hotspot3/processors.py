@@ -148,7 +148,10 @@ class GenomeProcessor(WithLogger):
     
     def merge_and_add_chromosome(self, results: Iterable[ProcessorOutputData]) -> ProcessorOutputData:
         data = []
-        results = sorted(results, key=lambda x: x.id)
+        results = {r.id: r for r in results}
+        results: List[ProcessorOutputData] = [
+            results[chrom] for chrom in self.chrom_sizes if chrom in results
+        ]
         categories = [x.id for x in results]
         for res in results:
             df = res.data_df
@@ -175,7 +178,7 @@ class GenomeProcessor(WithLogger):
             - outpath: Path to save the cutcounts to.
         """
         self.logger.info('Extracting cutcounts from bam file')
-        if self.cpus >= 10:
+        if False: # self.cpus >= 10: # FIXME make it work for large cpu (now concurent read to cram make the script fail for some reason)
             data = self.parallel_by_chromosome(
                 ChromosomeProcessor.extract_cutcounts_for_chromosome,
                 bam_path,
@@ -207,6 +210,9 @@ class GenomeProcessor(WithLogger):
             )
         )
         self.logger.info('Total cutcounts = %d', total_cutcounts)
+        if total_cutcounts == 0:
+            self.logger.critical('Total # of cuts (ends of reads) is 0. Most likely the input is malformed or empty. Exiting.')
+            raise ValueError('Total # of cuts (ends of reads) is 0. Most likely the input is malformed or empty. Exiting.')
         self.writer.save_cutcounts(total_cutcounts, total_cutcounts_path)
 
 
@@ -311,7 +317,6 @@ class GenomeProcessor(WithLogger):
             if is_outlier_segment.sum() == 0:
                 break
 
-
             self.logger.info(f"Found {is_outlier_segment.sum()} outlier SPOT score segments at iteration {iteration}. Refitting with approximated signal/noise constraint.")
 
             if self.config.save_debug:
@@ -333,6 +338,7 @@ class GenomeProcessor(WithLogger):
 
         per_region_params['refit_with_constraint'] = refit_with_constraint
         per_region_params['valid_segment'] = per_region_params.eval('success_fit & ~max_bg_reached & fit_type == "segment"')
+
         self.logger.info(f"Final SPOT score: {spot_results.spot_score:.2f}±{spot_results.spot_score_std:.2f}. Refitted {refit_with_constraint.sum()} segments.")
         self.writer.df_to_tabix(per_region_params, per_region_stats_path)
         self.writer.fit_stats_to_bw(
@@ -539,7 +545,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @ensure_contig_exists
     def fit_background_model(self, cutcounts_file) -> ProcessorOutputData:
         """
-        Fit background model to cutcounts and save fit parameters to a bed file.
+        Fit background model to cutcounts and save fit parameters to a bed.gz file.
         """
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
             cutcounts_file,

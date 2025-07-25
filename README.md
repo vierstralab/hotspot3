@@ -104,7 +104,11 @@ This reuses previously computed intermediate files to quickly generate peaks at 
 # Input parameters
 ## Required arguments
 - `sample_id` - Unique identifier for the sample (used for naming outputs).
-- `--chrom_sizes CHROM_SIZES` - Two-column TSV file with chromosome names and sizes (no header). Local path or URL.
+- `--chrom_sizes CHROM_SIZES` - Two-column TSV file with chromosome names and sizes (no header). Local path or URL. For GRCh38 you can use [GRCh38_no_alts.nuclear.chrom_sizes](https://resources.altius.org/~sabramov/files/hotspot3/GRCh38_no_alts.nuclear.chrom_sizes).
+    + Chromosome names must match those in the BAM/CRAM and reference FASTA.
+    + The order of chromosomes in this file determines the order in BED, BigWig and BigBed outputs.
+    + Use UCSC-style naming (e.g., `chr1`, `chr2`, ..., `chrX`, `chrY`) and exclude alternate contigs unless needed.
+
 - `--bam BAM` - Path to the input BAM or CRAM file.
 
 - `--fdrs FDRS [FDRS ...]` - Space separated list of FDR thresholds to generate peak calls and hotspots at.
@@ -124,7 +128,7 @@ without re-running the FDR step (e.g., starting from raw p-values).
 - `--cpus CPUS` - Number of CPUs to use. A high thread count increases memory usage — no benefit from using more CPUs than the number of chromosomes.
   
 - `--reference REFERENCE` - Path to reference FASTA (required for CRAMs missing sequence dictionary).
-- `--mappable_bases MAPPABLE_BASES` - Tabix-indexed BED file listing mappable positions.
+- `--mappable_bases MAPPABLE_BASES` - Three column (chrom, start, end) tabix-indexed BED file listing mappable positions. For GRCh38 you can use K36 mappable bases with  [ENCODE blacklist regions](https://github.com/Boyle-Lab/Blacklist/tree/master/lists) excluded. [GRCh38_no_alts.K36.n150.center_sites_and_extended_blacklist.bed.gz](https://resources.altius.org/~sabramov/files/hotspot3/GRCh38_no_alts.K36.n150.center_sites_and_extended_blacklist.bed.gz)
 
 - `--chromosomes CHROMOSOMES [CHROMOSOMES ...]` - Restrict to specific chromosomes (for debugging).
 - `--save_density` -  Save normalized cut count density as output.

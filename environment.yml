@@ -5,30 +5,16 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - pandas
-  - scipy
   - pip
-  - numpy
-  - statsmodels
-  - samtools=1.15.1
-  - pybigwig
-  - pysam
-  - tqdm
+  - samtools
   - ca-certificates
   - openssl
   - libflint
-  - bedops
   - ucsc-bedgraphtobigwig
   - bioconda::ucsc-bedtobigbed
-  - bioconda::mawk
-  - bottleneck
-  - pywavelets
-  - scikit-learn
-  - pyarrow
-  - networkx
   - pip:
-    - babachi
-    - git+https://github.com/vierstralab/genome-tools.git@plotting
+    - babachi==3.0.0
+    - genome-tools==2.0.0
     - git+https://github.com/vierstralab/hotspot3
 
 

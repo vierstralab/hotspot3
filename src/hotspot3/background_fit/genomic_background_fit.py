@@ -1,4 +1,3 @@
-
 import numpy.ma as ma
 import numpy as np
 import pandas as pd
@@ -126,6 +125,8 @@ class SegmentalFit(WithLoggerAndInterval):
             success_fit=True,
         )
         set_series_row_to_df(intervals_stats, fit_series, 0)
+        for df in [intervals_stats, segment_stats]:
+            df[['bg_r', 'bg_p', 'rmsea', 'bg_tr']] = df[['bg_r', 'bg_p', 'rmsea', 'bg_tr']].astype(np.float32)
         return pd.concat([intervals_stats, segment_stats], ignore_index=True)
 
 

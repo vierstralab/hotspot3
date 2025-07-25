@@ -132,7 +132,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    # Imports here to make help message faster
+    # Imports here to make help message appear faster
     from hotspot3.io.logging import setup_logger
     logger_level = logging.DEBUG if args.debug else logging.INFO
     root_logger = setup_logger(level=logger_level)
