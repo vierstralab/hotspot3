@@ -10,6 +10,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy.special import betainc
 from typing import List
+import warnings
 
 from hotspot3.helpers.models import NotEnoughDataForContig, FitResults, WindowedFitResults, DataForFit
 from hotspot3.config import ProcessorConfig
@@ -36,7 +37,9 @@ class BackgroundFit(BottleneckWrapper):
     def get_mean_and_var(self, array: np.ndarray, **kwargs):
         with np.errstate(invalid='ignore', divide='ignore'):
             mean = np.nanmean(array, axis=0, dtype=np.float32, **kwargs)
-            var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, **kwargs)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                var = np.nanvar(array, ddof=1, axis=0, dtype=np.float32, **kwargs)
         return mean, var
 
     @wrap_masked
