@@ -89,14 +89,13 @@ class SegmentalFit(WithLoggerAndInterval):
                         g_fit.config.max_background_prop,
                         min_bg_quantile
                     )
-                print('No warning')
+
                 segment_fit_results = g_fit.fit(
                     signal_at_segment,
                     step=step,
                     fallback_fit_results=fallback_fit_results
                 )
                 success_fit = True
-                print('No warning?')
 
             except NotEnoughDataForContig:
                 segment_fit_results = FitResults()
