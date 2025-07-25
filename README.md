@@ -62,11 +62,12 @@ conda activate hotspot3
 ## 2. Install hotspot3
 Once the environment is activated:
 ```
+pip install hotspot3
+```
+
 git clone https://github.com/vierstralab/hotspot3.git
 cd hotspot3
 pip install -e .
-```
-Not on PyPI yet — coming soon!
 
 ## 3. Test installation
 You can check that the CLI is working with:

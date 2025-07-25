@@ -7,14 +7,10 @@ dependencies:
   - python=3.9
   - pip
   - samtools
-  - ca-certificates
-  - openssl
   - libflint
   - ucsc-bedgraphtobigwig
   - bioconda::ucsc-bedtobigbed
-  - pip:
-    - babachi==3.0.0
-    - genome-tools==2.0.0
-    - git+https://github.com/vierstralab/hotspot3
-
+  - bioconda::pybigwig
+  - bioconda::bedops
+  - bottleneck
 

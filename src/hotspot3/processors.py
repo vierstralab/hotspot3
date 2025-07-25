@@ -177,7 +177,7 @@ class GenomeProcessor(WithLogger):
             - bam_path: Path to the BAM/CRAM/SAM file.
             - outpath: Path to save the cutcounts to.
         """
-        self.logger.info('Extracting cutcounts from bam file')
+        self.logger.info('Extracting cutcounts from BAM/CRAM file')
         if False: # self.cpus >= 10: # FIXME make it work for large cpu (now concurent read to cram make the script fail for some reason)
             data = self.parallel_by_chromosome(
                 ChromosomeProcessor.extract_cutcounts_for_chromosome,
@@ -233,9 +233,9 @@ class GenomeProcessor(WithLogger):
 
     def extract_fit_thresholds_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
         """
-        Convert threshold values to bigwig file.
+        Convert threshold values to BigWig file.
         """
-        self.logger.info('Converting threshold values to bigwig')
+        self.logger.info('Converting threshold values to BigWig')
         thresholds = self.parallel_by_chromosome(
             ChromosomeProcessor.extract_fit_threholds,
             fit_params_path
@@ -252,9 +252,9 @@ class GenomeProcessor(WithLogger):
     
     def extract_bg_quantile_to_bw(self, fit_params_path, total_cutcounts_path, save_path):
         """
-        Convert threshold values to bigwig file.
+        Convert threshold values to BigWig file.
         """
-        self.logger.info('Converting background quantile values to bigwig')
+        self.logger.info('Converting background quantile values to BigWig')
         thresholds = self.parallel_by_chromosome(
             ChromosomeProcessor.extract_bg_quantile,
             fit_params_path
@@ -297,7 +297,7 @@ class GenomeProcessor(WithLogger):
         """"
         Fit background model of cutcounts distribution and save fit parameters to parquet file.
         """
-        self.logger.info('Estimating parameters of background model')
+        self.logger.info('Estimating parameters of the background model')
         
         per_region_params = self.parallel_by_chromosome(
             ChromosomeProcessor.fit_background_model,
@@ -347,7 +347,7 @@ class GenomeProcessor(WithLogger):
             chrom_sizes=self.chrom_sizes,
             total_cutcounts=self.reader.read_total_cutcounts(total_cutcounts_path),
         )
-        self.logger.info('Estimating per-bp parameters of background model')
+        self.logger.info('Estimating per-bp parameters of the background model')
         self.writer.sanitize_path(save_path)
         all_segments = [
             ProcessorOutputData(x[0], x[1]) 
@@ -384,7 +384,7 @@ class GenomeProcessor(WithLogger):
             - save_path: Path to save the FDRs in parquet format.
             - max_fdr: Maximum FDR to calculate.
         """
-        self.logger.info('Calculating per-bp FDRs')
+        self.logger.info('Per-bp FDR correction')
         self.copy_with_params(
             SampleFDRCorrection,
             name=self.sample_id,
@@ -475,11 +475,11 @@ class GenomeProcessor(WithLogger):
 
     def extract_normalized_density(self, smoothed_signal, density_path):
         """
-        Save normalized density to bigwig file. Uses the density_step parameter from the config to downsample the data.
+        Save normalized density to BigWig file. Uses the density_step parameter from the config to downsample the data.
 
         Parameters:
             - smoothed_signal: Path to the parquet file containing the smoothed signal.
-            - density_path: Path to save the bigwig file.
+            - density_path: Path to save the BigWig file.
         """
         density_data = self.parallel_by_chromosome(
             ChromosomeProcessor.extract_normalized_density,
