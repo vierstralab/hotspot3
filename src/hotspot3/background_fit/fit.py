@@ -106,14 +106,12 @@ class BackgroundFit(BottleneckWrapper):
         n_signal_bins = round(n_signal_bins)
         
         bin_edges = np.full((n_signal_bins + 1, *min_bg_tr.shape), np.nan, dtype=np.float32)
-        print("No warning1", n_signal_bins, min_bg_tr, max_bg_tr)
         nan_tr = np.isnan(min_bg_tr) | np.isnan(max_bg_tr)
         with np.errstate(invalid='ignore'):
             bin_edges[:, ~nan_tr] = np.round(
                 np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
             )
             bin_edges[0, ~nan_tr] = min_bg_tr[~nan_tr]
-        print("No warning1?", bin_edges)
 
         return bin_edges, n_signal_bins
     
@@ -230,9 +228,7 @@ class GlobalBackgroundFit(BackgroundFit):
         return best_fit_result
     
     def fit_and_choose_best(self, data_for_fit: DataForFit, fallback_fit_results: FitResults=None):
-        print('No warning')
         result = self.fit_all_thresholds(data_for_fit, fallback_fit_results)
-        print('No warning?')
         if len(result) == 0: # No valid fits => fit all data
             best_fit_result = self.fit_for_tr(
                 data_for_fit,
@@ -285,7 +281,9 @@ class GlobalBackgroundFit(BackgroundFit):
                 )
             except NotEnoughDataForContig:
                 continue
+            print('No warning')
             q = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
+            print('No warning?')
             step_fit.fit_quantile = q
             step_fit.fit_threshold = tr
             result.append(step_fit)
