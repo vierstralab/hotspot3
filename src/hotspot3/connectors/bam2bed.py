@@ -12,7 +12,7 @@ from hotspot3.helpers.models import NotEnoughDataForContig
 def run_bam2bed(*args, reference_fasta=None):
     fasta_args = fasta_as_arg(reference_fasta)
     with pkg_resources.path('hotspot3.scripts', 'extract_cutcounts.sh') as script:
-        cmd = f'bash {script} {" ".join(fasta_args)} {" ".join(args)}'
+        cmd = f'bash {script} ' + " ".join(fasta_args) + " " + " ".join(args)
         try:
             result = subprocess.run(
                 cmd,
