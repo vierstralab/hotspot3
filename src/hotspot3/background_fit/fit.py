@@ -281,9 +281,7 @@ class GlobalBackgroundFit(BackgroundFit):
                 )
             except NotEnoughDataForContig:
                 continue
-            print('No warning')
             q = self.get_bg_quantile_from_tr(data_for_fit.agg_cutcounts, tr)
-            print('No warning?')
             step_fit.fit_quantile = q
             step_fit.fit_threshold = tr
             result.append(step_fit)
@@ -318,6 +316,8 @@ class GlobalBackgroundFit(BackgroundFit):
         fallback_fit_results: FitResults=None,
         calc_rmsea=True
     ):
+        print('No warning')
+
         mean, var = self.get_mean_and_var(agg_cutcounts, where=~assumed_signal_mask)
         if fallback_fit_results is not None:
             r = fallback_fit_results.r
@@ -326,6 +326,7 @@ class GlobalBackgroundFit(BackgroundFit):
             r = self.r_from_mean_and_var(mean, var)
             n_params = 2
         p = self.p_from_mean_and_r(mean, r)
+        print('No warning?')
 
         if not check_valid_nb_params(FitResults(p, r)):
             raise NotEnoughDataForContig
