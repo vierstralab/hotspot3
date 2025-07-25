@@ -127,7 +127,7 @@ class SegmentalFit(WithLoggerAndInterval):
         )
         set_series_row_to_df(intervals_stats, fit_series, 0)
         for df in [intervals_stats, segment_stats]:
-            df['rmsea'] = df['rmsea'].astype(np.float32)
+            df[['bg_r', 'bg_p', 'rmsea', 'bg_tr']] = df[['bg_r', 'bg_p', 'rmsea', 'bg_tr']].astype(np.float32)
         return pd.concat([intervals_stats, segment_stats], ignore_index=True)
 
 
