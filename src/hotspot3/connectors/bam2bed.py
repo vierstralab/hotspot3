@@ -4,6 +4,7 @@ from collections import defaultdict
 import pysam
 import pandas as pd
 from io import StringIO
+import tempfile
 
 from hotspot3.io.logging import WithLogger
 from hotspot3.helpers.models import NotEnoughDataForContig
@@ -49,8 +50,11 @@ class BamFileCutsExtractor(WithLogger):
         """
         Run bam2bed for a single chromosome. Returns a pandas DataFrame.
         """
-        result = run_bam2bed(bam_path, chromosome, reference_fasta=reference_fasta)
-        df = pd.read_table(StringIO(result.stdout))
+        with tempfile.NamedTemporaryFile(dir=self.config.tmp_dir, suffix=".bed", delete=False) as tmp:
+            tmp_path = tmp.name
+            run_bam2bed(bam_path, chromosome, '>', tmp_path, reference_fasta=reference_fasta)
+            df = pd.read_table(tmp_path)
+        
         return df.drop(columns=['#chr'])
 
     def extract_reads_pysam(self, bam_path, chromosome) -> pd.DataFrame:
