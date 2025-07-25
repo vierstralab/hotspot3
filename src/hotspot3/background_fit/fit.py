@@ -202,7 +202,7 @@ class GlobalBackgroundFit(BackgroundFit):
             step (int): Step to reduce computational burden and improve speed. Can be set to 1 for full resolution.
             fallback_fit_results (FitResults): Fallback fit results to use if the fit has failed.
         """
-        print('No warning')
+
         data_for_fit = self.prepare_data_for_fit(agg_cutcounts, step, fallback_fit_results)
         best_fit_result = self.fit_and_choose_best(data_for_fit)
         if not check_valid_nb_params(best_fit_result):
@@ -210,7 +210,6 @@ class GlobalBackgroundFit(BackgroundFit):
                 best_fit_result = self.fit_and_choose_best(data_for_fit, fallback_fit_results)
             else:
                 raise NotEnoughDataForContig
-        print('No warning?')
         best_fit_result.n_total = agg_cutcounts.count()
         signal_mask = self.get_signal_mask_for_tr(
             agg_cutcounts,
@@ -225,7 +224,9 @@ class GlobalBackgroundFit(BackgroundFit):
         return best_fit_result
     
     def fit_and_choose_best(self, data_for_fit: DataForFit, fallback_fit_results: FitResults=None):
+        print('No warning')
         result = self.fit_all_thresholds(data_for_fit, fallback_fit_results)
+        print('No warning?')
         if len(result) == 0: # No valid fits => fit all data
             best_fit_result = self.fit_for_tr(
                 data_for_fit,
