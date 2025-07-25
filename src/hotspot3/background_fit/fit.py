@@ -170,12 +170,13 @@ class BackgroundFit(BottleneckWrapper):
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
         expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
+        print('No warning')
         df = np.sum(
             np.diff(bin_edges, axis=0) != 0,
             axis=0,
             where=valid_bins
         ) - n_params - 1
-        print('No warning')
+
         rmsea = calc_rmsea(
             value_counts_per_bin,
             expected_counts,
