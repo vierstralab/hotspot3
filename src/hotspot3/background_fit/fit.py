@@ -66,6 +66,7 @@ class BackgroundFit(BottleneckWrapper):
         return value_counts
     
     def get_all_bins(self, array: np.ndarray, fallback_fit_results: FitResults=None):
+        print("No warning1")
         min_bg_tr = self.quantile_ignore_all_na(array, self.config.min_background_prop)
         signal_bins, n_signal_bins = self.get_signal_bins(
             array,
@@ -83,6 +84,7 @@ class BackgroundFit(BottleneckWrapper):
                 n_bg_bins + 1,
             )
         )
+        print("No warning1?")
         
         return np.concatenate([bg_bins[:-1], signal_bins]), n_signal_bins
 
