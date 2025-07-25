@@ -108,9 +108,11 @@ class BackgroundFit(BottleneckWrapper):
         bin_edges = np.full((n_signal_bins + 1, *min_bg_tr.shape), np.nan, dtype=np.float32)
         print("No warning1", n_signal_bins, min_bg_tr, max_bg_tr)
         nan_tr = np.isnan(min_bg_tr) | np.isnan(max_bg_tr)
-        bin_edges[:, ~nan_tr] = np.round(
-            np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
-        )
+        with np.errstate(invalid='ignore'):
+            bin_edges[:, ~nan_tr] = np.round(
+                np.linspace(min_bg_tr[~nan_tr], max_bg_tr[~nan_tr], n_signal_bins + 1)
+            )
+            bin_edges[0, ~nan_tr] = min_bg_tr[~nan_tr]
         print("No warning1?", bin_edges)
 
         return bin_edges, n_signal_bins
