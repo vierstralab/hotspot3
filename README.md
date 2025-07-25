@@ -64,7 +64,7 @@ Once the environment is activated:
 ```
 pip install hotspot3
 ```
-Or to install in developer mode
+Or to install in the developer mode:
 ```
 git clone https://github.com/vierstralab/hotspot3.git
 cd hotspot3
