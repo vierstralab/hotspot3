@@ -64,11 +64,12 @@ Once the environment is activated:
 ```
 pip install hotspot3
 ```
-
+Or to install in developer mode
+```
 git clone https://github.com/vierstralab/hotspot3.git
 cd hotspot3
 pip install -e .
-
+```
 ## 3. Test installation
 You can check that the CLI is working with:
 ```
