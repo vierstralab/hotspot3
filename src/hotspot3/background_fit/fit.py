@@ -330,12 +330,12 @@ class GlobalBackgroundFit(BackgroundFit):
         
         if calc_rmsea: # Used to bypass RMSEA calculation
             # in the code used when np.inf passed 
-            print('No warning')
             value_counts = self.value_counts_per_bin(
                 agg_cutcounts[:, None],
                 bin_edges,
                 where=~assumed_signal_mask[:, None]
             )
+            print('No warning')
             rmsea = self.calc_rmsea_all_windows(
                 p,
                 r,
