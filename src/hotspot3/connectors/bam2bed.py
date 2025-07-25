@@ -19,7 +19,7 @@ def run_bam2bed(*args, reference_fasta=None):
                 cmd,
                 check=True,
                 text=True,
-                capture_output=True,
+                # capture_output=True,
                 shell=True,
             )
         except subprocess.CalledProcessError as e:
