@@ -164,10 +164,9 @@ class BackgroundFit(BottleneckWrapper):
         valid_bins = np.ones_like(value_counts_per_bin, dtype=bool)
         bg_sum_mappable = np.sum(value_counts_per_bin, axis=0, where=valid_bins)
 
-        print('No warning')
         sf_values = np.where(bin_edges == 0, 1., betainc(bin_edges, r, p))
         sf_diffs = -np.diff(sf_values, axis=0)
-        print('No warning?')
+       
         assert sf_diffs.shape == value_counts_per_bin.shape, f"SF diffs shape should match value counts shape. Got SF: {sf_diffs.shape} and vc: {value_counts_per_bin.shape}"
         norm_coef = 1 - sf_values[-1]
         expected_counts = (sf_diffs * bg_sum_mappable / norm_coef)
@@ -176,13 +175,16 @@ class BackgroundFit(BottleneckWrapper):
             axis=0,
             where=valid_bins
         ) - n_params - 1
-        return calc_rmsea(
+        print('No warning')
+        rmsea = calc_rmsea(
             value_counts_per_bin,
             expected_counts,
             bg_sum_mappable,
             df,
             where=valid_bins
         )
+        print('No warning?')
+        return rmsea
 
     def get_bg_quantile_from_tr(self, agg_cutcounts: np.ndarray, tr: float):
         with np.errstate(invalid='ignore'):
