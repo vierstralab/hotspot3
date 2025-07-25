@@ -545,7 +545,7 @@ class ChromosomeProcessor(WithLoggerAndInterval):
     @ensure_contig_exists
     def fit_background_model(self, cutcounts_file) -> ProcessorOutputData:
         """
-        Fit background model to cutcounts and save fit parameters to a bed file.
+        Fit background model to cutcounts and save fit parameters to a bed.gz file.
         """
         agg_cutcounts = self.reader.extract_mappable_agg_cutcounts(
             cutcounts_file,
