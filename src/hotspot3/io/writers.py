@@ -144,9 +144,14 @@ class GenomeWriter(WithLogger):
         with tempfile.NamedTemporaryFile(suffix=".bed") as temp_sorted_bed:
             df.to_csv(temp_sorted_bed.name, sep='\t', header=False, index=False)
             try:
-                subprocess.run(["bedToBigBed", temp_sorted_bed.name, chrom_sizes, outpath], check=True)
+                subprocess.run(
+                    ["bedToBigBed", temp_sorted_bed.name, chrom_sizes, outpath],
+                    capture_output=True,
+                    text=True, 
+                    check=True
+                )
             except subprocess.CalledProcessError as e:
-                self.logger.warning(f"Error converting to BigBed: {e}")
+                self.logger.warning(f"Error converting to BigBed: {e}, {e.stderr}")
 
     def merge_partitioned_parquets(self, parquet_old, parquet_new):
         for file in os.listdir(parquet_old):
