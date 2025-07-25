@@ -178,7 +178,7 @@ class GenomeProcessor(WithLogger):
             - outpath: Path to save the cutcounts to.
         """
         self.logger.info('Extracting cutcounts from bam file')
-        if self.cpus >= 10:
+        if False: # self.cpus >= 10: # FIXME make it work for large cpu (now concurent read to cram make the script fail for some reason)
             data = self.parallel_by_chromosome(
                 ChromosomeProcessor.extract_cutcounts_for_chromosome,
                 bam_path,
