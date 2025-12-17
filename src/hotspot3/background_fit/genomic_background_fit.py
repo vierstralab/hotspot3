@@ -59,7 +59,10 @@ class SegmentalFit(WithLoggerAndInterval):
             min_bg_tag_proportion: np.ndarray=None
         ):
         total_len = agg_cutcounts.count()
-        intervals_stats = genomic_intervals_to_df(bad_segments).drop(columns=['chrom', 'name'])
+        intervals_stats = genomic_intervals_to_df(bad_segments).drop(
+            columns=['chrom'],
+            errors='ignore'
+        )
         if min_bg_tag_proportion is not None:
             assert len(min_bg_tag_proportion) == len(bad_segments), "min_bg_tag_proportion should have the same length as segments"
         self.logger.debug(f"{self.genomic_interval.chrom}: Fitting background model for {len(bad_segments)} segments")
