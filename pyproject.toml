@@ -29,7 +29,7 @@ dependencies = [
   "pyBigWig",
   "networkx",
   "babachi==3.0.0",
-  "genome-tools==2.0.0",
+  "genome-tools>=2.0.0",
 ]
 [project.urls]
 Homepage = "https://github.com/vierstralab/hotspot3"
