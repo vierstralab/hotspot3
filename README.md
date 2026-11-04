@@ -44,6 +44,7 @@ hotspot3 is optimized for scalability on large datasets with chromosome-level pa
 # Command line interface
 - `hotspot3` - Call peaks from input data using MODWT-smoothed signal and local background estimation.
 - `hotspot3-pvals` - (Experimental) Extract raw p-values for regions defined in a reference BED file. This is useful when comparing or aggregating signal across multiple samples at predefined loci (e.g., shared peak positions), enabling downstream consensus ("core") peak calling.
+- `hotspot3-trackhub` - Write a single-file UCSC track hub to view a sample's results in the genome browser: normalized density with the background overlaid, hotspots and peaks at several FDRs. Each file is given explicitly (`--density_bw`, `--background_bw`, `--hotspots_bb FDR FILE`, `--peaks_bb FDR FILE`; local paths or URLs); the hub links the track description page in this repository ([trackhub_description.html](docs/trackhub_description.html)); example in [Visualizing results in a genome browser](#visualizing-results-in-a-genome-browser), all options in `hotspot3-trackhub --help`.
 # Installation
 ## Prerequisites
 `conda` (recommended: `mamba` for faster solves)
@@ -206,6 +207,21 @@ You can load the following files in IGV or the UCSC Genome Browser for interacti
 
 - `{sample_id}.hotspots.fdr{fdr}.bb` - called hotspots at each FDR threshold
 - `{sample_id}.peaks.fdr{fdr}.bb` - **(green track)** Called peaks at each FDR threshold.
+
+To load all of them at once, write a UCSC track hub with `hotspot3-trackhub`, e.g. for a sample on [regulome](https://regulome.altius.org):
+```bash
+hotspot3-trackhub --name AG95384 \
+    --density_bw https://regulome.altius.org/data/per_sample/AG95384/AG95384.normalized_density.bw \
+    --background_bw https://regulome.altius.org/data/per_sample/AG95384/peaks/AG95384.background.bw \
+    --hotspots_bb 0.001 https://regulome.altius.org/data/per_sample/AG95384/peaks/fdr0.001/AG95384.hotspots.fdr0.001.bb \
+    --hotspots_bb 0.01 https://regulome.altius.org/data/per_sample/AG95384/peaks/fdr0.01/AG95384.hotspots.fdr0.01.bb \
+    --hotspots_bb 0.05 https://regulome.altius.org/data/per_sample/AG95384/peaks/fdr0.05/AG95384.hotspots.fdr0.05.bb \
+    --peaks_bb 0.001 https://regulome.altius.org/data/per_sample/AG95384/peaks/fdr0.001/AG95384.peaks.fdr0.001.bb \
+    --peaks_bb 0.01 https://regulome.altius.org/data/per_sample/AG95384/peaks/fdr0.01/AG95384.peaks.fdr0.01.bb \
+    --peaks_bb 0.05 https://regulome.altius.org/data/per_sample/AG95384/peaks/fdr0.05/AG95384.peaks.fdr0.05.bb \
+    --out AG95384.hub.txt
+```
+The hub is a single file. Put it on any public web server and paste its URL into the UCSC browser (My Data > Track Hubs), or pass that URL as `--hub_url` to print a link that opens the hub. Files can also be local paths.
 
 
 ## Flagging problematic segments

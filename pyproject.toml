@@ -39,6 +39,7 @@ hotspot3 = "hotspot3.cli:main"
 hotspot3-track-mem = "hotspot3.track_memory:main"
 hotspot3-fdr = "hotspot3.multiple_sample_fdr:main"
 hotspot3-pvals = "hotspot3.extract_pvals:main"
+hotspot3-trackhub = "hotspot3.ucsc_trackhub:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
