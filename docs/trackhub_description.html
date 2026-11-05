@@ -1,0 +1,61 @@
+<html>
+<head>
+
+</head>
+
+<body>
+
+	<h2>hotspot3 peak calls for chromatin accessibility data</h2>
+	<h3>Description</h3>
+	<p>hotspot3 is a peak caller for chromatin accessibility data. It is tailored to work on datasets without a control experiment (ATAC-seq and DNase-seq) using adaptive estimation of the background (nonspecific cleavages) with a negative binomial distribution. hotspot3 accounts for variation in both total signal level and signal-to-background ratio along the genome.</p>
+
+	<h3>Data included in this trackhub</h3>
+	<ul>
+		<li><b>Density and background</b> (overlaid):
+			<ul>
+				<li>Normalized density (black): per-base cut count density, in cuts per million.</li>
+				<li>Background (orange): estimated background level at each position, from the local negative binomial model (corresponds raw p-value cutoff 0.005). Signal above the orange track exceeds the modeled background and can potentially be significant (after FDR correction).</li>
+			</ul>
+		</li>
+		<li><b>Hotspots</b> at each FDR threshold: contiguous regions of signal enrichment. Thick blocks mark stretches of significant bases; the score reflects the maximum -log10 FDR in the hotspot. Darker purple marks more stringent FDR thresholds.</li>
+		<li><b>Peaks</b> at each FDR threshold: peaks detected from the smoothed signal that overlap significant bases. The tick marks the peak summit; the score reflects the maximum density in the peak. Darker green marks more stringent FDR thresholds.</li>
+	</ul>
+
+	<h3>Methods</h3>
+	<p>The main algorithm steps are:
+		<ol>
+			<li><b>Adaptive background modeling</b> using a negative binomial distribution, fitted within locally uniform genomic segments.</li>
+			<li><b>Bayesian segmentation</b> (via <a href="https://github.com/autosome-ru/BABACHI" target="_blank">BABACHI</a>) to partition the genome into regions with a homogeneous background (i.e., similar signal-to-noise ratio, modeled using a common overdispersion parameter in the background model).</li>
+			<li><b>Per-base statistical testing</b> to assign p-values and estimate FDR for enrichment at each position.</li>
+			<li><b>Signal smoothing</b> using the Maximal Overlap Discrete Wavelet Transform (MODWT) to suppress local noise and normalize fine-scale variability (e.g., transcription factor footprints).</li>
+			<li><b>Hotspot calling</b>, which identifies contiguous regions of signal enrichment at a specified FDR threshold.</li>
+			<li><b>Peak calling</b>, which detects peaks from the smoothed signal and reports those that overlap with significant bases.</li>
+		</ol>
+	</p>
+
+	<h4>Background model</h4>
+	<p>The background is fitted separately in each segment. Only the lower part of the signal distribution is modeled as background (by default the lowest 99.5% of positions), which excludes extreme outliers such as regions with unusually high coverage. Segments whose fit assigns too much signal (a signal-to-noise ratio above 5x the global weighted median) are re-fit with a minimum background proportion, which prevents overcalling peaks, e.g. near telomeres and centromeres. In segments where a negative binomial distribution cannot be fitted (typically very low signal), no peaks are called.</p>
+
+	<h4>Track encoding</h4>
+	<table border="1" cellpadding="4" cellspacing="0">
+		<tr><th>Track</th><th>Score (0-1000)</th><th>Blocks</th><th>Color</th></tr>
+		<tr><td>Hotspots</td><td>10 x maximum -log10 FDR in the hotspot</td><td>stretches of bases significant at the FDR threshold, plus 1 bp marks at the hotspot start and end</td><td rowspan="2">by FDR threshold: darkest for 0.001, then 0.01, 0.05, 0.1; gray above 0.1</td></tr>
+		<tr><td>Peaks</td><td>100 x maximum normalized density in the peak</td><td>1 bp marks at the peak start, summit (thick) and end</td></tr>
+	</table>
+
+	<h4>Quality control</h4>
+	<p>For each segment, hotspot3 reports the background fit (<code>{sample_id}.fit_stats.bed.gz</code>) and the SPOT score (Signal Proportion Of Tags): the proportion of tags not used to fit the background, i.e. signal tags. The overall SPOT score, the weighted median of segment SPOT scores, is a dataset-level quality metric. See <a href="https://github.com/vierstralab/hotspot3#flagging-problematic-segments" target="_blank">Flagging problematic segments</a> for how to interpret the segment flags.</p>
+
+	<h3>Code and documentation</h3>
+	<p>
+		Code and documentation are available on <a href="https://github.com/vierstralab/hotspot3" target="_blank">GitHub</a>: <a href="https://github.com/vierstralab/hotspot3#output-files" target="_blank">output files</a> and <a href="https://github.com/vierstralab/hotspot3#interpreting-output" target="_blank">interpreting output</a>.
+	</p>
+
+	<h3>Credits</h3>
+	<p>Developed by Sergey Abramov, Alexandr Boytsov and Jeff Vierstra, Altius Institute for Biomedical Sciences.</p>
+
+	<p>Please direct questions and comments to the <a href="https://github.com/vierstralab/hotspot3/issues" target="_blank">GitHub issue tracker</a>.</p>
+
+</body>
+
+</html>

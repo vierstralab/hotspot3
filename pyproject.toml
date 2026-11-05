@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hotspot3"
-version = "1.0.1"
+version = "1.0.2"
 description = "Chromatin accessibility peak caller with an adaptive background model"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -29,7 +29,7 @@ dependencies = [
   "pyBigWig",
   "networkx",
   "babachi==3.0.0",
-  "genome-tools==2.0.0",
+  "genome-tools>=2.0.0",
 ]
 [project.urls]
 Homepage = "https://github.com/vierstralab/hotspot3"
@@ -39,6 +39,7 @@ hotspot3 = "hotspot3.cli:main"
 hotspot3-track-mem = "hotspot3.track_memory:main"
 hotspot3-fdr = "hotspot3.multiple_sample_fdr:main"
 hotspot3-pvals = "hotspot3.extract_pvals:main"
+hotspot3-trackhub = "hotspot3.ucsc_trackhub:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -50,7 +51,7 @@ where = ["src"]
 hotspot3 = ["scripts/extract_cutcounts.sh"]
 
 [tool.bumpversion]
-current_version = "1.0.0"
+current_version = "1.0.2"
 commit = true
 tag = true
 
