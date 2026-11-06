@@ -13,6 +13,8 @@ hotspot3 is optimized for scalability on large datasets with chromosome-level pa
 
 ⚠️ hotspot3 has been primarily tested on the datasets with 10 million or more tags. Lower coverage may work, but the results could be less stable.
 
+Coding agents: read [AGENTS.md](AGENTS.md) first.
+
 ## Table of contents
 
 - [Command line interface](#command-line-interface)
