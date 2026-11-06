@@ -5,9 +5,8 @@ counts -> MODWT-smoothed signal -> negative binomial background fitted per genom
 (segments from BABACHI) -> per-base p-values -> FDR -> hotspots and peaks at each FDR.
 User docs are in `README.md` (CLI arguments, output files, how to read `fit_stats`).
 
-Everything is parallel by chromosome. Downstream: genome-tools plot components
-(`genome_tools.plotting.modular_plot.plot_components.hotspot3`), regulome per-sample releases,
-vinson tutorials.
+Everything is parallel by chromosome. Downstream: visualization with genome-tools (https://github.com/vierstralab/genome-tools/blob/master/AGENTS.md) plot components
+(`genome_tools.plotting.modular_plot.plot_components.hotspot3`).
 
 ## Where things are
 
@@ -86,7 +85,7 @@ Names and sizes are in `README.md` ("Output files"). For code that reads them:
 - `--debug` both raises the log level and sets `save_debug`.
 - Memory scales with `cpus` (~80 GB at 6, >150 GB at 24): one chromosome per worker is held in
   memory at full per-base resolution.
-- `numpy==1.26.0` and `babachi==3.0.0` are pinned in `pyproject.toml`; don't bump them as a side
+- `numpy<2.0` and `babachi==3.0.0` are pinned in `pyproject.toml`; don't bump them as a side
   effect of other changes.
 
 ## Working in this repo
