@@ -127,13 +127,13 @@ class GenomeProcessor(WithLogger):
         args = self.construct_parallel_args(*args)
         self.logger.debug(f'Using {cpus} CPUs to {func.__name__}')
         results = []
-        if self.cpus == 1:
+        if cpus == 1:
             for func_args in zip(*args):
                 result = func(*func_args)
                 if result is not None:
                     results.append(result)
         else:
-            with ProcessPoolExecutor(max_workers=self.cpus) as executor:
+            with ProcessPoolExecutor(max_workers=cpus) as executor:
                 try:
                     for result in executor.map(func, *args):
                         if result is not None:

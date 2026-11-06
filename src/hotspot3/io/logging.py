@@ -31,14 +31,15 @@ class WithLogger:
         self._logger = logger
     
     def __getstate__(self):
-        state = self.__dict__
-        if 'logger' in state:
-            del state['logger']
+        # don't pickle the logger, it is recreated in the worker process
+        state = self.__dict__.copy()
+        state.pop('_logger', None)
         return state
 
     def __setstate__(self, state: dict):
         for name, value in state.items():
             setattr(self, name, value)
+        self._logger = setup_logger(level=self.config.logger_level)
 
 
     def copy_with_params(self, cls: Type[T], **kwargs) -> T:

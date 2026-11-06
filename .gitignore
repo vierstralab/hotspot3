@@ -4,3 +4,6 @@
 *dist/
 *data/
 *test/
+# macOS
+.DS_Store
+._*
