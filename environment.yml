@@ -8,7 +8,6 @@ dependencies:
   - pip
   - samtools
   - libflint
-  - ucsc-bedgraphtobigwig
   - bioconda::ucsc-bedtobigbed
   - bioconda::pybigwig
   - bioconda::bedops

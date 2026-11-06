@@ -68,13 +68,15 @@ def run_process_with_memory_tracking(cmd, logger: logging.Logger):
         
 
 def main():
-    args, logger_level = parse_arguments(" with memory tracking. Creates {args.id}.memory_usage.tsv in output folder.")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    cmd = ["python3", f"{script_dir}/main.py", *sys.argv[1:]]
+    args = parse_arguments(" with memory tracking. Creates {id}.memory_usage.tsv in output folder.")
+    logger_level = logging.DEBUG if args.debug else logging.INFO
+    cmd = [sys.executable, "-m", "hotspot3", *sys.argv[1:]]
 
+    os.makedirs(args.outdir, exist_ok=True)
     memory_log = f"{args.outdir}/{args.id}.memory_usage.tsv"
-    logger = setup_logger(level=logger_level, outstream=memory_log)
-    run_process_with_memory_tracking(cmd, logger)
+    with open(memory_log, "w") as outstream:
+        logger = setup_logger(name="hotspot3.memory", level=logger_level, outstream=outstream)
+        run_process_with_memory_tracking(cmd, logger)
 
 
 if __name__ == "__main__":

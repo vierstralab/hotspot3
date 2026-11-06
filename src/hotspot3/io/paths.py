@@ -40,6 +40,7 @@ class Hotspot3Paths:
         self.outdir = outdir
         self.sample_id = sample_id
         self.outdir = Path(self.outdir)
+        self.outdir.mkdir(parents=True, exist_ok=True)
 
         allowed_keys = {
             k for k, v in self.__class__.__dict__.items()
