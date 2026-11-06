@@ -24,12 +24,12 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
 
     parser.add_argument(
         "--chrom_sizes", 
-        help="Path to chromosome sizes file. If none assumed to be hg38 sizes",
+        help="(Required) Path or URL to chromosome sizes file",
         default=None
     )
     parser.add_argument(
         "--fdrs", 
-        help="List of FDR thresholds, space separated",
+        help="List of FDR thresholds, space separated. Default: 0.05",
         type=float, 
         nargs='+',
         default=[0.05]
@@ -106,7 +106,7 @@ def parse_arguments(extra_desc: str = "") -> argparse.Namespace:
 
     parser.add_argument(
         "--fdrs_parquet",
-        help="Path to pre-calculated fdrs. Can correct for several samples using multiple_samples_fdr.py",
+        help="Path to pre-calculated partitioned parquet file(s) with per-bp FDRs. Skips FDR calculation",
         default=None
     )
 
