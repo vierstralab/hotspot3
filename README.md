@@ -74,6 +74,7 @@ Once the environment is activated:
 ```
 pip install hotspot3
 ```
+⚠️ Install hotspot3 into the conda environment from step 1. `pip install hotspot3` on its own installs only the Python dependencies: without `samtools`, `bedops` and `bgzip`, cut counts can't be extracted from BAM/CRAM files (precomputed ones can still be passed with `--cutcounts`), and without `bedToBigBed` the bigBed files are skipped with a warning.
 Or to install in the developer mode:
 ```
 git clone https://github.com/vierstralab/hotspot3.git

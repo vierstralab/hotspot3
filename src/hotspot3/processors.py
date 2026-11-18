@@ -310,7 +310,7 @@ class GenomeProcessor(WithLogger):
         per_region_params['refit_with_constraint'] = sn_fit.find_outliers(per_region_params)
 
         # keep track of all segments that have been refitted through the iterations
-        refit_with_constraint = per_region_params['refit_with_constraint'].values
+        refit_with_constraint = per_region_params['refit_with_constraint'].values.copy()
 
         for iteration in range(1, self.config.max_outlier_iterations + 1):
             is_outlier_segment = per_region_params['refit_with_constraint']

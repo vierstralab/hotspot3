@@ -150,8 +150,8 @@ class GenomeWriter(WithLogger):
                     text=True, 
                     check=True
                 )
-            except subprocess.CalledProcessError as e:
-                self.logger.warning(f"Error converting to BigBed: {e}, {e.stderr}")
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                self.logger.warning(f"Error converting to BigBed: {e}, {getattr(e, 'stderr', '')}")
 
     def merge_partitioned_parquets(self, parquet_old, parquet_new):
         for file in os.listdir(parquet_old):
