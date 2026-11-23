@@ -84,7 +84,8 @@ Names and sizes are in `README.md` ("Output files"). For code that reads them:
   coordinates beyond `chrom_sizes` raise `ValueError`.
 - `--debug` both raises the log level and sets `save_debug`.
 - Duplicates are counted (reads are used as is). Above ~50% duplication the negative binomial
-  background fit breaks down; such libraries should be downsampled before peak calling.
+  background fit breaks down; such libraries should be downsampled before peak calling
+  (how: [nf-aligning README](https://github.com/vierstralab/nf-aligning#libraries-with-a-high-duplication-rate)).
 - Memory scales with `cpus` (~80 GB at 6, >150 GB at 24): one chromosome per worker is held in
   memory at full per-base resolution.
 - `numpy<2.0` and `babachi==3.0.0` are pinned in `pyproject.toml`; don't bump them as a side
