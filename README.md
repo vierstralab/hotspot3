@@ -13,6 +13,8 @@ hotspot3 is optimized for scalability on large datasets with chromosome-level pa
 
 ⚠️ hotspot3 has been primarily tested on the datasets with 10 million or more tags. Lower coverage may work, but the results could be less stable.
 
+⚠️ The background model assumes that nonspecific cleavages follow a negative binomial distribution. Reads are counted as is, including duplicates, so in libraries with a high duplication rate this assumption breaks down and peak calling can produce unexpected results. Downsample such libraries before peak calling: in our data, hotspot3 works reliably at a duplication rate below 50%.
+
 Coding agents: read [AGENTS.md](AGENTS.md) first.
 
 ## Table of contents
